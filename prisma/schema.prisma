@@ -1,0 +1,199 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - linked to Supabase Auth
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  avatar_url    String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Relations
+  team_members  TeamMember[]
+  created_content     Content[] @relation("CreatedBy")
+  assigned_content    Content[] @relation("AssignedTo")
+  comments       Comment[]
+  content_versions ContentVersion[]
+
+  @@map("users")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  settings  Json     @default("{}")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  members       TeamMember[]
+  content       Content[]
+  templates     Template[]
+  platforms     PlatformAccount[]
+  comments      Comment[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  user_id   String
+  team_id   String
+  role      TeamRole @default(EDITOR)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, team_id])
+  @@map("team_members")
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Content {
+  id            String        @id @default(cuid())
+  team_id       String
+  title         String
+  blocks        Json          @default("[]") // Block-based content
+  status        ContentStatus @default(DRAFT)
+  scheduled_at  DateTime?
+  published_at  DateTime?
+  platforms     Json          @default("[]") // Array of platform configurations
+  created_by    String
+  assigned_to   String?
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+
+  // Relations
+  team        Team         @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("CreatedBy", fields: [created_by], references: [id])
+  assignedTo  User?        @relation("AssignedTo", fields: [assigned_to], references: [id])
+  versions    ContentVersion[]
+  schedules   ContentSchedule[]
+  comments    Comment[]
+
+  @@index([team_id])
+  @@index([status])
+  @@index([scheduled_at])
+  @@map("content")
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+model ContentVersion {
+  id          String   @id @default(cuid())
+  content_id  String
+  blocks      Json
+  created_by  String
+  created_at  DateTime @default(now())
+
+  content Content @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  creator User    @relation(fields: [created_by], references: [id])
+
+  @@map("content_versions")
+}
+
+model ContentSchedule {
+  id               String         @id @default(cuid())
+  content_id       String
+  platform_account_id String
+  scheduled_at     DateTime
+  status           ScheduleStatus @default(PENDING)
+  platform_post_id String?
+  error_message    String?
+  created_at       DateTime       @default(now())
+
+  content       Content         @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  platformAccount PlatformAccount @relation(fields: [platform_account_id], references: [id], onDelete: Cascade)
+
+  @@map("content_schedules")
+}
+
+enum ScheduleStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model PlatformAccount {
+  id            String   @id @default(cuid())
+  team_id       String
+  user_id       String
+  platform      String   // twitter, linkedin, instagram, etc.
+  account_id    String
+  account_name  String?
+  avatar_url    String?
+  access_token  String
+  refresh_token String?
+  settings      Json     @default("{}")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  team      Team              @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  schedules ContentSchedule[]
+
+  @@unique([team_id, platform, account_id])
+  @@map("platform_accounts")
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  team_id   String
+  name      String
+  category  String?
+  blocks    Json
+  is_public Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
+
+  @@map("templates")
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  content_id  String
+  user_id     String
+  team_id     String
+  parent_id   String?
+  text        String
+  mentions    Json     @default("[]")
+  resolved_at DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  content    Content   @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id])
+  team       Team      @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  parent     Comment?  @relation("CommentThread", fields: [parent_id], references: [id])
+  replies    Comment[] @relation("CommentThread")
+
+  @@map("comments")
+}
