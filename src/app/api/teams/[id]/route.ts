@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// GET /api/teams/[id] - Get single team with members
+// GET /api/teams/[id] - Get single team
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -16,36 +16,22 @@ export async function GET(
 
     const { id } = await params
 
-    // Get team
-    const { data: team, error: teamError } = await supabase
+    const { data, error } = await supabase
       .from('teams')
       .select('*')
       .eq('id', id)
       .single()
 
-    if (teamError) {
-      console.error('Error fetching team:', teamError)
-      return NextResponse.json({ error: teamError.message }, { status: 500 })
+    if (error) {
+      console.error('Error fetching team:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Get team members
-    const { data: members, error: membersError } = await supabase
-      .from('team_members')
-      .select(`
-        *,
-        user:user_id(id, name, email, avatar_url)
-      `)
-      .eq('team_id', id)
-
-    if (membersError) {
-      console.error('Error fetching members:', membersError)
-      return NextResponse.json({ error: membersError.message }, { status: 500 })
+    if (!data) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      ...team,
-      members: members || [],
-    })
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error in GET /api/teams/[id]:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -58,7 +44,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -67,11 +53,13 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
-    const { name, slug, settings } = body
+    const { name, settings } = body
 
-    const updateData: Record<string, unknown> = {}
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
     if (name !== undefined) updateData.name = name
-    if (slug !== undefined) updateData.slug = slug
     if (settings !== undefined) updateData.settings = settings
 
     const { data, error } = await supabase
@@ -99,7 +87,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -108,10 +96,10 @@ export async function DELETE(
 
     const { id } = await params
 
-    // First delete team members
-    await supabase.from('team_members').delete().eq('team_id', id)
-    // Then delete team
-    const { error } = await supabase.from('teams').delete().eq('id', id)
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', id)
 
     if (error) {
       console.error('Error deleting team:', error)

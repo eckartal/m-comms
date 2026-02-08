@@ -22,21 +22,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useTeamStore } from '@/stores'
+import { useAppStore } from '@/stores'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { Team, TeamMember } from '@/types'
 
 export function TeamSwitcher() {
   const router = useRouter()
-  const { currentTeam, setCurrentTeam, teams } = useTeamStore()
+  const { currentTeam, setCurrentTeam, teams } = useAppStore()
   const [showNewTeam, setShowNewTeam] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
 
   const handleTeamChange = (member: TeamMember) => {
-    if (!member.teams) return
-    setCurrentTeam(member.teams as Team)
-    router.push(`/${member.teams.slug}`)
+    if (!member.team) return
+    setCurrentTeam(member.team as Team)
+    router.push(`/${member.team.slug}`)
   }
 
   const handleCreateTeam = async () => {
@@ -63,19 +63,19 @@ export function TeamSwitcher() {
           <DropdownMenuLabel>Your Teams</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {teams.map((member) => (
-            member.teams && (
+            member.team && (
               <DropdownMenuItem
-                key={member.teams.id}
+                key={member.team.id}
                 onClick={() => handleTeamChange(member)}
                 className="gap-2"
               >
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={member.teams.logo || undefined} />
+                  <AvatarImage src={member.team.logo || undefined} />
                   <AvatarFallback className="text-xs">
-                    {member.teams.name.charAt(0)}
+                    {member.team.name.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate">{member.teams.name}</span>
+                <span className="truncate">{member.team.name}</span>
               </DropdownMenuItem>
             )
           ))}

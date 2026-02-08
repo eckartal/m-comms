@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 // GET /api/teams - List user's teams
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -31,7 +31,8 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const teams = data?.map((tm) => tm.team) || []
+    type TeamMemberData = { team: unknown }
+    const teams = (data as TeamMemberData[])?.map((tm) => tm.team) || []
     return NextResponse.json(teams)
   } catch (error) {
     console.error('Error in GET /api/teams:', error)
@@ -42,7 +43,7 @@ export async function GET() {
 // POST /api/teams - Create new team
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

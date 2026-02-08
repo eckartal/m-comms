@@ -1,49 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react'
-import { useTeamStore } from '@/stores'
+import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
 
-// Mock scheduled content
-const mockScheduled = [
+type ContentItem = {
+  id: string
+  title: string
+  scheduledAt: string | null
+  platforms: string[]
+}
+
+// Mock scheduled content (using API format)
+const mockScheduled: ContentItem[] = [
   {
     id: '1',
     title: 'Product Launch',
-    date: '2025-02-10',
+    scheduledAt: '2025-02-10T10:00:00Z',
     platforms: ['twitter', 'linkedin'],
-    time: '10:00',
   },
   {
     id: '2',
     title: 'Weekly Newsletter',
-    date: '2025-02-11',
+    scheduledAt: '2025-02-11T09:00:00Z',
     platforms: ['blog'],
-    time: '09:00',
   },
   {
     id: '3',
     title: 'Behind the Scenes',
-    date: '2025-02-12',
+    scheduledAt: '2025-02-12T14:00:00Z',
     platforms: ['instagram'],
-    time: '14:00',
   },
   {
     id: '4',
     title: 'Customer Story',
-    date: '2025-02-12',
+    scheduledAt: '2025-02-12T11:00:00Z',
     platforms: ['linkedin'],
-    time: '11:00',
   },
   {
     id: '5',
     title: 'Industry Insights',
-    date: '2025-02-15',
+    scheduledAt: '2025-02-15T08:00:00Z',
     platforms: ['twitter'],
-    time: '08:00',
   },
 ]
 
@@ -54,9 +57,32 @@ const MONTHS = [
 ]
 
 export default function CalendarPage() {
-  const currentTeam = useTeamStore((state) => state.currentTeam)
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 1, 1)) // February 2025
+  const { currentTeam } = useAppStore()
+  const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [scheduledContent, setScheduledContent] = useState<ContentItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchScheduledContent() {
+      if (!currentTeam?.id) return
+      try {
+        const res = await fetch(`/api/content?teamId=${currentTeam.id}&status=SCHEDULED`)
+        if (res.ok) {
+          const data = await res.json()
+          setScheduledContent(data.data || [])
+        } else {
+          setScheduledContent(mockScheduled)
+        }
+      } catch (error) {
+        console.error('Failed to fetch scheduled content:', error)
+        setScheduledContent(mockScheduled)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchScheduledContent()
+  }, [currentTeam?.id])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -76,7 +102,7 @@ export default function CalendarPage() {
 
   const getContentForDate = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return mockScheduled.filter((item) => item.date === dateStr)
+    return scheduledContent.filter((item) => item.scheduledAt?.startsWith(dateStr))
   }
 
   const selectedDateContent = selectedDate
@@ -85,7 +111,7 @@ export default function CalendarPage() {
 
   function getContentByDate(date: Date) {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    return mockScheduled.filter((item) => item.date === dateStr)
+    return scheduledContent.filter((item) => item.scheduledAt?.startsWith(dateStr))
   }
 
   const renderCalendarDays = () => {
@@ -147,6 +173,25 @@ export default function CalendarPage() {
     }
 
     return days
+  }
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-4">
+          <Skeleton className="lg:col-span-3 h-96" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -231,10 +276,10 @@ export default function CalendarPage() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">
-                          {item.time}
+                          {item.scheduledAt ? new Date(item.scheduledAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                         <div className="flex gap-1">
-                          {item.platforms.map((p) => (
+                          {(item.platforms || []).map((p: string) => (
                             <span key={p} className="text-xs">
                               {p === 'twitter' && '𝕏'}
                               {p === 'linkedin' && 'in'}

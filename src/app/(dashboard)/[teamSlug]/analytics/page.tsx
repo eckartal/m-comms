@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   TrendingUp,
   TrendingDown,
@@ -15,7 +15,7 @@ import {
   Download,
   Calendar,
 } from 'lucide-react'
-import { useTeamStore } from '@/stores'
+import { useAppStore } from '@/stores'
 
 // Mock analytics data
 const overviewStats = [
@@ -98,8 +98,54 @@ const topPosts = [
 ]
 
 export default function AnalyticsPage() {
-  const currentTeam = useTeamStore((state) => state.currentTeam)
+  const { currentTeam } = useAppStore()
   const [period, setPeriod] = useState('7d')
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    overviewStats,
+    platformStats,
+    topPosts,
+  })
+
+  useEffect(() => {
+    async function fetchAnalytics() {
+      if (!currentTeam?.id) return
+      try {
+        const res = await fetch(`/api/analytics?teamId=${currentTeam.id}&period=${period}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.data) {
+            setStats(data.data)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch analytics:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAnalytics()
+  }, [currentTeam?.id, period])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -132,7 +178,7 @@ export default function AnalyticsPage() {
 
       {/* Overview Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {overviewStats.map((stat) => (
+        {stats.overviewStats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
@@ -169,19 +215,19 @@ export default function AnalyticsPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Followers</span>
-              <span className="font-medium">{platformStats.twitter.followers}</span>
+              <span className="font-medium">{stats.platformStats.twitter.followers}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Impressions</span>
-              <span className="font-medium">{platformStats.twitter.impressions}</span>
+              <span className="font-medium">{stats.platformStats.twitter.impressions}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagements</span>
-              <span className="font-medium">{platformStats.twitter.engagements}</span>
+              <span className="font-medium">{stats.platformStats.twitter.engagements}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagement Rate</span>
-              <span className="font-medium text-primary">{platformStats.twitter.engagementRate}</span>
+              <span className="font-medium text-primary">{stats.platformStats.twitter.engagementRate}</span>
             </div>
           </CardContent>
         </Card>
@@ -197,19 +243,19 @@ export default function AnalyticsPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Followers</span>
-              <span className="font-medium">{platformStats.linkedin.followers}</span>
+              <span className="font-medium">{stats.platformStats.linkedin.followers}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Impressions</span>
-              <span className="font-medium">{platformStats.linkedin.impressions}</span>
+              <span className="font-medium">{stats.platformStats.linkedin.impressions}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagements</span>
-              <span className="font-medium">{platformStats.linkedin.engagements}</span>
+              <span className="font-medium">{stats.platformStats.linkedin.engagements}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagement Rate</span>
-              <span className="font-medium text-primary">{platformStats.linkedin.engagementRate}</span>
+              <span className="font-medium text-primary">{stats.platformStats.linkedin.engagementRate}</span>
             </div>
           </CardContent>
         </Card>
@@ -225,19 +271,19 @@ export default function AnalyticsPage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Followers</span>
-              <span className="font-medium">{platformStats.instagram.followers}</span>
+              <span className="font-medium">{stats.platformStats.instagram.followers}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Impressions</span>
-              <span className="font-medium">{platformStats.instagram.impressions}</span>
+              <span className="font-medium">{stats.platformStats.instagram.impressions}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagements</span>
-              <span className="font-medium">{platformStats.instagram.engagements}</span>
+              <span className="font-medium">{stats.platformStats.instagram.engagements}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Engagement Rate</span>
-              <span className="font-medium text-primary">{platformStats.instagram.engagementRate}</span>
+              <span className="font-medium text-primary">{stats.platformStats.instagram.engagementRate}</span>
             </div>
           </CardContent>
         </Card>
@@ -253,7 +299,7 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {topPosts.map((post, index) => (
+            {stats.topPosts.map((post, index) => (
               <div
                 key={post.id}
                 className="flex items-center justify-between rounded-lg border p-4"

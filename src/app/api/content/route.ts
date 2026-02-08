@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 // GET /api/content - List all content
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -35,7 +35,7 @@ export async function GET() {
 // POST /api/content - Create new content
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {

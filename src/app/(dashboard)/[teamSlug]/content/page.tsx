@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -32,10 +32,19 @@ import {
   Copy,
   Calendar,
 } from 'lucide-react'
-import { useTeamStore } from '@/stores'
+import { useAppStore } from '@/stores'
+
+type ContentItem = {
+  id: string
+  title: string
+  status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
+  scheduledAt: string | null
+  platforms: string[]
+  createdAt: string
+}
 
 // Mock data
-const mockContent = [
+const mockContent: ContentItem[] = [
   {
     id: '1',
     title: 'Product Launch Announcement',
@@ -95,15 +104,59 @@ const platformIcons: Record<string, { icon: string; color: string }> = {
 }
 
 export default function ContentPage() {
-  const currentTeam = useTeamStore((state) => state.currentTeam)
+  const { currentTeam } = useAppStore()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [content, setContent] = useState<ContentItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredContent = mockContent.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    async function fetchContent() {
+      if (!currentTeam?.id) return
+      try {
+        const res = await fetch(`/api/content?teamId=${currentTeam.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setContent(data.data || [])
+        } else {
+          // Fallback to mock data if API not available
+          setContent(mockContent)
+        }
+      } catch (error) {
+        console.error('Failed to fetch content:', error)
+        setContent(mockContent)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchContent()
+  }, [currentTeam?.id])
+
+  const filteredContent = content.filter((item) => {
+    const matchesSearch = item.title?.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter
     return matchesSearch && matchesStatus
   })
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
