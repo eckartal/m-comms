@@ -70,7 +70,7 @@ export function Sidebar() {
   const currentTeam = { name: 'Asimov', slug: 'asimovinc' }
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-72 border-r bg-[#F8F9FA] flex flex-col">
+    <aside className="w-72 border-r bg-[#F8F9FA] flex flex-col shrink-0">
       {/* Brand Header */}
       <div className="flex h-14 items-center justify-between border-b px-3">
         <Link href="/" className="flex items-center gap-2">
