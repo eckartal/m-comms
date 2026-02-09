@@ -67,12 +67,23 @@ export function Sidebar() {
     setDrafts(drafts.filter(d => d.id !== id))
   }
 
+  const getRelativeTime = (date: Date) => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+    if (seconds < 60) return 'just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
   const currentTeam = { name: 'Asimov', slug: 'asimovinc' }
 
   return (
-    <aside className="w-72 border-r bg-[#F8F9FA] flex flex-col shrink-0">
+    <aside className="w-[280px] border-r bg-[#F8F9FA] flex flex-col shrink-0 h-full">
       {/* Brand Header */}
-      <div className="flex h-14 items-center justify-between border-b px-3">
+      <div className="flex h-12 items-center justify-between border-b px-3 shrink-0">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-pink-500">
             <span className="text-sm font-bold text-white">A</span>
@@ -100,43 +111,46 @@ export function Sidebar() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b bg-white px-3">
+      <div className="flex border-b bg-white px-2 shrink-0">
         {(['drafts', 'scheduled', 'posted'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'flex-1 px-4 py-3 text-sm font-medium transition-colors relative',
+              'flex-1 px-3 py-2.5 text-sm font-medium transition-colors relative',
               activeTab === tab
                 ? 'text-gray-900'
-                : 'text-muted-foreground hover:text-gray-700'
+                : 'text-gray-500 hover:text-gray-700'
             )}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
             {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
             )}
           </button>
         ))}
       </div>
 
       {/* New Draft Button */}
-      <div className="p-3">
-        <Button className="w-full gap-1.5 bg-gray-200 hover:bg-gray-300 text-gray-900 font-medium">
+      <div className="p-3 shrink-0">
+        <Button className="w-full gap-1.5 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm font-medium py-2">
           <Plus className="h-4 w-4" />
           New draft
         </Button>
       </div>
 
       {/* Draft List */}
-      <div className="flex-1 overflow-y-auto">
-        {drafts.map((draft) => (
+      <div className="flex-1 overflow-y-auto px-2">
+        {drafts.map((draft, index) => (
           <div
             key={draft.id}
-            className="group relative border-b border-gray-100 p-3 hover:bg-gray-100 cursor-pointer"
+            className={cn(
+              'group relative py-2.5 px-2 rounded-lg hover:bg-gray-100 cursor-pointer mb-0.5',
+              index !== drafts.length - 1 && 'border-b border-gray-100'
+            )}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="flex-1 text-sm text-gray-700 line-clamp-2">
+              <p className="flex-1 text-sm text-gray-900 line-clamp-2 font-normal">
                 {draft.title}
               </p>
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -151,13 +165,15 @@ export function Sidebar() {
                 >
                   <X className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
-                  <Archive className="h-3 w-3" />
-                </Button>
               </div>
             </div>
-            <p className="mt-1 text-xs text-gray-400">
-              {draft.status === 'scheduled' ? 'Scheduled' : 'Saved'}
+            {/* Status + Timestamp */}
+            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1.5">
+              <span className={cn(
+                'w-1.5 h-1.5 rounded-full',
+                draft.status === 'scheduled' ? 'bg-blue-500' : 'bg-gray-400'
+              )} />
+              {draft.status === 'scheduled' ? 'Scheduled' : `Edited ${getRelativeTime(draft.updatedAt)}`}
             </p>
           </div>
         ))}

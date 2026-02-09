@@ -1,10 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import {
   Image,
   Smile,
   MessageCircle,
-  List,
   Bookmark,
   Eye,
   Maximize2,
@@ -18,8 +18,6 @@ interface EditorToolbarProps {
   onEmoji?: () => void
   onAddThread?: () => void
   onBookmark?: () => void
-  onPreview?: () => void
-  onExpand?: () => void
   isBookmarked?: boolean
 }
 
@@ -30,81 +28,68 @@ export function EditorToolbar({
   onEmoji,
   onAddThread,
   onBookmark,
-  onPreview,
-  onExpand,
   isBookmarked = false,
 }: EditorToolbarProps) {
+  const isOverLimit = characterCount > maxCharacters
+  const isNearLimit = characterCount > maxCharacters * 0.8
+
   return (
-    <div className="flex items-center justify-between border-t px-4 py-2">
+    <div className="flex items-center justify-between border-t px-4 py-3">
+      {/* Left - Toolbar Icons with Tooltips */}
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-9 w-9"
           onClick={onImageUpload}
+          title="Add image"
         >
           <Image className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-9 w-9"
           onClick={onEmoji}
+          title="Add emoji"
         >
           <Smile className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-9 w-9"
           onClick={onAddThread}
+          title="Add to thread"
         >
           <MessageCircle className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <List className="h-4 w-4" />
-        </Button>
-        <div className="w-px h-6 bg-gray-200 mx-1" />
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-9 w-9"
           onClick={onBookmark}
+          title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
         >
           <Bookmark
-            className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`}
+            className={`h-4 w-4 ${isBookmarked ? 'fill-current text-blue-500' : ''}`}
           />
         </Button>
       </div>
 
-      <div className="flex items-center gap-1">
+      {/* Right - Character Counter */}
+      <div className="flex items-center gap-3">
         <span
-          className={`text-xs font-medium ${
-            characterCount > maxCharacters
+          className={`text-sm font-medium tabular-nums ${
+            isOverLimit
               ? 'text-red-500'
-              : characterCount > maxCharacters * 0.8
-              ? 'text-yellow-500'
+              : isNearLimit
+              ? 'text-amber-500'
               : 'text-gray-500'
           }`}
         >
-          {characterCount}
+          {characterCount} / {maxCharacters}
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onPreview}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={onExpand}
-        >
-          <Maximize2 className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   )

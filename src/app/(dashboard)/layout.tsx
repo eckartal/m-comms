@@ -22,20 +22,10 @@ export default function DashboardLayout({
       {/* Left Sidebar - Navigation & Drafts */}
       <Sidebar />
 
-      {/* Center - Composition Area */}
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-white">
         {children}
       </main>
-
-      {/* Right - Preview/Publishing Controls */}
-      <aside className="w-80 border-l bg-gray-50/50 hidden xl:flex flex-col">
-        <div className="p-4 border-b">
-          <h3 className="font-medium text-sm text-gray-900">Publishing</h3>
-        </div>
-        <div className="flex-1 p-4">
-          <p className="text-sm text-gray-500">Preview area</p>
-        </div>
-      </aside>
 
       <Toaster />
     </div>
