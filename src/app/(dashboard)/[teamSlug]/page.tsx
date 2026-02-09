@@ -100,7 +100,7 @@ export default function DashboardPage() {
             {currentTeam?.name || 'Dashboard'}
           </h1>
           <p className="text-[#9ca3af] mt-1">
-            Here's what's happening with your content.
+            Here&apos;s what&apos;s happening with your content.
           </p>
         </div>
         <Link

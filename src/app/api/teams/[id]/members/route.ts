@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// GET /api/teams/[teamId]/members - List team members
+// GET /api/teams/[id]/members - List team members
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ teamId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
+    const { id: teamId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -29,7 +29,7 @@ export async function GET(
           avatar_url
         )
       `)
-      .eq('team_id', resolvedParams.teamId)
+      .eq('team_id', teamId)
 
     if (error) {
       console.error('Error fetching team members:', error)
@@ -38,18 +38,18 @@ export async function GET(
 
     return NextResponse.json({ data })
   } catch (error) {
-    console.error('Error in GET /api/teams/[teamId]/members:', error)
+    console.error('Error in GET /api/teams/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// POST /api/teams/[teamId]/members - Invite new member
+// POST /api/teams/[id]/members - Invite new member
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ teamId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
+    const { id: teamId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -68,7 +68,7 @@ export async function POST(
     const { data: currentMember } = await supabase
       .from('team_members')
       .select('role')
-      .eq('team_id', resolvedParams.teamId)
+      .eq('team_id', teamId)
       .eq('user_id', user.id)
       .single()
 
@@ -91,7 +91,7 @@ export async function POST(
     const { data: existingMember } = await supabase
       .from('team_members')
       .select('id')
-      .eq('team_id', resolvedParams.teamId)
+      .eq('team_id', teamId)
       .eq('user_id', invitedUser.id)
       .single()
 
@@ -103,7 +103,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('team_members')
       .insert({
-        team_id: resolvedParams.teamId,
+        team_id: teamId,
         user_id: invitedUser.id,
         role,
       })
@@ -117,18 +117,18 @@ export async function POST(
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (error) {
-    console.error('Error in POST /api/teams/[teamId]/members:', error)
+    console.error('Error in POST /api/teams/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// PUT /api/teams/[teamId]/members - Update member role
+// PUT /api/teams/[id]/members - Update member role
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ teamId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
+    const { id: teamId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -147,7 +147,7 @@ export async function PUT(
     const { data: currentMember } = await supabase
       .from('team_members')
       .select('role')
-      .eq('team_id', resolvedParams.teamId)
+      .eq('team_id', teamId)
       .eq('user_id', user.id)
       .single()
 
@@ -181,18 +181,18 @@ export async function PUT(
 
     return NextResponse.json({ data })
   } catch (error) {
-    console.error('Error in PUT /api/teams/[teamId]/members:', error)
+    console.error('Error in PUT /api/teams/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// DELETE /api/teams/[teamId]/members - Remove member
+// DELETE /api/teams/[id]/members - Remove member
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ teamId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params
+    const { id: teamId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -226,7 +226,7 @@ export async function DELETE(
     const { data: currentMember } = await supabase
       .from('team_members')
       .select('role')
-      .eq('team_id', resolvedParams.teamId)
+      .eq('team_id', teamId)
       .eq('user_id', user.id)
       .single()
 
@@ -251,7 +251,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/teams/[teamId]/members:', error)
+    console.error('Error in DELETE /api/teams/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

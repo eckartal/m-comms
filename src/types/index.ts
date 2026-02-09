@@ -64,8 +64,15 @@ export interface Content {
   assigned_to: string | null
   created_at: string
   updated_at: string
+  share_token?: string | null
+  share_settings?: ShareSettings | null
   createdBy?: User
   assignedTo?: User
+}
+
+export interface ShareSettings {
+  allow_comments?: boolean
+  allow_editing?: boolean
 }
 
 export interface PlatformConfig {

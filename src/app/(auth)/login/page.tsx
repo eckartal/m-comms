@@ -3,16 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isDevMode, mockUser, mockTeam } from '@/lib/supabase/client'
+import { useAppStore, syncUserWithStore, syncTeamsWithStore } from '@/stores'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Zap } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const setCurrentUser = useAppStore((state) => state.setCurrentUser)
+  const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,7 +35,9 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      router.push('/')
+      await syncUserWithStore()
+      await syncTeamsWithStore()
+      router.push('/demo-team')
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign in'
@@ -60,6 +65,15 @@ export default function LoginPage() {
     }
   }
 
+  // Dev mode quick login
+  const handleDevLogin = async () => {
+    setLoading(true)
+    setCurrentUser(mockUser)
+    setCurrentTeam(mockTeam)
+    router.push('/demo-team')
+    router.refresh()
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
@@ -76,6 +90,22 @@ export default function LoginPage() {
           {error && (
             <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
               {error}
+            </div>
+          )}
+
+          {isDevMode() && (
+            <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 mb-4">
+              <p className="font-medium mb-2">Dev Mode Active</p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full bg-white"
+                onClick={handleDevLogin}
+                disabled={loading}
+              >
+                <Zap className="mr-2 h-4 w-4" />
+                Quick Login as Demo User
+              </Button>
             </div>
           )}
 
