@@ -2,18 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Plus,
+  Search,
+  ChevronDown,
+  FileText,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Copy,
+  Calendar,
+} from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,17 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Plus,
-  Search,
-  Filter,
-  MoreHorizontal,
-  FileText,
-  Edit,
-  Trash2,
-  Copy,
-  Calendar,
-} from 'lucide-react'
 import { useAppStore } from '@/stores'
 
 type ContentItem = {
@@ -87,21 +75,28 @@ const mockContent: ContentItem[] = [
   },
 ]
 
-const statusColors: Record<string, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700 border-gray-200',
-  IN_REVIEW: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  APPROVED: 'bg-blue-50 text-blue-700 border-blue-200',
-  SCHEDULED: 'bg-orange-50 text-orange-700 border-orange-200',
-  PUBLISHED: 'bg-green-50 text-green-700 border-green-200',
-  ARCHIVED: 'bg-gray-100 text-gray-500 border-gray-200',
+const platformIcons: Record<string, string> = {
+  twitter: '𝕏',
+  linkedin: 'in',
+  instagram: '📷',
+  blog: '📝',
 }
 
-const platformIcons: Record<string, { icon: string; color: string }> = {
-  twitter: { icon: '𝕏', color: 'text-black' },
-  linkedin: { icon: 'in', color: 'text-blue-700' },
-  instagram: { icon: '📷', color: '' },
-  blog: { icon: '📝', color: '' },
+const statusLabels: Record<string, string> = {
+  DRAFT: 'Draft',
+  IN_REVIEW: 'In Review',
+  APPROVED: 'Approved',
+  SCHEDULED: 'Scheduled',
+  PUBLISHED: 'Published',
+  ARCHIVED: 'Archived',
 }
+
+const platforms = [
+  { id: 'twitter', name: 'Twitter/X', icon: '𝕏' },
+  { id: 'linkedin', name: 'LinkedIn', icon: 'in' },
+  { id: 'instagram', name: 'Instagram', icon: '📷' },
+  { id: 'blog', name: 'Blog', icon: '📝' },
+]
 
 export default function ContentPage() {
   const { currentTeam } = useAppStore()
@@ -119,7 +114,6 @@ export default function ContentPage() {
           const data = await res.json()
           setContent(data.data || [])
         } else {
-          // Fallback to mock data if API not available
           setContent(mockContent)
         }
       } catch (error) {
@@ -138,160 +132,187 @@ export default function ContentPage() {
     return matchesSearch && matchesStatus
   })
 
-  // Loading skeleton
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 w-full" />
-          ))}
+      <div className="max-w-5xl mx-auto">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 w-32 bg-[#e5e5e5] rounded" />
+          <div className="h-12 w-full bg-[#e5e5e5] rounded" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Content</h1>
-          <p className="text-muted-foreground">
-            Manage and organize your content library
+          <h1 className="text-3xl font-semibold text-[#37352f]">Content</h1>
+          <p className="text-[#9ca3af] mt-1">
+            {filteredContent.length} pieces of content
           </p>
         </div>
-        <Button asChild>
-          <Link href={`/${currentTeam?.slug}/content/new`}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Content
-          </Link>
-        </Button>
+
+        {/* Platform Quick Select + New Content */}
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 px-4 py-2 bg-[#f7f7f5] hover:bg-[#efece8] rounded-lg transition-colors text-[#37352f] text-sm font-medium">
+                <Plus className="w-4 h-4" />
+                New Content
+                <ChevronDown className="w-4 h-4 text-[#9ca3af]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link href={`/${currentTeam?.slug}/content/new`}>
+                  <span className="flex items-center gap-2">
+                    <span className="text-lg">📝</span>
+                    <div>
+                      <p className="font-medium">Blank Content</p>
+                      <p className="text-xs text-[#9ca3af]">Start from scratch</p>
+                    </div>
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5">
+                <p className="text-xs font-medium text-[#9ca3af] uppercase tracking-wide mb-2">
+                  Quick Create For
+                </p>
+                {platforms.map((platform) => (
+                  <DropdownMenuItem key={platform.id} asChild>
+                    <Link href={`/${currentTeam?.slug}/content/new?platform=${platform.id}`}>
+                      <span className="flex items-center gap-2">
+                        <span>{platform.icon}</span>
+                        <span>{platform.name}</span>
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+          <input
+            type="text"
             placeholder="Search content..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="w-full pl-9 pr-4 py-2 bg-[#f7f7f5] rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-[#2383e2] text-[#37352f] placeholder:text-[#c4c4c4]"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="IN_REVIEW">In Review</SelectItem>
-            <SelectItem value="APPROVED">Approved</SelectItem>
-            <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-            <SelectItem value="PUBLISHED">Published</SelectItem>
-            <SelectItem value="ARCHIVED">Archived</SelectItem>
-          </SelectContent>
-        </Select>
+
+        <div className="flex items-center gap-1">
+          {['all', 'DRAFT', 'IN_REVIEW', 'SCHEDULED', 'PUBLISHED'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                statusFilter === status
+                  ? 'bg-[#37352f] text-white'
+                  : 'text-[#6b7280] hover:bg-[#f7f7f5]'
+              }`}
+            >
+              {status === 'all' ? 'All' : statusLabels[status]}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content List */}
-      <div className="grid gap-4">
-        {filteredContent.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No content found</h3>
-              <p className="text-muted-foreground">
-                {search ? 'Try adjusting your search' : 'Create your first piece of content'}
-              </p>
-              <Button className="mt-4" asChild>
-                <Link href={`/${currentTeam?.slug}/content/new`}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Content
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredContent.map((content) => (
-            <Card key={content.id} className="transition-shadow hover:shadow-md">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <FileText className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{content.title}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge
-                        variant="outline"
-                        className={statusColors[content.status]}
-                      >
-                        {content.status.replace(/_/g, ' ')}
-                      </Badge>
-                      <div className="flex items-center gap-1">
-                        {content.platforms.map((p) => (
-                          <span
-                            key={p}
-                            className={`text-xs ${platformIcons[p].color}`}
-                          >
-                            {platformIcons[p].icon}
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Created {new Date(content.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
+      {filteredContent.length === 0 ? (
+        <div className="text-center py-16">
+          <FileText className="w-12 h-12 mx-auto text-[#e5e5e5] mb-4" />
+          <p className="text-[#9ca3af]">
+            {search ? 'No content matches your search' : 'No content yet'}
+          </p>
+          <Link
+            href={`/${currentTeam?.slug}/content/new`}
+            className="inline-flex items-center gap-2 mt-4 text-[#2383e2] hover:underline"
+          >
+            Create your first piece
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {filteredContent.map((item) => (
+            <Link
+              key={item.id}
+              href={`/${currentTeam?.slug}/content/${item.id}`}
+              className="flex items-center justify-between py-3 px-2 -mx-2 rounded hover:bg-[#f7f7f5] group"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-[#9ca3af]" />
+                <div>
+                  <p className="text-[#37352f] group-hover:text-[#2383e2]">
+                    {item.title}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-[#9ca3af]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6b7280]" />
+                      {statusLabels[item.status]}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      Created {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
+                    {item.scheduledAt && (
+                      <>
+                        <span>·</span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(item.scheduledAt).toLocaleDateString()}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {content.scheduledAt && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mr-2">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(content.scheduledAt).toLocaleDateString()}
-                    </div>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/${currentTeam?.slug}/content/${content.id}`}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1">
+                  {item.platforms.map((p) => (
+                    <span key={p} className="text-xs">{platformIcons[p]}</span>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
+                    <button className="p-1 rounded hover:bg-[#e5e5e5] opacity-0 group-hover:opacity-100 transition-opacity">
+                      <MoreHorizontal className="w-4 h-4 text-[#6b7280]" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={`/${currentTeam?.slug}/content/${item.id}`}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-red-600">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
