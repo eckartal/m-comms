@@ -412,7 +412,7 @@ export default function NewContentPage() {
           ) : (
             <>
               <Send className="h-4 w-4 mr-2" />
-              Submit
+              Submit for Review
             </>
           )}
         </Button>
