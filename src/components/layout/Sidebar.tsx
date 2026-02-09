@@ -177,16 +177,31 @@ export function Sidebar() {
       {/* Bottom Navigation */}
       <div className="border-t bg-white px-2 py-1">
         <nav className="flex items-center justify-between">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={`/${currentTeam.slug}${item.href}`}
-              className="flex flex-col items-center gap-0.5 px-2 py-2 text-xs text-muted-foreground hover:text-gray-900"
-            >
-              <item.icon className="h-5 w-5" />
-              <span className="text-[10px]">{item.name}</span>
-            </Link>
-          ))}
+          {navigation.map((item) => {
+            const isActive = pathname.includes(item.href)
+            return (
+              <Link
+                key={item.name}
+                href={`/${currentTeam.slug}${item.href}`}
+                className={cn(
+                  'relative group flex flex-col items-center gap-0.5 px-2 py-2 text-xs transition-colors',
+                  isActive
+                    ? 'text-blue-500'
+                    : 'text-muted-foreground hover:text-gray-900'
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                <span className="text-[10px]">{item.name}</span>
+                {isActive && (
+                  <div className="absolute left-0 right-0 -bottom-1 h-0.5 bg-blue-500" />
+                )}
+                {/* Tooltip on hover */}
+                <span className="absolute left-1/2 -translate-x-1/2 -top-8 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                  {item.name}
+                </span>
+              </Link>
+            )
+          })}
         </nav>
       </div>
     </aside>
