@@ -8,6 +8,10 @@ import {
   Calendar,
   TrendingUp,
   ChevronRight,
+  CheckCircle2,
+  Clock,
+  PenLine,
+  Eye,
 } from 'lucide-react'
 import { useAppStore } from '@/stores'
 
@@ -58,12 +62,12 @@ const platformIcons: Record<string, string> = {
   blog: '📝',
 }
 
-const statusLabels: Record<string, string> = {
-  DRAFT: 'Draft',
-  IN_REVIEW: 'In Review',
-  APPROVED: 'Approved',
-  SCHEDULED: 'Scheduled',
-  PUBLISHED: 'Published',
+const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  DRAFT: { label: 'Draft', color: 'bg-gray-400', icon: <PenLine className="w-3 h-3" /> },
+  IN_REVIEW: { label: 'In Review', color: 'bg-amber-500', icon: <Eye className="w-3 h-3" /> },
+  APPROVED: { label: 'Approved', color: 'bg-blue-500', icon: <CheckCircle2 className="w-3 h-3" /> },
+  SCHEDULED: { label: 'Scheduled', color: 'bg-blue-500', icon: <Clock className="w-3 h-3" /> },
+  PUBLISHED: { label: 'Published', color: 'bg-green-500', icon: <CheckCircle2 className="w-3 h-3" /> },
 }
 
 export default function DashboardPage() {
@@ -92,84 +96,88 @@ export default function DashboardPage() {
   }, [currentTeam, setCurrentTeam, setCurrentUser])
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Header */}
+    <div className="max-w-6xl mx-auto">
+      {/* Header - 24px max */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-semibold text-[#37352f]">
+          <h1 className="text-2xl font-semibold text-gray-900">
             {currentTeam?.name || 'Dashboard'}
           </h1>
-          <p className="text-[#9ca3af] mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             Here&apos;s what&apos;s happening with your content.
           </p>
         </div>
         <Link
           href={`/${currentTeam?.slug}/content/new`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#2383e2] text-white rounded-lg hover:bg-[#1a6fb8] transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
         >
           <Plus className="w-4 h-4" />
           New Content
         </Link>
       </div>
 
-      {/* Stats - Typography based, no cards */}
-      <div className="flex gap-12 mb-12">
-        <div>
-          <p className="text-sm text-[#9ca3af]">Total Content</p>
-          <p className="text-2xl font-semibold text-[#37352f]">{stats.totalContent}</p>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4 mb-10">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500 font-normal">Total Content</p>
+          <p className="text-3xl font-semibold text-gray-900 mt-1">{stats.totalContent}</p>
         </div>
-        <div>
-          <p className="text-sm text-[#9ca3af]">Published</p>
-          <p className="text-2xl font-semibold text-[#37352f]">{stats.published}</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500 font-normal">Published</p>
+          <p className="text-3xl font-semibold text-gray-900 mt-1">{stats.published}</p>
         </div>
-        <div>
-          <p className="text-sm text-[#9ca3af]">Scheduled</p>
-          <p className="text-2xl font-semibold text-[#37352f]">{stats.scheduled}</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500 font-normal">Scheduled</p>
+          <p className="text-3xl font-semibold text-gray-900 mt-1">{stats.scheduled}</p>
         </div>
-        <div>
-          <p className="text-sm text-[#9ca3af]">Engagement</p>
-          <p className="text-2xl font-semibold text-[#37352f]">{stats.engagement}</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-sm text-gray-500 font-normal">Engagement</p>
+          <p className="text-3xl font-semibold text-gray-900 mt-1">{stats.engagement}</p>
         </div>
       </div>
 
-      {/* Two column layout - no borders, just sections */}
-      <div className="grid grid-cols-3 gap-12">
+      {/* Two column layout */}
+      <div className="grid grid-cols-3 gap-8">
         {/* Recent Content - 2 cols */}
         <div className="col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[#37352f]">Recent Content</h2>
+            <h2 className="text-lg font-medium text-gray-900">Recent Content</h2>
             <Link
               href={`/${currentTeam?.slug}/content`}
-              className="text-sm text-[#2383e2] hover:underline flex items-center gap-1"
+              className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium"
             >
               View all
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="space-y-1">
-            {recentContent.map((content) => (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            {recentContent.map((content, index) => (
               <Link
                 key={content.id}
                 href={`/${currentTeam?.slug}/content/${content.id}`}
-                className="flex items-center justify-between py-3 px-2 -mx-2 rounded hover:bg-[#f7f7f5] group"
+                className={`flex items-center justify-between py-4 px-4 hover:bg-gray-50 transition-colors ${
+                  index !== recentContent.length - 1 ? 'border-b border-gray-100' : ''
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-[#9ca3af]" />
-                  <span className="text-[#37352f] group-hover:text-[#2383e2]">
+                  <FileText className="w-5 h-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900">
                     {content.title}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-[#9ca3af]">
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#6b7280]" />
-                    {statusLabels[content.status]}
-                  </span>
+                <div className="flex items-center gap-4">
                   <div className="flex gap-1">
                     {content.platforms.map((p) => (
-                      <span key={p} className="text-xs">{platformIcons[p]}</span>
+                      <span key={p} className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                        {platformIcons[p]}
+                      </span>
                     ))}
                   </div>
+                  <span className="flex items-center gap-1.5 text-sm text-gray-500">
+                    <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[content.status].color}`} />
+                    {statusConfig[content.status].label}
+                  </span>
                 </div>
               </Link>
             ))}
@@ -179,55 +187,60 @@ export default function DashboardPage() {
         {/* This Week - 1 col */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[#37352f]">This Week</h2>
+            <h2 className="text-lg font-medium text-gray-900">This Week</h2>
             <Link
               href={`/${currentTeam?.slug}/calendar`}
-              className="text-sm text-[#2383e2] hover:underline flex items-center gap-1"
+              className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium"
             >
               Calendar
               <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="flex gap-2 mb-4">
-            {upcomingSchedule.map((day, i) => (
-              <div key={day.date} className="flex-1 text-center">
-                <div
-                  className={`h-10 w-10 mx-auto flex items-center justify-center rounded-lg text-sm mb-1 ${
-                    day.count > 4
-                      ? 'bg-[#2383e2] text-white'
-                      : 'bg-[#f7f7f5] text-[#37352f]'
-                  }`}
-                >
-                  {day.count}
-                </div>
-                <span className="text-xs text-[#9ca3af]">
-                  {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="flex gap-2 mb-4">
+              {upcomingSchedule.map((day, i) => {
+                const isToday = day.date === '2025-02-12'
+                return (
+                  <div key={day.date} className="flex-1 text-center">
+                    <div
+                      className={`h-9 w-9 mx-auto flex items-center justify-center rounded-lg text-sm mb-1.5 transition-colors ${
+                        isToday
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {day.count}
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
 
-          <p className="text-sm text-[#9ca3af]">
-            {upcomingSchedule.reduce((acc, d) => acc + d.count, 0)} posts scheduled
-          </p>
+            <p className="text-sm text-gray-500 pt-2 border-t border-gray-100">
+              {upcomingSchedule.reduce((acc, d) => acc + d.count, 0)} posts scheduled
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-12 pt-8 border-t border-[#e5e5e5]">
-        <h2 className="text-lg font-semibold text-[#37352f] mb-4">Quick Actions</h2>
-        <div className="flex gap-4">
+      <div className="mt-10 pt-8 border-t border-gray-200">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+        <div className="flex gap-3">
           <Link
             href={`/${currentTeam?.slug}/content/new`}
-            className="flex items-center gap-2 px-4 py-2 bg-[#f7f7f5] rounded-lg hover:bg-[#efece8] transition-colors text-[#37352f]"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium text-gray-700"
           >
             <FileText className="w-4 h-4" />
             Create Content
           </Link>
           <Link
             href={`/${currentTeam?.slug}/calendar`}
-            className="flex items-center gap-2 px-4 py-2 bg-[#f7f7f5] rounded-lg hover:bg-[#efece8] transition-colors text-[#37352f]"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium text-gray-700"
           >
             <Calendar className="w-4 h-4" />
             View Schedule
