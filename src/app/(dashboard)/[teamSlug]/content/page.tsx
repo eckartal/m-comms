@@ -26,90 +26,26 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { useAppStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { ContentStatus } from '@/types'
 
 type ContentItem = {
   id: string
   title: string
-  content?: string
+  blocks: any[]
   status: ContentStatus
-  scheduledAt: string | null
-  publishedAt: string | null
+  scheduled_at: string | null
+  published_at: string | null
   platforms: string[]
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
+  createdBy?: {
+    id: string
+    name: string
+    email: string
+    avatar_url?: string
+  }
 }
-
-// Mock data
-const mockContent: ContentItem[] = [
-  {
-    id: '1',
-    title: 'Product Launch Announcement',
-    content: '🚀 Big news coming soon! Stay tuned.',
-    status: 'SCHEDULED' as const,
-    scheduledAt: '2025-02-20T10:00:00Z',
-    publishedAt: null,
-    platforms: ['twitter', 'linkedin'],
-    createdAt: '2025-02-01T10:00:00Z',
-    updatedAt: '2025-02-15T14:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Weekly Newsletter #45 - Q1 Updates',
-    content: 'Here are this week\'s updates...',
-    status: 'IN_REVIEW' as const,
-    scheduledAt: null,
-    publishedAt: null,
-    platforms: ['blog'],
-    createdAt: '2025-02-03T14:00:00Z',
-    updatedAt: '2025-02-05T09:00:00Z',
-  },
-  {
-    id: '3',
-    title: 'Customer Success Story - Acme Corp',
-    content: 'How Acme Corp achieved 200% growth...',
-    status: 'DRAFT' as const,
-    scheduledAt: null,
-    publishedAt: null,
-    platforms: ['linkedin', 'blog'],
-    createdAt: '2025-02-05T09:00:00Z',
-    updatedAt: '2025-02-05T09:00:00Z',
-  },
-  {
-    id: '4',
-    title: 'Behind the Scenes - Engineering',
-    content: 'A look at our engineering team...',
-    status: 'PUBLISHED' as const,
-    scheduledAt: '2025-02-08T15:00:00Z',
-    publishedAt: '2025-02-08T15:00:00Z',
-    platforms: ['instagram'],
-    createdAt: '2025-02-02T11:00:00Z',
-    updatedAt: '2025-02-08T15:00:00Z',
-  },
-  {
-    id: '5',
-    title: 'Industry Insights - AI Trends 2025',
-    content: 'The future of AI in business...',
-    status: 'APPROVED' as const,
-    scheduledAt: null,
-    publishedAt: null,
-    platforms: ['twitter', 'linkedin'],
-    createdAt: '2025-02-04T16:00:00Z',
-    updatedAt: '2025-02-10T11:00:00Z',
-  },
-  {
-    id: '6',
-    title: 'Old Campaign - Q4回顾',
-    content: 'Q4回顾...',
-    status: 'ARCHIVED' as const,
-    scheduledAt: null,
-    publishedAt: '2024-12-31T10:00:00Z',
-    platforms: ['twitter', 'linkedin', 'blog'],
-    createdAt: '2024-12-15T10:00:00Z',
-    updatedAt: '2024-12-31T10:00:00Z',
-  },
-]
 
 const platformConfig: Record<string, { icon: string; name: string; color: string }> = {
   twitter: { icon: '𝕏', name: 'X (Twitter)', color: '#000000' },
@@ -131,32 +67,47 @@ type SortOption = 'newest' | 'oldest' | 'updated' | 'scheduled'
 
 export default function ContentPage() {
   const { currentTeam } = useAppStore()
+  const { contents, setContents, fetchContents } = useContentStore()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all')
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
-  const [content, setContent] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchContent() {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setContent(mockContent)
-      setLoading(false)
+    async function loadContent() {
+      if (!currentTeam) {
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      try {
+        await fetchContents(currentTeam.id)
+      } catch (error) {
+        console.error('Error fetching content:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-    fetchContent()
-  }, [])
+    loadContent()
+  }, [currentTeam, fetchContents])
 
   const filteredContent = useMemo(() => {
-    let result = [...content]
+    let result = [...contents]
 
-    // Search filter
+    // Search filter - extract text from blocks
     if (search) {
-      result = result.filter(item =>
-        item.title.toLowerCase().includes(search.toLowerCase()) ||
-        item.content?.toLowerCase().includes(search.toLowerCase())
-      )
+      result = result.filter(item => {
+        const textContent = item.blocks
+          ?.filter((b: any) => b.type === 'text')
+          ?.map((b: any) => b.content?.text || '')
+          ?.join(' ') || ''
+        return (
+          item.title.toLowerCase().includes(search.toLowerCase()) ||
+          textContent.toLowerCase().includes(search.toLowerCase())
+        )
+      })
     }
 
     // Status filter
@@ -166,38 +117,40 @@ export default function ContentPage() {
 
     // Platform filter
     if (platformFilter !== 'all') {
-      result = result.filter(item => item.platforms.includes(platformFilter))
+      result = result.filter(item =>
+        item.platforms?.some((p: any) => p.type === platformFilter)
+      )
     }
 
     // Sort
-    result.sort((a, b) => {
+    result.sort((a: any, b: any) => {
       switch (sortBy) {
         case 'newest':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'oldest':
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         case 'updated':
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         case 'scheduled':
-          if (!a.scheduledAt && !b.scheduledAt) return 0
-          if (!a.scheduledAt) return 1
-          if (!b.scheduledAt) return -1
-          return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+          if (!a.scheduled_at && !b.scheduled_at) return 0
+          if (!a.scheduled_at) return 1
+          if (!b.scheduled_at) return -1
+          return new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
         default:
           return 0
       }
     })
 
     return result
-  }, [content, search, statusFilter, platformFilter, sortBy])
+  }, [contents, search, statusFilter, platformFilter, sortBy])
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: content.length }
-    content.forEach(item => {
+    const counts: Record<string, number> = { all: contents.length }
+    contents.forEach((item: any) => {
       counts[item.status] = (counts[item.status] || 0) + 1
     })
     return counts
-  }, [content])
+  }, [contents])
 
   const formatDate = (date: string | null) => {
     if (!date) return null
@@ -207,6 +160,16 @@ export default function ContentPage() {
       hour: 'numeric',
       minute: '2-digit',
     })
+  }
+
+  // Extract text from blocks for display
+  const getContentPreview = (blocks: any[]) => {
+    if (!blocks || !Array.isArray(blocks)) return null
+    const textBlock = blocks.find((b: any) => b.type === 'text')
+    if (textBlock?.content?.text) {
+      return textBlock.content.text
+    }
+    return null
   }
 
   if (loading) {
@@ -351,11 +314,12 @@ export default function ContentPage() {
         ) : (
           <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
             {filteredContent.map((item, index) => {
-              const statusConfig = STATUS_CONFIG[item.status]
+              const statusConfig = STATUS_CONFIG[item.status as ContentStatus]
               const StatusIcon = statusConfig.icon
-              const isOverLimit = item.platforms.some(p => {
-                const limit = p === 'twitter' ? 280 : p === 'linkedin' ? 3000 : 2200
-                return (item.content?.length || 0) > limit
+              const contentPreview = getContentPreview(item.blocks)
+              const isOverLimit = item.platforms?.some((p: any) => {
+                const limit = p?.type === 'twitter' ? 280 : p?.type === 'linkedin' ? 3000 : 2200
+                return (contentPreview?.length || 0) > limit
               })
 
               return (
@@ -388,34 +352,34 @@ export default function ContentPage() {
                         )}
                       </div>
 
-                      {item.content && (
+                      {contentPreview && (
                         <p className="text-[13px] text-[#6C6C70] line-clamp-1 mb-2">
-                          {item.content}
+                          {contentPreview}
                         </p>
                       )}
 
                       <div className="flex items-center gap-3 text-[12px] text-[#8E8E93]">
                         {/* Created date */}
-                        <span>Created {formatDate(item.createdAt)}</span>
+                        <span>Created {formatDate(item.created_at)}</span>
 
                         {/* Scheduled date */}
-                        {item.scheduledAt && (
+                        {item.scheduled_at && (
                           <>
                             <span>·</span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              Scheduled for {formatDate(item.scheduledAt)}
+                              Scheduled for {formatDate(item.scheduled_at)}
                             </span>
                           </>
                         )}
 
                         {/* Published date */}
-                        {item.publishedAt && (
+                        {item.published_at && (
                           <>
                             <span>·</span>
                             <span className="flex items-center gap-1 text-[#8B5CF6]">
                               <CheckCircle className="w-3 h-3" />
-                              Published {formatDate(item.publishedAt)}
+                              Published {formatDate(item.published_at)}
                             </span>
                           </>
                         )}
@@ -426,13 +390,13 @@ export default function ContentPage() {
                   <div className="flex items-center gap-4 flex-shrink-0 ml-4">
                     {/* Platforms */}
                     <div className="flex gap-1">
-                      {item.platforms.map((p) => (
+                      {(item.platforms || []).map((p: any) => (
                         <span
-                          key={p}
+                          key={p?.type || 'unknown'}
                           className="text-[13px] w-6 h-6 flex items-center justify-center bg-[#F5F5F7] rounded"
-                          title={platformConfig[p].name}
+                          title={platformConfig[p?.type]?.name || 'Unknown'}
                         >
-                          {platformConfig[p].icon}
+                          {platformConfig[p?.type]?.icon || '?'}
                         </span>
                       ))}
                     </div>

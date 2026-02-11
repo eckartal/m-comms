@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, KeyboardEvent } from 'react'
+import { useState, useEffect, KeyboardEvent, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
-import { useAppStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { PlatformType } from '@/types'
+import { createContent, updateContent, autoSaveContent } from '@/stores'
 import {
   Sparkles,
   Plus,
@@ -55,7 +56,10 @@ export default function NewContentPage() {
   const params = useParams()
   const teamSlug = params.teamSlug as string
   const { currentUser } = useAppStore()
+  const { currentTeam, saving, lastSaved, setSaving } = useContentStore()
 
+  const [contentId, setContentId] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
   const [thread, setThread] = useState<ThreadItem[]>([{ id: '1', content: '' }])
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
@@ -89,20 +93,41 @@ export default function NewContentPage() {
     }
   }, [teamSlug])
 
-  // Auto-save to localStorage
+  // Auto-save to Supabase and localStorage
   useEffect(() => {
     setIsSaved(false)
-    const timer = setTimeout(() => {
-      localStorage.setItem(`draft_${teamSlug}`, JSON.stringify({
+    const timer = setTimeout(async () => {
+      const blocks = thread.map((item, index) => ({
+        id: item.id,
+        type: 'text' as const,
+        content: { text: item.content }
+      }))
+
+      const draftData = {
         thread,
         platform: selectedPlatform,
         bookmarked: isBookmarked,
         savedAt: new Date().toISOString()
-      }))
+      }
+
+      // Save to localStorage
+      localStorage.setItem(`draft_${teamSlug}`, JSON.stringify(draftData))
+
+      // If we have a contentId, sync to Supabase
+      if (contentId && currentTeam) {
+        setSaving(true)
+        await updateContent(contentId, {
+          title: title || 'Untitled',
+          blocks,
+          platforms: [{ type: selectedPlatform }],
+        })
+        setSaving(false)
+      }
+
       setIsSaved(true)
     }, 1000)
     return () => clearTimeout(timer)
-  }, [thread, selectedPlatform, isBookmarked, teamSlug])
+  }, [thread, selectedPlatform, isBookmarked, teamSlug, contentId, currentTeam, title, setSaving])
 
   // Handle text change
   const handleContentChange = (index: number, value: string) => {
@@ -147,14 +172,75 @@ export default function NewContentPage() {
     const hasContent = thread.some(t => t.content.trim().length > 0)
     if (!hasContent) return
     setIsPublishing(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    localStorage.removeItem(`draft_${teamSlug}`)
-    setIsPublishing(false)
-    router.push(`/${teamSlug}/content`)
+
+    try {
+      const blocks = thread.map((item, index) => ({
+        id: item.id,
+        type: 'thread' as const,
+        content: { tweets: thread.map(t => ({ text: t.content })) }
+      }))
+
+      // Create content in Supabase if not exists
+      if (!contentId && currentTeam) {
+        const newContent = await createContent(currentTeam.id, {
+          title: title || 'Untitled',
+          blocks,
+          status: 'PUBLISHED'
+        })
+        if (newContent) {
+          setContentId(newContent.id)
+        }
+      } else if (contentId) {
+        await updateContent(contentId, {
+          title: title || 'Untitled',
+          blocks,
+          status: 'PUBLISHED'
+        })
+      }
+
+      localStorage.removeItem(`draft_${teamSlug}`)
+      router.push(`/${teamSlug}/content`)
+    } catch (error) {
+      console.error('Error publishing:', error)
+    } finally {
+      setIsPublishing(false)
+    }
   }
 
-  const handleSchedule = () => {
-    console.log('Scheduling thread:', thread)
+  const handleSchedule = async (scheduledAt: Date) => {
+    const hasContent = thread.some(t => t.content.trim().length > 0)
+    if (!hasContent) return
+
+    const blocks = thread.map((item) => ({
+      id: item.id,
+      type: 'thread' as const,
+      content: { tweets: thread.map(t => ({ text: t.content })) }
+    }))
+
+    try {
+      if (!contentId && currentTeam) {
+        const newContent = await createContent(currentTeam.id, {
+          title: title || 'Untitled',
+          blocks,
+          status: 'SCHEDULED'
+        })
+        if (newContent) {
+          setContentId(newContent.id)
+        }
+      } else if (contentId) {
+        await updateContent(contentId, {
+          title: title || 'Untitled',
+          blocks,
+          status: 'SCHEDULED',
+          scheduled_at: scheduledAt.toISOString()
+        })
+      }
+
+      localStorage.removeItem(`draft_${teamSlug}`)
+      router.push(`/${teamSlug}/content`)
+    } catch (error) {
+      console.error('Error scheduling:', error)
+    }
   }
 
   // Keyboard shortcuts

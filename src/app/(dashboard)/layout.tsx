@@ -18,15 +18,11 @@ export default function DashboardLayout({
   })
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
-      {/* Left Sidebar - Navigation & Drafts */}
-      <Sidebar />
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-white">
+    <div className="flex h-screen bg-background text-foreground">
+      <Sidebar className="w-[240px] flex-shrink-0" />
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-background">
         {children}
       </main>
-
       <Toaster />
     </div>
   )
