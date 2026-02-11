@@ -1,0 +1,293 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import {
+  Globe,
+  Clock,
+  Bell,
+  Shield,
+  Palette,
+  Link as LinkIcon,
+  Check,
+} from 'lucide-react'
+import { useAppStore } from '@/stores'
+import { cn } from '@/lib/utils'
+
+const timezones = [
+  { id: 'America/New_York', label: 'Eastern Time (ET)', offset: 'UTC-5' },
+  { id: 'America/Chicago', label: 'Central Time (CT)', offset: 'UTC-6' },
+  { id: 'America/Denver', label: 'Mountain Time (MT)', offset: 'UTC-7' },
+  { id: 'America/Los_Angeles', label: 'Pacific Time (PT)', offset: 'UTC-8' },
+  { id: 'Europe/London', label: 'London (GMT)', offset: 'UTC+0' },
+  { id: 'Europe/Paris', label: 'Paris (CET)', offset: 'UTC+1' },
+  { id: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 'UTC+9' },
+]
+
+const workingHours = [
+  { id: '09:00-17:00', label: '9 AM - 5 PM' },
+  { id: '08:00-16:00', label: '8 AM - 4 PM' },
+  { id: '10:00-18:00', label: '10 AM - 6 PM' },
+  { id: '12:00-20:00', label: '12 PM - 8 PM' },
+]
+
+export default function SettingsPage() {
+  const { currentTeam, setCurrentTeam } = useAppStore()
+  const [timezone, setTimezone] = useState('America/New_York')
+  const [workingHourStart, setWorkingHourStart] = useState('09:00-17:00')
+  const [notifications, setNotifications] = useState({
+    email: true,
+    push: false,
+    scheduled: true,
+    published: true,
+  })
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    // Load settings from team settings or use defaults
+    if (currentTeam?.settings) {
+      setTimezone((currentTeam.settings.timezone as string) || 'America/New_York')
+    }
+  }, [currentTeam?.settings])
+
+  const handleSave = () => {
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-3xl mx-auto px-12 py-12">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-[20px] font-medium text-[#1C1C1E]">Settings</h1>
+          <p className="text-[14px] text-[#6C6C70] mt-1">
+            Manage your team preferences and integrations
+          </p>
+        </div>
+
+        {/* Timezone Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Globe className="w-5 h-5 text-[#6C6C70]" />
+            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Timezone</h2>
+          </div>
+          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
+            <p className="text-[14px] text-[#6C6C70] mb-4">
+              Set your timezone for accurate content scheduling
+            </p>
+            <div className="grid md:grid-cols-2 gap-3">
+              {timezones.map((tz) => (
+                <button
+                  key={tz.id}
+                  onClick={() => setTimezone(tz.id)}
+                  className={cn(
+                    'flex items-center justify-between p-3 rounded-[6px] border transition-all',
+                    timezone === tz.id
+                      ? 'border-[#1C1C1E] bg-[#FAFAFA]'
+                      : 'border-[#E5E5E7] hover:border-[#1C1C1E]'
+                  )}
+                >
+                  <div className="text-left">
+                    <p className="text-[14px] font-medium text-[#1C1C1E]">{tz.label}</p>
+                    <p className="text-[12px] text-[#8E8E93]">{tz.offset}</p>
+                  </div>
+                  {timezone === tz.id && (
+                    <Check className="w-4 h-4 text-[#1C1C1E]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Working Hours Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-5 h-5 text-[#6C6C70]" />
+            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Working Hours</h2>
+          </div>
+          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
+            <p className="text-[14px] text-[#6C6C70] mb-4">
+              Set your team&apos;s working hours for scheduling suggestions
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {workingHours.map((hours) => (
+                <button
+                  key={hours.id}
+                  onClick={() => setWorkingHourStart(hours.id)}
+                  className={cn(
+                    'p-3 rounded-[6px] border text-[14px] font-medium transition-all',
+                    workingHourStart === hours.id
+                      ? 'border-[#1C1C1E] bg-[#1C1C1E] text-white'
+                      : 'border-[#E5E5E7] text-[#6C6C70] hover:border-[#1C1C1E]'
+                  )}
+                >
+                  {hours.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Notifications Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="w-5 h-5 text-[#6C6C70]" />
+            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Notifications</h2>
+          </div>
+          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
+            <div className="space-y-4">
+              <ToggleOption
+                label="Email notifications"
+                description="Receive email updates about your content"
+                checked={notifications.email}
+                onChange={(v) => setNotifications({ ...notifications, email: v })}
+              />
+              <ToggleOption
+                label="Push notifications"
+                description="Receive browser push notifications"
+                checked={notifications.push}
+                onChange={(v) => setNotifications({ ...notifications, push: v })}
+              />
+              <ToggleOption
+                label="Scheduled post reminders"
+                description="Get reminded before scheduled posts go live"
+                checked={notifications.scheduled}
+                onChange={(v) => setNotifications({ ...notifications, scheduled: v })}
+              />
+              <ToggleOption
+                label="Published notifications"
+                description="Get notified when posts are published"
+                checked={notifications.published}
+                onChange={(v) => setNotifications({ ...notifications, published: v })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Integrations Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <LinkIcon className="w-5 h-5 text-[#6C6C70]" />
+            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Integrations</h2>
+          </div>
+          <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
+            <IntegrationRow
+              name="X (Twitter)"
+              icon="𝕏"
+              connected={true}
+              account="@yourbrand"
+            />
+            <IntegrationRow
+              name="LinkedIn"
+              icon="in"
+              connected={true}
+              account="Your Company"
+            />
+            <IntegrationRow
+              name="Instagram"
+              icon="📷"
+              connected={false}
+            />
+            <IntegrationRow
+              name="Blog"
+              icon="📝"
+              connected={true}
+              account="yourblog.com"
+            />
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-[13px] text-[#8E8E93]">
+            Changes are saved automatically
+          </p>
+          <button
+            onClick={handleSave}
+            className={cn(
+              'px-6 py-2 rounded-[6px] text-[14px] font-medium transition-all',
+              saved
+                ? 'bg-[#10B981] text-white'
+                : 'bg-[#1C1C1E] text-white hover:bg-[#2C2C2E]'
+            )}
+          >
+            {saved ? 'Saved!' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ToggleOption({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-[14px] font-medium text-[#1C1C1E]">{label}</p>
+        <p className="text-[13px] text-[#8E8E93]">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={cn(
+          'w-11 h-6 rounded-full transition-colors relative',
+          checked ? 'bg-[#1C1C1E]' : 'bg-[#E5E5E7]'
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-1 w-4 h-4 rounded-full bg-white transition-transform',
+            checked ? 'left-6' : 'left-1'
+          )}
+        />
+      </button>
+    </div>
+  )
+}
+
+function IntegrationRow({
+  name,
+  icon,
+  connected,
+  account,
+}: {
+  name: string
+  icon: string
+  connected: boolean
+  account?: string
+}) {
+  return (
+    <div className="flex items-center justify-between py-3 px-4 border-b border-[#E5E5E7] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+      <div className="flex items-center gap-3">
+        <span className="text-[20px]">{icon}</span>
+        <div>
+          <p className="text-[14px] font-medium text-[#1C1C1E]">{name}</p>
+          {connected && account && (
+            <p className="text-[12px] text-[#8E8E93]">{account}</p>
+          )}
+        </div>
+      </div>
+      <button
+        className={cn(
+          'px-3 py-1.5 text-[13px] font-medium rounded-[6px] transition-colors',
+          connected
+            ? 'bg-[#F5F5F7] text-[#6C6C70] hover:bg-[#E5E5E7]'
+            : 'bg-[#1C1C1E] text-white hover:bg-[#2C2C2E]'
+        )}
+      >
+        {connected ? 'Disconnect' : 'Connect'}
+      </button>
+    </div>
+  )
+}
