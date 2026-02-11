@@ -2,27 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import {
-  Search,
-  RefreshCcw,
-  Columns,
-  X,
-  MoreHorizontal,
-  Plus,
-  Calendar,
-  BarChart3,
-  User,
-  HelpCircle,
-  Settings,
-  ChevronRight,
-  Trash2,
-  Archive,
-  TrendingUp,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Home, BarChart3, Calendar, Settings, Users, Zap, Plus, Image, Bookmark, MessageSquare, Thread } from 'lucide-react'
 
 interface Draft {
   id: string
@@ -31,41 +13,31 @@ interface Draft {
   status: 'draft' | 'scheduled' | 'posted'
 }
 
-const navigation = [
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Public Profile', href: '/profile', icon: User },
-  { name: 'Help', href: '/help', icon: HelpCircle },
-  { name: 'Settings', href: '/settings', icon: Settings },
-]
-
-export function Sidebar() {
+export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
-  const [activeTab, setActiveTab] = useState<'drafts' | 'scheduled' | 'posted'>('drafts')
-  const [drafts, setDrafts] = useState<Draft[]>([
-    {
-      id: '1',
-      title: 'We added torque and joint limits to Asimov\'s simulation...',
-      updatedAt: new Date(),
-      status: 'draft',
-    },
-    {
-      id: '2',
-      title: 'We\'re open-sourcing firmware for Asimov, a humanoid robot...',
-      updatedAt: new Date(Date.now() - 86400000),
-      status: 'scheduled',
-    },
-    {
-      id: '3',
-      title: 'We\'re going to have a pair of humanoid robot legs running...',
-      updatedAt: new Date(Date.now() - 172800000),
-      status: 'draft',
-    },
-  ])
+  const params = useParams()
+  const teamSlug = params.teamSlug as string
 
-  const handleDeleteDraft = (id: string) => {
-    setDrafts(drafts.filter(d => d.id !== id))
-  }
+  const navItems = [
+    { icon: Home, href: `/${teamSlug}`, label: "Home" },
+    { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
+    { icon: Calendar, href: `/${teamSlug}/calendar`, label: "Calendar" },
+    { icon: Settings, href: `/${teamSlug}/settings`, label: "Settings" },
+  ]
+
+  const bottomNavItems = [
+    { icon: Image, href: `/${teamSlug}/content`, label: "Drafts", tooltip: "Drafts" },
+    { icon: Users, href: `/${teamSlug}/team`, label: "Team", tooltip: "Team" },
+    { icon: Zap, href: `/${teamSlug}/features`, label: "Features", tooltip: "Features" },
+    { icon: Bookmark, href: `/${teamSlug}/saved`, label: "Saved", tooltip: "Saved" },
+    { icon: MessageSquare, href: `/${teamSlug}/threads`, label: "Threads", tooltip: "Threads" },
+  ]
+
+  const [drafts] = useState<Draft[]>([
+    { id: '1', title: 'Product launch announcement', updatedAt: new Date(), status: 'draft' },
+    { id: '2', title: 'Weekly newsletter update', updatedAt: new Date(Date.now() - 86400000), status: 'scheduled' },
+    { id: '3', title: 'Thank you post for new customers', updatedAt: new Date(Date.now() - 172800000), status: 'draft' },
+  ])
 
   const getRelativeTime = (date: Date) => {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
@@ -78,147 +50,100 @@ export function Sidebar() {
     return `${days}d ago`
   }
 
-  const currentTeam = { name: 'Asimov', slug: 'asimovinc' }
-
   return (
-    <aside className="w-[280px] border-r bg-[#F8F9FA] flex flex-col shrink-0 h-full">
-      {/* Brand Header */}
-      <div className="flex h-12 items-center justify-between border-b px-3 shrink-0">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-pink-500">
-            <span className="text-sm font-bold text-white">A</span>
-          </div>
-          <span className="font-semibold text-gray-900">Asimov</span>
-          <span className="text-lg">®</span>
+    <aside className={cn("flex flex-col h-full bg-background border-r border-[#E5E5E7]", className)}>
+      {/* New Post button */}
+      <div className="px-4 py-4 border-b border-[#E5E5E7]">
+        <Link
+          href={`/${teamSlug}/content/new`}
+          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#1C1C1E] text-white text-[14px] font-medium rounded-[6px] hover:bg-[#2C2C2E] transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New post</span>
         </Link>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Search className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Columns className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex border-b bg-white px-2 shrink-0">
-        {(['drafts', 'scheduled', 'posted'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              'flex-1 px-3 py-2.5 text-sm font-medium transition-colors relative',
-              activeTab === tab
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* New Draft Button */}
-      <div className="p-3 shrink-0">
-        <Button className="w-full gap-1.5 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm font-medium py-2">
-          <Plus className="h-4 w-4" />
-          New draft
-        </Button>
-      </div>
-
-      {/* Draft List */}
-      <div className="flex-1 overflow-y-auto px-2">
-        {drafts.map((draft, index) => (
-          <div
-            key={draft.id}
-            className={cn(
-              'group relative py-2.5 px-2 rounded-lg hover:bg-gray-100 cursor-pointer mb-0.5',
-              index !== drafts.length - 1 && 'border-b border-gray-100'
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p className="flex-1 text-sm text-gray-900 line-clamp-2 font-normal">
-                {draft.title}
-              </p>
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteDraft(draft.id)
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            {/* Status + Timestamp */}
-            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1.5">
-              <span className={cn(
-                'w-1.5 h-1.5 rounded-full',
-                draft.status === 'scheduled' ? 'bg-blue-500' : 'bg-gray-400'
-              )} />
-              {draft.status === 'scheduled' ? 'Scheduled' : `Edited ${getRelativeTime(draft.updatedAt)}`}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Latest Update Activity */}
-      <div className="border-t">
-        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-            <span className="text-sm font-medium text-gray-700">Latest update</span>
-          </div>
-          <ChevronRight className="h-4 w-4 text-gray-400" />
-        </div>
-      </div>
-
-      {/* Bottom Navigation */}
-      <div className="border-t bg-white px-2 py-1">
-        <nav className="flex items-center justify-between">
-          {navigation.map((item) => {
-            const isActive = pathname.includes(item.href)
+      {/* Main Navigation */}
+      <nav className="flex-1 overflow-y-auto custom-scrollbar py-4">
+        <div className="space-y-1 px-3">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href
             return (
               <Link
-                key={item.name}
-                href={`/${currentTeam.slug}${item.href}`}
+                key={item.href}
+                href={item.href}
                 className={cn(
-                  'relative group flex flex-col items-center gap-0.5 px-2 py-2 text-xs transition-colors',
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-[14px]",
                   isActive
-                    ? 'text-blue-500'
-                    : 'text-muted-foreground hover:text-gray-900'
+                    ? "text-[#1C1C1E] font-medium"
+                    : "text-[#6C6C70] hover:text-[#1C1C1E]"
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                <span className="text-[10px]">{item.name}</span>
-                {isActive && (
-                  <div className="absolute left-0 right-0 -bottom-1 h-0.5 bg-blue-500" />
-                )}
-                {/* Tooltip on hover */}
-                <span className="absolute left-1/2 -translate-x-1/2 -top-8 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                  {item.name}
-                </span>
+                <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "text-[#007AFF]")} />
+                <span>{item.label}</span>
               </Link>
             )
           })}
-        </nav>
+        </div>
+
+        {/* Drafts Section */}
+        <div className="mt-6 px-3">
+          <div className="flex items-center justify-between px-3 mb-2">
+            <span className="text-[13px] font-medium text-[#8E8E93] uppercase tracking-wide">
+              Drafts
+            </span>
+            <Link
+              href={`/${teamSlug}/content`}
+              className="text-[13px] text-[#6C6C70] hover:text-[#1C1C1E]"
+            >
+              View all
+            </Link>
+          </div>
+          <div className="space-y-1">
+            {drafts.map((draft) => {
+              const isActive = pathname === `/${teamSlug}/content/${draft.id}`
+              return (
+                <Link
+                  key={draft.id}
+                  href={`/${teamSlug}/content/${draft.id}`}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+                    isActive && "border-l-2 border-[#007AFF] pl-[10px]"
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("text-[14px] truncate", isActive ? "text-[#1C1C1E] font-medium" : "text-[#1C1C1E]")}>
+                      {draft.title}
+                    </p>
+                    <p className="text-[13px] text-[#8E8E93]">{getRelativeTime(draft.updatedAt)}</p>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* Bottom Navigation */}
+      <div className="border-t border-[#E5E5E7] py-3 px-2">
+        <div className="flex items-center justify-between">
+          {bottomNavItems.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center justify-center p-2 rounded-lg transition-colors relative group",
+                  isActive ? "text-[#007AFF]" : "text-[#6C6C70] hover:text-[#1C1C1E]"
+                )}
+                title={item.tooltip}
+              >
+                <item.icon className="w-5 h-5" />
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </aside>
   )

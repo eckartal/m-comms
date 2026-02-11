@@ -15,6 +15,7 @@ interface PublishControlsProps {
   scheduledDate?: Date | null
   isPublishing?: boolean
   isScheduling?: boolean
+  disabled?: boolean
 }
 
 export function PublishControls({
@@ -23,9 +24,10 @@ export function PublishControls({
   scheduledDate,
   isPublishing = false,
   isScheduling = false,
+  disabled = false,
 }: PublishControlsProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 mt-8">
       {/* Primary Actions - Fixed Button Hierarchy */}
       <div className="flex gap-3">
         {/* Schedule - Ghost style (secondary) */}
@@ -33,32 +35,34 @@ export function PublishControls({
           variant="outline"
           className={cn(
             'flex-1 gap-1.5 font-medium',
-            'border-gray-300 bg-white text-gray-700',
-            'hover:bg-gray-50 hover:border-gray-400',
-            'py-2.5 px-4'
+            'border-[#E5E5E7] bg-white text-[#6C6C70]',
+            'hover:bg-[#FAFAFA] hover:text-[#1C1C1E] hover:border-[#1C1C1E]',
+            'py-2.5 px-4',
+            'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
           onClick={onSchedule}
-          disabled={isScheduling || isPublishing}
+          disabled={disabled || isScheduling || isPublishing}
         >
           <Calendar className="h-4 w-4" />
           Schedule
-          <ChevronDown className="h-3 w-3 ml-auto text-gray-400" />
+          <ChevronDown className="h-3 w-3 ml-auto text-[#8E8E93]" />
         </Button>
 
-        {/* Publish - Solid blue (primary) */}
+        {/* Publish - Solid black (primary) */}
         <Button
           className={cn(
             'flex-1 gap-1.5 font-medium',
-            'bg-blue-500 border-blue-500 text-white',
-            'hover:bg-blue-600 hover:border-blue-600',
-            'py-2.5 px-6'
+            'bg-[#1C1C1E] border-[#1C1C1E] text-white',
+            'hover:bg-[#2C2C2E] hover:border-[#2C2C2E]',
+            'py-2.5 px-6',
+            'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
           onClick={onPublish}
-          disabled={isPublishing || isScheduling}
+          disabled={disabled || isPublishing || isScheduling}
         >
           {isPublishing ? (
             <>
-              <span className="animate-spin">⏳</span>
+              <span className="animate-spin">◌</span>
               Publishing...
             </>
           ) : (
@@ -69,16 +73,16 @@ export function PublishControls({
 
       {/* Keyboard Shortcut Hint */}
       <div className="text-center">
-        <span className="text-xs text-gray-400">
-          Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">⌘</kbd>
-          <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600">↵</kbd> to publish
+        <span className="text-xs text-[#8E8E93]">
+          Press <kbd className="px-1.5 py-0.5 bg-[#F5F5F7] rounded text-[#6C6C70] font-medium">⌘</kbd>
+          <kbd className="px-1.5 py-0.5 bg-[#F5F5F7] rounded text-[#6C6C70] font-medium">↵</kbd> to publish
         </span>
       </div>
 
       {/* Scheduled Date Display */}
       {scheduledDate && (
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        <div className="flex items-center justify-center gap-2 text-sm text-[#34C759]">
+          <CheckCircle2 className="h-4 w-4" />
           <span>Scheduled for {scheduledDate.toLocaleDateString()}</span>
         </div>
       )}

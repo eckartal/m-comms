@@ -2,45 +2,92 @@
 
 import { useState, useEffect, KeyboardEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  List,
-  Sparkles,
-  ChevronDown,
-  Check,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
+import { useAppStore } from '@/stores'
+import { Template, PlatformType } from '@/types'
+import { Clock, Image, FileText, Sparkles } from 'lucide-react'
+
+// Platform configurations with character limits
+const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
+  twitter: { name: 'X (Twitter)', limit: 280, icon: '𝕏' },
+  linkedin: { name: 'LinkedIn', limit: 3000, icon: 'in' },
+  instagram: { name: 'Instagram', limit: 2200, icon: '📷' },
+  blog: { name: 'Blog', limit: 10000, icon: '📝' },
+}
+
+// Platform-specific templates
+const TEMPLATES: Record<PlatformType, { name: string; content: string }[]> = {
+  twitter: [
+    { name: 'Announcement', content: '🚀 Big news coming soon! Stay tuned.' },
+    { name: 'Tip', content: '💡 Pro tip: ' },
+    { name: 'Question', content: 'Quick question for the community: ' },
+    { name: 'Thread starter', content: '🧵 Here\'s how we built our latest feature:\n\n1. Start with the problem\n\n2. ' },
+  ],
+  linkedin: [
+    { name: 'Case Study', content: 'How we increased metrics by 200%:\n\nThe challenge:\n\nThe solution:\n\nThe results:\n\n👇 What\'s your experience?' },
+    { name: 'Thought Leadership', content: 'Most companies focus on the wrong metrics.\n\nHere\'s why engagement beats reach every time:\n\n[Your insight here]\n\nAgree or disagree?' },
+    { name: 'Update', content: 'Excited to share that we\'re launching a new feature! 🚀\n\nWhat it does:\n\nWhy it matters:\n\nLink in comments 👇' },
+  ],
+  instagram: [
+    { name: 'Product Launch', content: '✨ NEW: [Product Name]\n\nFinally here! We\'ve been working on this for [timeframe] and can\'t wait to hear what you think.\n\n#newproduct #[YourBrand]' },
+    { name: 'Behind the Scenes', content: 'Behind every post is hours of work. 👀\n\nHere\'s a look at how we create content:\n\n[Your BTS content here]\n\nDouble tap if you love BTS content! ❤️' },
+  ],
+  blog: [
+    { name: 'How-To Guide', content: '## How to [Achieve Result]\n\nIn this guide, you\'ll learn:\n\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]\n\nLet\'s dive in.\n\n---' },
+    { name: 'Announcement', content: '## Big Update: [Title]\n\nWe\'re excited to announce [news].\n\n### What changed\n\n[Details here]\n\n### What this means for you\n\n[Impact]\n\nLet us know what you think!' },
+  ],
+}
 
 export default function NewContentPage() {
   const router = useRouter()
   const params = useParams()
   const teamSlug = params.teamSlug as string
+  const { currentUser, currentTeam } = useAppStore()
 
   const [content, setContent] = useState('')
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isSaved, setIsSaved] = useState(true)
+  const [showTemplates, setShowTemplates] = useState(false)
 
+  const maxChars = PLATFORMS[selectedPlatform].limit
   const characterCount = content.length
-  const maxCharacters = 280
+  const isOverLimit = characterCount > maxChars
+  const isNearLimit = characterCount > maxChars * 0.8
 
-  // Auto-save indicator
+  // Load saved draft from localStorage on mount
   useEffect(() => {
-    if (content) {
+    const savedDraft = localStorage.getItem(`draft_${teamSlug}`)
+    if (savedDraft) {
+      try {
+        const { content: savedContent, platform, bookmarked } = JSON.parse(savedDraft)
+        setContent(savedContent || '')
+        setSelectedPlatform((platform as PlatformType) || 'twitter')
+        setIsBookmarked(bookmarked || false)
+      } catch (e) {
+        console.error('Failed to load draft', e)
+      }
+    }
+  }, [teamSlug])
+
+  // Auto-save to localStorage
+  useEffect(() => {
+    if (content || selectedPlatform || isBookmarked) {
       setIsSaved(false)
-      const timer = setTimeout(() => setIsSaved(true), 1000)
+      const timer = setTimeout(() => {
+        localStorage.setItem(`draft_${teamSlug}`, JSON.stringify({
+          content,
+          platform: selectedPlatform,
+          bookmarked: isBookmarked,
+          savedAt: new Date().toISOString()
+        }))
+        setIsSaved(true)
+      }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [content])
+  }, [content, selectedPlatform, isBookmarked, teamSlug])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -49,10 +96,6 @@ export default function NewContentPage() {
         e.preventDefault()
         handlePublish()
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        // Already auto-saving
-      }
     }
 
     document.addEventListener('keydown', handleKeyDown as any)
@@ -60,103 +103,163 @@ export default function NewContentPage() {
   }, [content])
 
   const handlePublish = async () => {
-    if (characterCount === 0) return
+    if (characterCount === 0 || isOverLimit) return
     setIsPublishing(true)
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500))
+    // Clear draft after successful publish
+    localStorage.removeItem(`draft_${teamSlug}`)
     setIsPublishing(false)
     router.push(`/${teamSlug}/content`)
   }
 
   const handleSchedule = () => {
-    console.log('Scheduling:', content)
+    console.log('Scheduling:', { content, platform: selectedPlatform })
   }
 
-  // Mock current user data
-  const currentUser = {
-    name: 'Asimov',
-    handle: '@asimovinc',
-    avatar_url: null,
+  const applyTemplate = (templateContent: string) => {
+    setContent(templateContent)
+    setShowTemplates(false)
+  }
+
+  const clearContent = () => {
+    setContent('')
+    localStorage.removeItem(`draft_${teamSlug}`)
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Top Bar - Back Button & Account Switcher */}
-      <header className="flex items-center justify-between px-4 py-2 border-b">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="text-gray-500"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
-
-        {/* Auto-save Indicator */}
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          {isSaved ? (
-            <>
-              <Check className="h-4 w-4 text-green-500" />
-              Saved
-            </>
-          ) : (
-            'Saving...'
-          )}
+    <div className="flex flex-col h-full bg-background">
+      {/* Account Header */}
+      <header className="px-12 py-4 border-b border-[#E5E5E7]">
+        <div className="flex items-center justify-between">
+          <span className="text-[14px] font-medium text-[#1C1C1E]">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
+          <div className="flex items-center gap-4">
+            {/* Auto-save indicator */}
+            <span className={`text-xs flex items-center gap-1 ${
+              isSaved ? 'text-[#8E8E93]' : 'text-[#007AFF]'
+            }`}>
+              {!isSaved ? (
+                <>
+                  <span className="w-2 h-2 bg-[#007AFF] rounded-full animate-pulse" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 bg-[#34C759] rounded-full" />
+                  Saved
+                </>
+              )}
+            </span>
+          </div>
         </div>
-
-        {/* Account Switcher with Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={currentUser.avatar_url || undefined} />
-                <AvatarFallback className="bg-gradient-to-br from-orange-400 to-pink-500 text-white text-xs">
-                  A
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex items-center gap-1">
-                <span className="font-medium text-sm text-gray-900">{currentUser.name}</span>
-                <span className="text-gray-400">✓</span>
-              </div>
-              <ChevronDown className="h-3 w-3 text-gray-400" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem>Switch Account</DropdownMenuItem>
-            <DropdownMenuItem>Manage Accounts</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </header>
 
       {/* Composition Area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto py-6 px-6">
+        <div className="max-w-[680px] mx-auto px-12 py-8">
+          {/* Platform Selector & Quick Actions */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              {Object.entries(PLATFORMS).map(([key, config]) => (
+                <button
+                  key={key}
+                  onClick={() => setSelectedPlatform(key as PlatformType)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all ${
+                    selectedPlatform === key
+                      ? 'bg-[#1C1C1E] text-white'
+                      : 'bg-[#F5F5F7] text-[#6C6C70] hover:bg-[#E5E5E7]'
+                  }`}
+                >
+                  <span>{config.icon}</span>
+                  <span className="hidden sm:inline">{config.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowTemplates(!showTemplates)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#1C1C1E] transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                Templates
+              </button>
+              {content && (
+                <button
+                  onClick={clearContent}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#ef4444] transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Templates Dropdown */}
+          {showTemplates && (
+            <div className="mb-6 p-4 bg-[#FAFAFA] rounded-[8px] border border-[#E5E5E7]">
+              <p className="text-xs font-medium text-[#8E8E93] mb-3 uppercase tracking-wider">Templates for {PLATFORMS[selectedPlatform].name}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {TEMPLATES[selectedPlatform].map((template, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => applyTemplate(template.content)}
+                    className="text-left px-3 py-2 rounded-[6px] hover:bg-[#E5E5E7] transition-colors"
+                  >
+                    <span className="text-[14px] font-medium text-[#1C1C1E]">{template.name}</span>
+                    <p className="text-[12px] text-[#8E8E93] mt-0.5 line-clamp-1">
+                      {template.content.split('\n')[0]}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Text Area */}
           <textarea
-            placeholder="What would you like to share?"
+            placeholder={`What is happening on ${PLATFORMS[selectedPlatform].name}?`}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full min-h-[200px] resize-none border-none outline-none text-base text-gray-900 placeholder:text-gray-400 leading-relaxed"
-            style={{ lineHeight: '1.6' }}
+            className="w-full h-[240px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-[#8E8E93]"
           />
+
+          {/* Editor Toolbar */}
+          <EditorToolbar
+            characterCount={characterCount}
+            maxCharacters={maxChars}
+            isBookmarked={isBookmarked}
+            onBookmark={() => setIsBookmarked(!isBookmarked)}
+          />
+
+          {/* Publish Controls */}
+          <PublishControls
+            onPublish={handlePublish}
+            onSchedule={handleSchedule}
+            isPublishing={isPublishing}
+            disabled={characterCount === 0 || isOverLimit}
+            scheduledDate={null}
+          />
+
+          {/* Character/Visual Limit Warning */}
+          {content.length > 0 && (
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <span className={`text-[12px] tabular-nums ${
+                isOverLimit
+                  ? 'text-[#ef4444]'
+                  : isNearLimit
+                  ? 'text-[#F59E0B]'
+                  : 'text-[#8E8E93]'
+              }`}>
+                {characterCount.toLocaleString()} / {maxChars.toLocaleString()} characters
+              </span>
+              {isOverLimit && (
+                <span className="text-[12px] text-[#ef4444]">
+                  {characterCount - maxChars} characters over limit
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Editor Toolbar */}
-      <EditorToolbar
-        characterCount={characterCount}
-        maxCharacters={maxCharacters}
-        isBookmarked={isBookmarked}
-        onBookmark={() => setIsBookmarked(!isBookmarked)}
-      />
-
-      {/* Publishing Controls */}
-      <div className="border-t px-6 py-4 bg-white">
-        <PublishControls
-          onSchedule={handleSchedule}
-          onPublish={handlePublish}
-          isPublishing={isPublishing}
-        />
       </div>
     </div>
   )
