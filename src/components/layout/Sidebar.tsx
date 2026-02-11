@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Home, BarChart3, Calendar, Settings, Users, Zap, Plus, Image, Bookmark, MessageSquare, Thread } from 'lucide-react'
+import { Home, BarChart3, Calendar, Settings, Users, Zap, Plus, Image, Bookmark, MessageSquare } from 'lucide-react'
 
 interface Draft {
   id: string

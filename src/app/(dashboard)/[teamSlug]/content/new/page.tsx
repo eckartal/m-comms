@@ -1,21 +1,15 @@
 'use client'
 
-import { useState, useEffect, KeyboardEvent, useCallback } from 'react'
+import { useState, useEffect, KeyboardEvent } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { useAppStore } from '@/stores'
-import { Template, PlatformType } from '@/types'
+import { PlatformType } from '@/types'
 import {
-  Clock,
-  Image,
-  FileText,
   Sparkles,
   Plus,
   X,
-  GripVertical,
-  ChevronDown,
-  ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -110,24 +104,6 @@ export default function NewContentPage() {
     return () => clearTimeout(timer)
   }, [thread, selectedPlatform, isBookmarked, teamSlug])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault()
-        handlePublish()
-      }
-      // Cmd+Enter to add new tweet when in last tweet
-      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown' && activeIndex === thread.length - 1 && currentContent.length > 0) {
-        e.preventDefault()
-        addTweet()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown as any)
-    return () => document.removeEventListener('keydown', handleKeyDown as any)
-  }, [activeIndex, thread.length, currentContent])
-
   // Handle text change
   const handleContentChange = (index: number, value: string) => {
     const newThread = [...thread]
@@ -180,6 +156,24 @@ export default function NewContentPage() {
   const handleSchedule = () => {
     console.log('Scheduling thread:', thread)
   }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        handlePublish()
+      }
+      // Cmd+Enter to add new tweet when in last tweet
+      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown' && activeIndex === thread.length - 1 && currentContent.length > 0) {
+        e.preventDefault()
+        addTweet()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [activeIndex, thread.length, currentContent, addTweet, handlePublish])
 
   // Merge tweets indicator
   const canMerge = thread.length > 1 && activeIndex < thread.length - 1
