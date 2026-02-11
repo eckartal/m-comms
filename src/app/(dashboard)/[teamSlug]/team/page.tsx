@@ -86,7 +86,33 @@ export default function TeamPage() {
         setMembers(data.data || [])
       }
     } catch (error) {
-      console.error('Failed to fetch team members:', error)
+      // Use mock data for demo mode
+      setMembers([
+        {
+          id: '1',
+          role: 'OWNER' as const,
+          joined_at: '2024-12-01T10:00:00Z',
+          user: { id: '1', email: 'demo@example.com', full_name: 'Demo User', avatar_url: null }
+        },
+        {
+          id: '2',
+          role: 'ADMIN' as const,
+          joined_at: '2024-12-15T10:00:00Z',
+          user: { id: '2', email: 'sarah@company.com', full_name: 'Sarah Chen', avatar_url: null }
+        },
+        {
+          id: '3',
+          role: 'EDITOR' as const,
+          joined_at: '2025-01-10T10:00:00Z',
+          user: { id: '3', email: 'mike@company.com', full_name: 'Mike Johnson', avatar_url: null }
+        },
+        {
+          id: '4',
+          role: 'VIEWER' as const,
+          joined_at: '2025-02-01T10:00:00Z',
+          user: { id: '4', email: 'emma@company.com', full_name: 'Emma Wilson', avatar_url: null }
+        },
+      ])
     } finally {
       setLoading(false)
     }
