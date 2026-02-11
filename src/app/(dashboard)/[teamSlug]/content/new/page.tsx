@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useEffect, KeyboardEvent } from 'react'
+import { useState, useEffect, KeyboardEvent, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { useAppStore } from '@/stores'
 import { Template, PlatformType } from '@/types'
-import { Clock, Image, FileText, Sparkles } from 'lucide-react'
+import {
+  Clock,
+  Image,
+  FileText,
+  Sparkles,
+  Plus,
+  X,
+  GripVertical,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 // Platform configurations with character limits
 const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
@@ -39,13 +50,20 @@ const TEMPLATES: Record<PlatformType, { name: string; content: string }[]> = {
   ],
 }
 
+// Thread item type
+interface ThreadItem {
+  id: string
+  content: string
+}
+
 export default function NewContentPage() {
   const router = useRouter()
   const params = useParams()
   const teamSlug = params.teamSlug as string
-  const { currentUser, currentTeam } = useAppStore()
+  const { currentUser } = useAppStore()
 
-  const [content, setContent] = useState('')
+  const [thread, setThread] = useState<ThreadItem[]>([{ id: '1', content: '' }])
+  const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
@@ -53,19 +71,24 @@ export default function NewContentPage() {
   const [showTemplates, setShowTemplates] = useState(false)
 
   const maxChars = PLATFORMS[selectedPlatform].limit
-  const characterCount = content.length
+  const currentContent = thread[activeIndex]?.content || ''
+  const characterCount = currentContent.length
   const isOverLimit = characterCount > maxChars
   const isNearLimit = characterCount > maxChars * 0.8
+  const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
 
   // Load saved draft from localStorage on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(`draft_${teamSlug}`)
     if (savedDraft) {
       try {
-        const { content: savedContent, platform, bookmarked } = JSON.parse(savedDraft)
-        setContent(savedContent || '')
-        setSelectedPlatform((platform as PlatformType) || 'twitter')
-        setIsBookmarked(bookmarked || false)
+        const data = JSON.parse(savedDraft)
+        if (data.thread && Array.isArray(data.thread) && data.thread.length > 0) {
+          setThread(data.thread)
+          setActiveIndex(data.thread.length - 1)
+        }
+        setSelectedPlatform((data.platform as PlatformType) || 'twitter')
+        setIsBookmarked(data.bookmarked || false)
       } catch (e) {
         console.error('Failed to load draft', e)
       }
@@ -74,20 +97,18 @@ export default function NewContentPage() {
 
   // Auto-save to localStorage
   useEffect(() => {
-    if (content || selectedPlatform || isBookmarked) {
-      setIsSaved(false)
-      const timer = setTimeout(() => {
-        localStorage.setItem(`draft_${teamSlug}`, JSON.stringify({
-          content,
-          platform: selectedPlatform,
-          bookmarked: isBookmarked,
-          savedAt: new Date().toISOString()
-        }))
-        setIsSaved(true)
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [content, selectedPlatform, isBookmarked, teamSlug])
+    setIsSaved(false)
+    const timer = setTimeout(() => {
+      localStorage.setItem(`draft_${teamSlug}`, JSON.stringify({
+        thread,
+        platform: selectedPlatform,
+        bookmarked: isBookmarked,
+        savedAt: new Date().toISOString()
+      }))
+      setIsSaved(true)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [thread, selectedPlatform, isBookmarked, teamSlug])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -96,35 +117,72 @@ export default function NewContentPage() {
         e.preventDefault()
         handlePublish()
       }
+      // Cmd+Enter to add new tweet when in last tweet
+      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown' && activeIndex === thread.length - 1 && currentContent.length > 0) {
+        e.preventDefault()
+        addTweet()
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown as any)
     return () => document.removeEventListener('keydown', handleKeyDown as any)
-  }, [content])
+  }, [activeIndex, thread.length, currentContent])
+
+  // Handle text change
+  const handleContentChange = (index: number, value: string) => {
+    const newThread = [...thread]
+    newThread[index] = { ...newThread[index], content: value }
+    setThread(newThread)
+  }
+
+  // Add new tweet
+  const addTweet = () => {
+    const newId = Date.now().toString()
+    setThread([...thread, { id: newId, content: '' }])
+    setActiveIndex(thread.length)
+  }
+
+  // Remove tweet
+  const removeTweet = (index: number) => {
+    if (thread.length === 1) {
+      setThread([{ id: '1', content: '' }])
+      setActiveIndex(0)
+      return
+    }
+    const newThread = thread.filter((_, i) => i !== index)
+    setThread(newThread)
+    setActiveIndex(Math.min(index, newThread.length - 1))
+  }
+
+  // Apply template
+  const applyTemplate = (templateContent: string) => {
+    handleContentChange(activeIndex, templateContent)
+    setShowTemplates(false)
+  }
+
+  // Clear all
+  const clearAll = () => {
+    setThread([{ id: Date.now().toString(), content: '' }])
+    setActiveIndex(0)
+    localStorage.removeItem(`draft_${teamSlug}`)
+  }
 
   const handlePublish = async () => {
-    if (characterCount === 0 || isOverLimit) return
+    const hasContent = thread.some(t => t.content.trim().length > 0)
+    if (!hasContent) return
     setIsPublishing(true)
     await new Promise(resolve => setTimeout(resolve, 1500))
-    // Clear draft after successful publish
     localStorage.removeItem(`draft_${teamSlug}`)
     setIsPublishing(false)
     router.push(`/${teamSlug}/content`)
   }
 
   const handleSchedule = () => {
-    console.log('Scheduling:', { content, platform: selectedPlatform })
+    console.log('Scheduling thread:', thread)
   }
 
-  const applyTemplate = (templateContent: string) => {
-    setContent(templateContent)
-    setShowTemplates(false)
-  }
-
-  const clearContent = () => {
-    setContent('')
-    localStorage.removeItem(`draft_${teamSlug}`)
-  }
+  // Merge tweets indicator
+  const canMerge = thread.length > 1 && activeIndex < thread.length - 1
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -133,21 +191,22 @@ export default function NewContentPage() {
         <div className="flex items-center justify-between">
           <span className="text-[14px] font-medium text-[#1C1C1E]">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
           <div className="flex items-center gap-4">
+            {/* Thread count */}
+            {thread.length > 1 && (
+              <span className="text-xs text-[#6C6C70]">
+                {thread.length} tweets
+              </span>
+            )}
             {/* Auto-save indicator */}
-            <span className={`text-xs flex items-center gap-1 ${
+            <span className={cn(
+              'text-xs flex items-center gap-1',
               isSaved ? 'text-[#8E8E93]' : 'text-[#007AFF]'
-            }`}>
-              {!isSaved ? (
-                <>
-                  <span className="w-2 h-2 bg-[#007AFF] rounded-full animate-pulse" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 bg-[#34C759] rounded-full" />
-                  Saved
-                </>
-              )}
+            )}>
+              <span className={cn(
+                'w-2 h-2 rounded-full',
+                isSaved ? 'bg-[#34C759]' : 'bg-[#007AFF] animate-pulse'
+              )} />
+              {isSaved ? 'Saved' : 'Saving...'}
             </span>
           </div>
         </div>
@@ -163,11 +222,12 @@ export default function NewContentPage() {
                 <button
                   key={key}
                   onClick={() => setSelectedPlatform(key as PlatformType)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all ${
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all',
                     selectedPlatform === key
                       ? 'bg-[#1C1C1E] text-white'
                       : 'bg-[#F5F5F7] text-[#6C6C70] hover:bg-[#E5E5E7]'
-                  }`}
+                  )}
                 >
                   <span>{config.icon}</span>
                   <span className="hidden sm:inline">{config.name}</span>
@@ -183,9 +243,9 @@ export default function NewContentPage() {
                 <Sparkles className="w-4 h-4" />
                 Templates
               </button>
-              {content && (
+              {thread.some(t => t.content) && (
                 <button
-                  onClick={clearContent}
+                  onClick={clearAll}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#ef4444] transition-colors"
                 >
                   Clear
@@ -215,13 +275,119 @@ export default function NewContentPage() {
             </div>
           )}
 
-          {/* Main Text Area */}
-          <textarea
-            placeholder={`What is happening on ${PLATFORMS[selectedPlatform].name}?`}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full h-[240px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-[#8E8E93]"
-          />
+          {/* Thread Items */}
+          <div className="space-y-0">
+            {thread.map((item, index) => {
+              const isActive = activeIndex === index
+              const itemCharCount = item.content.length
+              const itemOverLimit = itemCharCount > maxChars
+
+              return (
+                <div key={item.id}>
+                  {/* Thread connector line */}
+                  {index > 0 && (
+                    <div className="flex">
+                      <div className="w-8 flex items-center justify-center">
+                        <div className="w-0.5 h-6 bg-[#E5E5E7]" />
+                      </div>
+                      <div className="flex-1" />
+                    </div>
+                  )}
+
+                  {/* Tweet item */}
+                  <div
+                    className={cn(
+                      'relative rounded-[8px] transition-all cursor-text',
+                      isActive
+                        ? 'bg-white'
+                        : 'bg-transparent'
+                    )}
+                    onClick={() => setActiveIndex(index)}
+                  >
+                    {/* Tweet number */}
+                    <div className="absolute left-0 top-3 w-8 flex items-center justify-center">
+                      <span className={cn(
+                        'text-[13px] font-medium',
+                        isActive ? 'text-[#8E8E93]' : 'text-[#E5E5E7]'
+                      )}>
+                        {index + 1}
+                      </span>
+                    </div>
+
+                    {/* Content area */}
+                    <div className="pl-12 pr-4">
+                      <textarea
+                        placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add next tweet...'}
+                        value={item.content}
+                        onChange={(e) => handleContentChange(index, e.target.value)}
+                        onFocus={() => setActiveIndex(index)}
+                        className={cn(
+                          'w-full min-h-[80px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-[#8E8E93]',
+                          isActive && 'mt-3'
+                        )}
+                        style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
+                      />
+
+                      {/* Character count & actions */}
+                      {isActive && (
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-2">
+                            {thread.length > 1 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removeTweet(index)
+                                }}
+                                className="p-1.5 text-[#8E8E93] hover:text-[#ef4444] hover:bg-[#FEF2F2] rounded transition-colors"
+                                title="Remove tweet"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                            {canMerge && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleContentChange(index, item.content + ' ' + thread[index + 1].content)
+                                  removeTweet(index + 1)
+                                }}
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7] rounded transition-colors"
+                                title="Merge with next tweet"
+                              >
+                                <Plus className="w-3 h-3" />
+                                Merge
+                              </button>
+                            )}
+                          </div>
+                          <span className={cn(
+                            'text-[12px] tabular-nums',
+                            itemOverLimit
+                              ? 'text-[#ef4444]'
+                              : itemCharCount > maxChars * 0.8
+                              ? 'text-[#F59E0B]'
+                              : 'text-[#8E8E93]'
+                          )}>
+                            {itemCharCount} / {maxChars}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Add Tweet Button */}
+          {selectedPlatform === 'twitter' && (
+            <button
+              onClick={addTweet}
+              className="mt-4 flex items-center gap-2 px-4 py-2 text-[14px] text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7] rounded-[6px] transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add tweet
+            </button>
+          )}
 
           {/* Editor Toolbar */}
           <EditorToolbar
@@ -229,6 +395,7 @@ export default function NewContentPage() {
             maxCharacters={maxChars}
             isBookmarked={isBookmarked}
             onBookmark={() => setIsBookmarked(!isBookmarked)}
+            onAddThread={selectedPlatform === 'twitter' ? addTweet : undefined}
           />
 
           {/* Publish Controls */}
@@ -236,27 +403,16 @@ export default function NewContentPage() {
             onPublish={handlePublish}
             onSchedule={handleSchedule}
             isPublishing={isPublishing}
-            disabled={characterCount === 0 || isOverLimit}
+            disabled={totalCharacters === 0}
             scheduledDate={null}
           />
 
-          {/* Character/Visual Limit Warning */}
-          {content.length > 0 && (
+          {/* Total character count (for threads) */}
+          {thread.length > 1 && (
             <div className="mt-4 flex items-center justify-center gap-4">
-              <span className={`text-[12px] tabular-nums ${
-                isOverLimit
-                  ? 'text-[#ef4444]'
-                  : isNearLimit
-                  ? 'text-[#F59E0B]'
-                  : 'text-[#8E8E93]'
-              }`}>
-                {characterCount.toLocaleString()} / {maxChars.toLocaleString()} characters
+              <span className="text-[12px] text-[#8E8E93]">
+                {totalCharacters.toLocaleString()} total characters • {thread.length} tweets
               </span>
-              {isOverLimit && (
-                <span className="text-[12px] text-[#ef4444]">
-                  {characterCount - maxChars} characters over limit
-                </span>
-              )}
             </div>
           )}
         </div>
