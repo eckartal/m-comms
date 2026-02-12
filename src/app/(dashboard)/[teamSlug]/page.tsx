@@ -7,23 +7,25 @@ import {
   FileText,
   Calendar,
   ChevronRight,
-  FileStack,
-  CheckCircle,
   Clock,
   Edit,
   Eye,
+  CheckCircle,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { ContentStatus } from '@/types'
 
-// Mock data
-const stats = {
-  totalContent: 24,
-  published: 18,
-  scheduled: 4,
-  engagement: '4.2%',
-}
+const stats = [
+  { label: 'total', value: '24' },
+  { label: 'published', value: '18' },
+  { label: 'scheduled', value: '4' },
+  { label: 'engagement', value: '4.2%' },
+]
 
 const recentContent = [
   { id: '1', title: 'Product Launch Announcement', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-15T10:00:00Z', platforms: ['twitter', 'linkedin'] },
@@ -38,13 +40,13 @@ const platformIcons: Record<string, string> = {
   blog: '📝',
 }
 
-const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; bg: string; icon: typeof Edit }> = {
-  DRAFT: { label: 'Draft', color: 'text-[#6B7280]', bg: 'bg-[#F3F4F6]', icon: Edit },
-  IN_REVIEW: { label: 'In Review', color: 'text-[#F59E0B]', bg: 'bg-[#FEF3C7]', icon: Eye },
-  APPROVED: { label: 'Approved', color: 'text-[#10B981]', bg: 'bg-[#D1FAE5]', icon: CheckCircle },
-  SCHEDULED: { label: 'Scheduled', color: 'text-[#3B82F6]', bg: 'bg-[#DBEAFE]', icon: Clock },
-  PUBLISHED: { label: 'Published', color: 'text-[#8B5CF6]', bg: 'bg-[#EDE9FE]', icon: CheckCircle },
-  ARCHIVED: { label: 'Archived', color: 'text-[#9CA3AF]', bg: 'bg-[#F3F4F6]', icon: FileText },
+const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon: typeof Edit }> = {
+  DRAFT: { label: 'Draft', color: 'text-[#737373]', icon: Edit },
+  IN_REVIEW: { label: 'In Review', color: 'text-yellow-500', icon: Eye },
+  APPROVED: { label: 'Approved', color: 'text-green-500', icon: CheckCircle },
+  SCHEDULED: { label: 'Scheduled', color: 'text-[#f97316]', icon: Clock },
+  PUBLISHED: { label: 'Published', color: 'text-white', icon: CheckCircle },
+  ARCHIVED: { label: 'Archived', color: 'text-[#525252]', icon: FileText },
 }
 
 export default function DashboardPage() {
@@ -71,69 +73,47 @@ export default function DashboardPage() {
     }
   }, [currentTeam, setCurrentTeam, setCurrentUser])
 
-  const formatDate = (date: string | null) => {
-    if (!date) return null
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+  const upcoming = [
+    { title: 'Product Launch', time: 'Feb 20, 10:00 AM', color: 'bg-[#f97316]' },
+    { title: 'Newsletter #46', time: 'Feb 22, 9:00 AM', color: 'bg-white' },
+  ]
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-12 py-12">
+    <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="max-w-4xl mx-auto px-4 py-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-[20px] font-medium text-[#1C1C1E] mb-1">
+        <div className="mb-4">
+          <h1 className="text-sm font-medium text-white">
             {currentTeam?.name || 'Dashboard'}
           </h1>
-          <p className="text-[14px] text-[#6C6C70]">
-            Here&apos;s what&apos;s happening with your content.
+          <p className="text-[11px] text-[#737373]">
+            What&apos;s happening with your content.
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4 hover:border-[#1C1C1E] transition-colors cursor-pointer group">
-            <p className="text-[13px] text-[#8E8E93] group-hover:text-[#6C6C70] transition-colors">Total Content</p>
-            <p className="text-[28px] font-medium text-[#1C1C1E] mt-1">{stats.totalContent}</p>
-          </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4 hover:border-[#8B5CF6] transition-colors cursor-pointer group">
-            <p className="text-[13px] text-[#8E8E93] group-hover:text-[#8B5CF6] transition-colors">Published</p>
-            <p className="text-[28px] font-medium text-[#1C1C1E] mt-1">{stats.published}</p>
-          </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4 hover:border-[#3B82F6] transition-colors cursor-pointer group">
-            <p className="text-[13px] text-[#8E8E93] group-hover:text-[#3B82F6] transition-colors">Scheduled</p>
-            <p className="text-[28px] font-medium text-[#1C1C1E] mt-1">{stats.scheduled}</p>
-          </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4 hover:border-[#10B981] transition-colors cursor-pointer group">
-            <p className="text-[13px] text-[#8E8E93] group-hover:text-[#10B981] transition-colors">Engagement</p>
-            <p className="text-[28px] font-medium text-[#1C1C1E] mt-1">{stats.engagement}</p>
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-px bg-[#262626] mb-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="bg-black p-3">
+              <p className="text-[10px] text-[#525252] uppercase">{stat.label}</p>
+              <p className="text-lg text-white mt-0.5">{stat.value}</p>
+            </div>
+          ))}
         </div>
 
-        {/* Two column layout */}
-        <div className="grid grid-cols-3 gap-8">
-          {/* Recent Content - 2 cols */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Recent Content */}
           <div className="col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-medium text-[#1C1C1E]">Recent Content</h2>
-              <Link
-                href={`/${currentTeam?.slug}/content`}
-                className="text-[14px] text-[#6C6C70] hover:text-[#1C1C1E] flex items-center gap-1 transition-colors"
-              >
-                View all
-                <ChevronRight className="w-4 h-4" />
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-medium text-white uppercase">Recent</h2>
+              <Link href={`/${currentTeam?.slug}/content`} className="text-[10px] text-[#737373] hover:text-white">
+                all
               </Link>
             </div>
-
-            <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
+            <div className="border border-[#262626]">
               {recentContent.map((content, index) => {
                 const isSelected = selectedId === content.id
                 const statusConfig = STATUS_CONFIG[content.status]
-                const StatusIcon = statusConfig.icon
 
                 return (
                   <Link
@@ -141,37 +121,27 @@ export default function DashboardPage() {
                     href={`/${currentTeam?.slug}/content/${content.id}`}
                     onClick={() => setSelectedId(content.id)}
                     className={cn(
-                      'flex items-center justify-between py-3 px-4 transition-colors',
-                      index !== recentContent.length - 1 && 'border-b border-[#E5E5E7]',
-                      isSelected ? 'bg-[#FAFAFA] border-l-2 border-[#007AFF] pl-[14px]' : 'hover:bg-[#FAFAFA]'
+                      'flex items-center gap-2 py-2 px-3 border-b border-[#262626] last:border-0 transition-colors',
+                      isSelected ? 'bg-[#171717]' : 'hover:bg-[#0a0a0a]'
                     )}
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {/* Status Icon */}
-                      <div className={cn(
-                        'w-8 h-8 rounded-[6px] flex items-center justify-center flex-shrink-0',
-                        statusConfig.bg
-                      )}>
-                        <StatusIcon className={cn('w-4 h-4', statusConfig.color)} />
-                      </div>
-
-                      <span className="text-[14px] text-[#1C1C1E] truncate">{content.title}</span>
+                    <div className={cn('w-6 h-6 flex items-center justify-center text-xs', statusConfig.color)}>
+                      <statusConfig.icon className="w-3.5 h-3.5" />
                     </div>
-
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                      {/* Platforms */}
-                      <div className="flex gap-1">
+                    <span className="text-xs text-white truncate flex-1">{content.title}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-0.5">
                         {content.platforms.map((p) => (
-                          <span key={p} className="text-xs bg-[#F5F5F7] px-1.5 py-0.5 rounded text-[#6C6C70]">
+                          <span key={p} className="text-[9px] bg-[#171717] px-1 py-0.5 text-[#737373]">
                             {platformIcons[p]}
                           </span>
                         ))}
                       </div>
-
-                      {/* Status */}
-                      <span className={cn('text-[12px] font-medium', statusConfig.color)}>
-                        {statusConfig.label}
-                      </span>
+                      <Badge variant={content.status === 'PUBLISHED' ? 'default' : 'secondary'}>
+                        <span className={cn('text-[9px]', statusConfig.color)}>
+                          {statusConfig.label}
+                        </span>
+                      </Badge>
                     </div>
                   </Link>
                 )
@@ -179,51 +149,41 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick Actions - 1 col */}
-          <div>
-            <h2 className="text-[16px] font-medium text-[#1C1C1E] mb-4">Quick Actions</h2>
-            <div className="space-y-2">
-              <Link
-                href={`/${currentTeam?.slug}/content/new`}
-                className="flex items-center gap-2 px-3 py-2.5 border border-[#E5E5E7] rounded-[6px] hover:bg-[#FAFAFA] hover:border-[#1C1C1E] transition-colors text-[14px] text-[#1C1C1E]"
-              >
-                <Plus className="w-4 h-4 text-[#6C6C70]" />
-                New post
-              </Link>
-              <Link
-                href={`/${currentTeam?.slug}/calendar`}
-                className="flex items-center gap-2 px-3 py-2.5 border border-[#E5E5E7] rounded-[6px] hover:bg-[#FAFAFA] hover:border-[#1C1C1E] transition-colors text-[14px] text-[#1C1C1E]"
-              >
-                <Calendar className="w-4 h-4 text-[#6C6C70]" />
-                Calendar
-              </Link>
-              <Link
-                href={`/${currentTeam?.slug}/content`}
-                className="flex items-center gap-2 px-3 py-2.5 border border-[#E5E5E7] rounded-[6px] hover:bg-[#FAFAFA] hover:border-[#1C1C1E] transition-colors text-[14px] text-[#1C1C1E]"
-              >
-                <FileText className="w-4 h-4 text-[#6C6C70]" />
-                All content
-              </Link>
+          {/* Quick Actions & Upcoming */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-xs font-medium text-white uppercase mb-1">Quick</h2>
+              <div className="border border-[#262626]">
+                {[
+                  { href: `/${currentTeam?.slug}/content/new`, icon: Plus, label: 'New' },
+                  { href: `/${currentTeam?.slug}/calendar`, icon: Calendar, label: 'Calendar' },
+                  { href: `/${currentTeam?.slug}/content`, icon: FileText, label: 'All content' },
+                  { href: `/${currentTeam?.slug}/analytics`, icon: BarChart3, label: 'Analytics' },
+                ].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-2 py-1.5 px-3 border-b border-[#262626] last:border-0 hover:bg-[#171717] transition-colors"
+                  >
+                    <item.icon className="w-3.5 h-3.5 text-[#525252]" />
+                    <span className="text-xs text-[#a3a3a3]">{item.label}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
 
-            {/* Upcoming */}
-            <div className="mt-8">
-              <h3 className="text-[14px] font-medium text-[#1C1C1E] mb-4">Upcoming</h3>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-[6px]">
-                  <Clock className="w-4 h-4 text-[#3B82F6]" />
-                  <div>
-                    <p className="text-[13px] text-[#1C1C1E]">Product Launch</p>
-                    <p className="text-[12px] text-[#8E8E93]">Feb 20, 10:00 AM</p>
+            <div>
+              <h2 className="text-xs font-medium text-white uppercase mb-1">Upcoming</h2>
+              <div className="space-y-1.5">
+                {upcoming.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 py-1">
+                    <div className={cn('w-1.5 h-1.5', item.color)} />
+                    <div>
+                      <p className="text-xs text-white">{item.title}</p>
+                      <p className="text-[10px] text-[#525252]">{item.time}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-[6px]">
-                  <CheckCircle className="w-4 h-4 text-[#8B5CF6]" />
-                  <div>
-                    <p className="text-[13px] text-[#1C1C1E]">Newsletter #46</p>
-                    <p className="text-[12px] text-[#8E8E93]">Feb 22, 9:00 AM</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>

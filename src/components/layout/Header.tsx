@@ -1,7 +1,7 @@
 'use client'
 
-import { Bell, Search, Plus, Menu, LogOut, User, Settings, CreditCard } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Bell, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -13,115 +13,71 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useAppStore } from '@/stores'
+import { cn } from '@/lib/utils'
 
-export function Header() {
-  const router = useRouter()
-  const { currentUser } = useAppStore()
-
-  const userInitials = currentUser?.name
-    ? currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase()
-    : currentUser?.email?.charAt(0).toUpperCase() || 'U'
-
-  const handleNewContent = () => {
-    router.push('/content/new')
-  }
-
-  const handleSignOut = async () => {
-    // TODO: Implement sign out with Supabase
-    console.log('Sign out')
-  }
-
+export function Header({ className }: { className?: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="md:hidden">
-          <Menu className="h-5 w-5" />
-        </Button>
-        <div className="relative w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <header className={cn(
+      "flex items-center justify-between px-3 py-1.5 bg-black border-b border-[#262626]",
+      className
+    )}>
+      <div className="flex items-center gap-3 flex-1 max-w-xs">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#525252]" />
           <Input
-            placeholder="Search content..."
-            className="pl-9 bg-muted/50"
+            type="text"
+            placeholder="Search..."
+            className="pl-7 h-6 text-xs"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          className="gap-1.5 bg-primary hover:bg-primary/90"
-          onClick={handleNewContent}
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Content</span>
-        </Button>
-
+      <div className="flex items-center gap-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                3
-              </span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-[#737373] hover:text-white">
+              <Bell className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-              <p className="text-sm">New comment on your draft</p>
-              <p className="text-xs text-muted-foreground">2 minutes ago</p>
+          <DropdownMenuContent align="end" className="w-64 bg-black border-[#262626]">
+            <DropdownMenuLabel className="text-xs text-[#737373]">Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-[#262626]" />
+            <DropdownMenuItem className="flex flex-col items-start gap-0.5 p-2">
+              <p className="text-xs">New comment on your draft</p>
+              <p className="text-[10px] text-[#525252]">2m ago</p>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-              <p className="text-sm">Content approved for publishing</p>
-              <p className="text-xs text-muted-foreground">1 hour ago</p>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-              <p className="text-sm">Team member joined</p>
-              <p className="text-xs text-muted-foreground">Yesterday</p>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-primary">
-              View all notifications
+            <DropdownMenuItem className="flex flex-col items-start gap-0.5 p-2">
+              <p className="text-xs">Content approved</p>
+              <p className="text-[10px] text-[#525252]">1h ago</p>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={currentUser?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary">
-                  {userInitials}
-                </AvatarFallback>
+            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-none">
+              <Avatar className="h-5 w-5 border border-[#262626]">
+                <AvatarImage src={undefined} />
+                <AvatarFallback className="bg-[#171717] text-[10px]">EU</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="bg-black border-[#262626]">
             <DropdownMenuLabel>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{currentUser?.name || 'User'}</p>
-                <p className="text-xs text-muted-foreground">{currentUser?.email || 'user@example.com'}</p>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-xs">Emre Kartal</p>
+                <p className="text-[10px] text-[#525252]">emre@example.com</p>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
+            <DropdownMenuSeparator className="bg-[#262626]" />
+            <DropdownMenuItem className="text-xs hover:bg-[#171717]">
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCard className="mr-2 h-4 w-4" />
-              Billing
+            <DropdownMenuItem className="text-xs hover:bg-[#171717]">
+              Settings
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Preferences
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
+            <DropdownMenuSeparator className="bg-[#262626]" />
+            <DropdownMenuItem className="text-xs text-[#737373] hover:text-white">
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

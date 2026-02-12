@@ -51,21 +51,21 @@ export function Sidebar({ className }: { className?: string }) {
   }
 
   return (
-    <aside className={cn("flex flex-col h-full bg-background border-r border-[#E5E5E7]", className)}>
+    <aside className={cn("flex flex-col h-full bg-black border-r border-[#262626]", className)}>
       {/* New Post button */}
-      <div className="px-4 py-4 border-b border-[#E5E5E7]">
+      <div className="px-2 py-2 border-b border-[#262626]">
         <Link
           href={`/${teamSlug}/content/new`}
-          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-[#1C1C1E] text-white text-[14px] font-medium rounded-[6px] hover:bg-[#2C2C2E] transition-colors"
+          className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 bg-white text-black text-xs font-medium hover:bg-white/90 transition-colors"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           <span>New post</span>
         </Link>
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 overflow-y-auto custom-scrollbar py-4">
-        <div className="space-y-1 px-3">
+      <nav className="flex-1 overflow-y-auto custom-scrollbar py-2">
+        <div className="space-y-0.5 px-1.5">
           {navItems.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -73,13 +73,13 @@ export function Sidebar({ className }: { className?: string }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-[14px]",
+                  "flex items-center gap-2 px-2 py-1.5 transition-colors text-xs",
                   isActive
-                    ? "text-[#1C1C1E] font-medium"
-                    : "text-[#6C6C70] hover:text-[#1C1C1E]"
+                    ? "text-white"
+                    : "text-[#737373] hover:text-white"
                 )}
               >
-                <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "text-[#007AFF]")} />
+                <item.icon className={cn("w-3.5 h-3.5 flex-shrink-0", isActive && "text-[#f97316]")} />
                 <span>{item.label}</span>
               </Link>
             )
@@ -87,19 +87,19 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
 
         {/* Drafts Section */}
-        <div className="mt-6 px-3">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <span className="text-[13px] font-medium text-[#8E8E93] uppercase tracking-wide">
+        <div className="mt-4 px-1.5">
+          <div className="flex items-center justify-between px-2 mb-1">
+            <span className="text-[10px] font-medium text-[#525252] uppercase">
               Drafts
             </span>
             <Link
               href={`/${teamSlug}/content`}
-              className="text-[13px] text-[#6C6C70] hover:text-[#1C1C1E]"
+              className="text-[10px] text-[#525252] hover:text-white"
             >
-              View all
+              all
             </Link>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {drafts.map((draft) => {
               const isActive = pathname === `/${teamSlug}/content/${draft.id}`
               return (
@@ -107,15 +107,15 @@ export function Sidebar({ className }: { className?: string }) {
                   key={draft.id}
                   href={`/${teamSlug}/content/${draft.id}`}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                    isActive && "border-l-2 border-[#007AFF] pl-[10px]"
+                    "flex items-center gap-2 px-2 py-1.5 transition-colors",
+                    isActive && "border-l border-[#f97316] -ml-[1px]"
                   )}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-[14px] truncate", isActive ? "text-[#1C1C1E] font-medium" : "text-[#1C1C1E]")}>
+                    <p className={cn("text-xs truncate", isActive ? "text-white" : "text-[#a3a3a3]")}>
                       {draft.title}
                     </p>
-                    <p className="text-[13px] text-[#8E8E93]">{getRelativeTime(draft.updatedAt)}</p>
+                    <p className="text-[10px] text-[#525252]">{getRelativeTime(draft.updatedAt)}</p>
                   </div>
                 </Link>
               )
@@ -125,8 +125,8 @@ export function Sidebar({ className }: { className?: string }) {
       </nav>
 
       {/* Bottom Navigation */}
-      <div className="border-t border-[#E5E5E7] py-3 px-2">
-        <div className="flex items-center justify-between">
+      <div className="border-t border-[#262626] py-1.5 px-1">
+        <div className="flex items-center justify-between px-1">
           {bottomNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -134,12 +134,12 @@ export function Sidebar({ className }: { className?: string }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-center p-2 rounded-lg transition-colors relative group",
-                  isActive ? "text-[#007AFF]" : "text-[#6C6C70] hover:text-[#1C1C1E]"
+                  "flex items-center justify-center p-1.5 transition-colors",
+                  isActive ? "text-[#f97316]" : "text-[#525252] hover:text-white"
                 )}
                 title={item.tooltip}
               >
-                <item.icon className="w-5 h-5" />
+                <item.icon className="w-3.5 h-3.5" />
               </Link>
             )
           })}
