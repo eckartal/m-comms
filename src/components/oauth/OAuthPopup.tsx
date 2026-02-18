@@ -87,8 +87,8 @@ export function OAuthPopup({ platform, isOpen, onClose, onConnect, teamId }: OAu
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 rounded-xl bg-[#171717] flex items-center justify-center">
             {platform === 'twitter' && <div className="text-white"><platformIcons.twitter className="h-10 w-10" /></div>}
-            {platform === 'linkedin' && <div className="text-[#0077B5]"><platformIcons.linkedin className="h-10 w-10" /></div>}
-            {platform === 'instagram' && <div className="text-[#E1306C]"><platformIcons.instagram className="h-10 w-10" /></div>}
+            {platform === 'linkedin' && <div className="text-[#0A66C2]"><platformIcons.linkedin className="h-10 w-10" /></div>}
+            {platform === 'instagram' && <div className="h-10 w-10"><platformIcons.instagram className="h-10 w-10" /></div>}
             {platform === 'blog' && <div className="text-[#6B7280]"><platformIcons.blog className="h-10 w-10" /></div>}
           </div>
         </div>

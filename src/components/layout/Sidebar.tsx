@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
+import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
-import { Home, BarChart3, Calendar, Settings, Users, Zap, Plus, Image, Bookmark, MessageSquare } from 'lucide-react'
+import { Home, BarChart3, Calendar, Settings, Zap, Plus, Image, Bookmark, MessageSquare, Hash } from 'lucide-react'
 
 interface Draft {
   id: string
@@ -17,20 +18,21 @@ export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const params = useParams()
   const teamSlug = params.teamSlug as string
+  const { currentUser } = useAppStore()
 
-  const navItems = [
+  const primaryNavItems = [
     { icon: Home, href: `/${teamSlug}`, label: "Home" },
-    { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
+    { icon: Hash, href: `/${teamSlug}/collaboration`, label: "Collaboration" },
     { icon: Calendar, href: `/${teamSlug}/calendar`, label: "Calendar" },
-    { icon: Settings, href: `/${teamSlug}/settings`, label: "Settings" },
+    { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
   ]
 
-  const bottomNavItems = [
+  const secondaryNavItems = [
     { icon: Image, href: `/${teamSlug}/content`, label: "Drafts", tooltip: "Drafts" },
     { icon: Users, href: `/${teamSlug}/team`, label: "Team", tooltip: "Team" },
-    { icon: Zap, href: `/${teamSlug}/features`, label: "Features", tooltip: "Features" },
     { icon: Bookmark, href: `/${teamSlug}/saved`, label: "Saved", tooltip: "Saved" },
     { icon: MessageSquare, href: `/${teamSlug}/threads`, label: "Threads", tooltip: "Threads" },
+    { icon: Zap, href: `/${teamSlug}/features`, label: "Features", tooltip: "Features" },
   ]
 
   const [drafts] = useState<Draft[]>([
@@ -50,100 +52,150 @@ export function Sidebar({ className }: { className?: string }) {
     return `${days}d ago`
   }
 
+  const activePrimaryItem = primaryNavItems.find(item => pathname === item.href)
+  const activeSecondaryItem = secondaryNavItems.find(item => pathname === item.href)
+
   return (
-    <aside className={cn("flex flex-col h-full bg-black border-r border-border", className)}>
+    <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border w-[275px] transition-colors duration-200", className)}>
+      {/* Profile Avatar (Top) */}
+      <div className="px-4 py-3 hover:bg-sidebar-accent transition-colors cursor-pointer">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="h-10 w-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm transition-colors duration-200">
+              {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-sidebar"></div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-sidebar-foreground truncate">
+              {currentUser?.name || 'User'}
+            </p>
+            <p className="text-xs text-sidebar-foreground/70 truncate">
+              @{currentUser?.email?.split('@')[0] || 'user'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* New Post button */}
-      <div className="px-2 py-2 border-b border-border">
+      <div className="px-4 py-3 border-b border-sidebar-border">
         <Link
           href={`/${teamSlug}/content/new`}
-          className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 bg-white text-black text-xs font-medium hover:bg-white/90 transition-colors"
+          className="flex items-center gap-2 w-full px-4 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-colors dark:bg-white dark:hover:bg-gray-100"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New post</span>
+          <Plus className="w-5 h-5" />
+          <span className="flex-1 text-center">Post</span>
         </Link>
       </div>
 
-      {/* Main Navigation */}
+      {/* Primary Navigation */}
       <nav className="flex-1 overflow-y-auto custom-scrollbar py-2">
-        <div className="space-y-0.5 px-1.5">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 transition-colors text-xs",
-                  isActive
-                    ? "text-white"
-                    : "text-muted-foreground hover:text-white"
-                )}
-              >
-                <item.icon className={cn("w-3.5 h-3.5 flex-shrink-0", isActive && "text-primary")} />
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Drafts Section */}
-        <div className="mt-4 px-1.5">
-          <div className="flex items-center justify-between px-2 mb-1">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Drafts
-            </span>
-            <Link
-              href={`/${teamSlug}/content`}
-              className="text-[10px] text-muted-foreground hover:text-white"
-            >
-              all
-            </Link>
-          </div>
+        <div className="px-2">
+          {/* Primary Nav Items */}
           <div className="space-y-0.5">
-            {drafts.map((draft) => {
-              const isActive = pathname === `/${teamSlug}/content/${draft.id}`
+            {primaryNavItems.map((item) => {
+              const isActive = pathname === item.href
               return (
                 <Link
-                  key={draft.id}
-                  href={`/${teamSlug}/content/${draft.id}`}
+                  key={item.href}
+                  href={item.href}
                   className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 transition-colors",
-                    isActive && "border-l border-primary -ml-[1px]"
+                    "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-sidebar-accent",
+                    isActive ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground hover:text-sidebar-foreground"
                   )}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className={cn("text-xs truncate", isActive ? "text-white" : "text-foreground")}>
-                      {draft.title}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">{getRelativeTime(draft.updatedAt)}</p>
-                  </div>
+                  <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-sidebar-primary")} />
+                  <span className="text-[15px]">{item.label}</span>
+                  {isActive && (
+                    <div className="ml-auto text-sidebar-primary">
+                      <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+                    </div>
+                  )}
                 </Link>
               )
             })}
           </div>
+
+          {/* Drafts Section - Subtle Divider */}
+          <div className="my-3 px-4">
+            <div className="h-px bg-sidebar-border"></div>
+          </div>
+          <div className="px-4 py-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
+                Drafts
+              </span>
+              <Link
+                href={`/${teamSlug}/content`}
+                className="text-xs text-sidebar-primary hover:text-sidebar-primary/80"
+              >
+                Show all
+              </Link>
+            </div>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+              {drafts.map((draft) => {
+                const isActive = pathname === `/${teamSlug}/content/${draft.id}`
+                return (
+                  <Link
+                    key={draft.id}
+                    href={`/${teamSlug}/content/${draft.id}`}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-sidebar-accent transition-colors",
+                      isActive && "bg-sidebar-accent"
+                    )}
+                  >
+                    <div className="h-6 w-6 rounded-full bg-sidebar-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] font-semibold text-sidebar-primary">P</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-sm truncate", isActive ? "text-sidebar-foreground font-medium" : "text-sidebar-foreground")}>
+                        {draft.title}
+                      </p>
+                      <p className="text-[10px] text-sidebar-foreground/70">{getRelativeTime(draft.updatedAt)}</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </nav>
 
-      {/* Bottom Navigation */}
-      <div className="border-t border-border py-1.5 px-1">
-        <div className="flex items-center justify-between px-1">
-          {bottomNavItems.map((item) => {
+      {/* Secondary Navigation */}
+      <div className="border-t border-sidebar-border py-2">
+        <div className="px-2 space-y-1">
+          {secondaryNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center justify-center p-1.5 transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-white"
+                  "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-sidebar-accent",
+                  isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
                 )}
                 title={item.tooltip}
               >
-                <item.icon className="w-3.5 h-3.5" />
+                <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-sidebar-primary")} />
+                <span className="text-[15px]">{item.label}</span>
               </Link>
             )
           })}
         </div>
+      </div>
+
+      {/* Sticky Settings Footer */}
+      <div className="border-t border-sidebar-border p-2">
+        <Link
+          href={`/${teamSlug}/settings`}
+          className={cn(
+            "flex items-center gap-4 px-4 py-3 w-full rounded-full hover:bg-sidebar-accent transition-colors",
+            pathname === `/${teamSlug}/settings` ? "text-sidebar-foreground" : "text-sidebar-foreground/70"
+          )}
+        >
+          <Settings className="w-7 h-7 flex-shrink-0" />
+          <span className="text-[15px]">Settings</span>
+        </Link>
       </div>
     </aside>
   )

@@ -16,7 +16,9 @@ export async function GET() {
       .select(`
         *,
         createdBy:created_by(id, name, email, avatar_url),
-        assignedTo:assigned_to(id, name, email, avatar_url)
+        assignedTo:assigned_to(id, name, email, avatar_url),
+        comments:comments(id),
+        comment_count:comments(count)
       `)
       .order('created_at', { ascending: false })
 

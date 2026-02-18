@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Bell, Search } from 'lucide-react'
+import { Bell, Search, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,11 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/components/theme/ThemeProvider'
 
 export function Header({ className }: { className?: string }) {
+  const { theme, toggleTheme } = useTheme()
+
   return (
     <header className={cn(
-      "flex items-center justify-between px-3 py-1.5 bg-black border-b border-border",
+      "flex items-center justify-between px-3 py-1.5 bg-background border-b border-border transition-colors duration-200",
       className
     )}>
       <div className="flex items-center gap-3 flex-1 max-w-xs">
@@ -33,9 +36,23 @@ export function Header({ className }: { className?: string }) {
       </div>
 
       <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-3.5 h-3.5 text-foreground hover:text-foreground" />
+          ) : (
+            <Moon className="w-3.5 h-3.5 text-foreground hover:text-foreground" />
+          )}
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-white">
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground">
               <Bell className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
@@ -77,7 +94,7 @@ export function Header({ className }: { className?: string }) {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem className="text-xs text-muted-foreground hover:text-white">
+            <DropdownMenuItem className="text-xs text-foreground hover:text-foreground">
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -5,10 +5,9 @@ import { useRouter, useParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { useAppStore, useContentStore } from '@/stores'
-import { PlatformType } from '@/types'
+import { PlatformIcon, platformIcons } from '@/components/oauth/PlatformIcon'
 import { createContent, updateContent, autoSaveContent } from '@/stores'
 import {
-  Sparkles,
   Plus,
   X,
 } from 'lucide-react'
@@ -19,31 +18,8 @@ const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: strin
   twitter: { name: 'X (Twitter)', limit: 280, icon: '𝕏' },
   linkedin: { name: 'LinkedIn', limit: 3000, icon: 'in' },
   instagram: { name: 'Instagram', limit: 2200, icon: '📷' },
-  blog: { name: 'Blog', limit: 10000, icon: '📝' },
 }
 
-// Platform-specific templates
-const TEMPLATES: Record<PlatformType, { name: string; content: string }[]> = {
-  twitter: [
-    { name: 'Announcement', content: '🚀 Big news coming soon! Stay tuned.' },
-    { name: 'Tip', content: '💡 Pro tip: ' },
-    { name: 'Question', content: 'Quick question for the community: ' },
-    { name: 'Thread starter', content: '🧵 Here\'s how we built our latest feature:\n\n1. Start with the problem\n\n2. ' },
-  ],
-  linkedin: [
-    { name: 'Case Study', content: 'How we increased metrics by 200%:\n\nThe challenge:\n\nThe solution:\n\nThe results:\n\n👇 What\'s your experience?' },
-    { name: 'Thought Leadership', content: 'Most companies focus on the wrong metrics.\n\nHere\'s why engagement beats reach every time:\n\n[Your insight here]\n\nAgree or disagree?' },
-    { name: 'Update', content: 'Excited to share that we\'re launching a new feature! 🚀\n\nWhat it does:\n\nWhy it matters:\n\nLink in comments 👇' },
-  ],
-  instagram: [
-    { name: 'Product Launch', content: '✨ NEW: [Product Name]\n\nFinally here! We\'ve been working on this for [timeframe] and can\'t wait to hear what you think.\n\n#newproduct #[YourBrand]' },
-    { name: 'Behind the Scenes', content: 'Behind every post is hours of work. 👀\n\nHere\'s a look at how we create content:\n\n[Your BTS content here]\n\nDouble tap if you love BTS content! ❤️' },
-  ],
-  blog: [
-    { name: 'How-To Guide', content: '## How to [Achieve Result]\n\nIn this guide, you\'ll learn:\n\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]\n\nLet\'s dive in.\n\n---' },
-    { name: 'Announcement', content: '## Big Update: [Title]\n\nWe\'re excited to announce [news].\n\n### What changed\n\n[Details here]\n\n### What this means for you\n\n[Impact]\n\nLet us know what you think!' },
-  ],
-}
 
 // Thread item type
 interface ThreadItem {
@@ -64,9 +40,6 @@ export default function NewContentPage() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [isBookmarked, setIsBookmarked] = useState(false)
-  const [isPublishing, setIsPublishing] = useState(false)
-  const [isSaved, setIsSaved] = useState(true)
-  const [showTemplates, setShowTemplates] = useState(false)
 
   const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
@@ -153,12 +126,6 @@ export default function NewContentPage() {
     const newThread = thread.filter((_, i) => i !== index)
     setThread(newThread)
     setActiveIndex(Math.min(index, newThread.length - 1))
-  }
-
-  // Apply template
-  const applyTemplate = (templateContent: string) => {
-    handleContentChange(activeIndex, templateContent)
-    setShowTemplates(false)
   }
 
   // Clear all
@@ -297,32 +264,30 @@ export default function NewContentPage() {
         <div className="max-w-[680px] mx-auto px-12 py-8">
           {/* Platform Selector & Quick Actions */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              {Object.entries(PLATFORMS).map(([key, config]) => (
-                <button
-                  key={key}
-                  onClick={() => setSelectedPlatform(key as PlatformType)}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all',
-                    selectedPlatform === key
-                      ? 'bg-foreground text-white'
-                      : 'bg-muted text-muted-foreground hover:bg-border'
-                  )}
-                >
-                  <span>{config.icon}</span>
-                  <span className="hidden sm:inline">{config.name}</span>
-                </button>
-              ))}
+            <div className="flex items-center gap-1">
+              {Object.entries(PLATFORMS).map(([key, config]) => {
+                const isSelected = selectedPlatform === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedPlatform(key as PlatformType)}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-[8px] transition-all duration-200',
+                      isSelected
+                        ? 'bg-[#171717] text-white border border-[#262626] shadow-sm'
+                        : 'bg-transparent text-muted-foreground hover:bg-[#171717] hover:text-foreground'
+                    )}
+                  >
+                    <PlatformIcon platform={key} className={cn('h-4 w-4', isSelected ? 'text-white' : 'text-current')} />
+                    <span className={cn('text-[13px] font-medium transition-colors', isSelected ? 'text-white' : '')}>
+                      {config.name.split(' ')[0]}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Sparkles className="w-4 h-4" />
-                Templates
-              </button>
               {thread.some(t => t.content) && (
                 <button
                   onClick={clearAll}
@@ -333,27 +298,6 @@ export default function NewContentPage() {
               )}
             </div>
           </div>
-
-          {/* Templates Dropdown */}
-          {showTemplates && (
-            <div className="mb-6 p-4 bg-accent rounded-[8px] border border-border">
-              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Templates for {PLATFORMS[selectedPlatform].name}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {TEMPLATES[selectedPlatform].map((template, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => applyTemplate(template.content)}
-                    className="text-left px-3 py-2 rounded-[6px] hover:bg-border transition-colors"
-                  >
-                    <span className="text-[14px] font-medium text-foreground">{template.name}</span>
-                    <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
-                      {template.content.split('\n')[0]}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Thread Items */}
           <div className="space-y-0">
@@ -397,7 +341,7 @@ export default function NewContentPage() {
                     {/* Content area */}
                     <div className="pl-12 pr-4">
                       <textarea
-                        placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add next tweet...'}
+                        placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add tweet...'}
                         value={item.content}
                         onChange={(e) => handleContentChange(index, e.target.value)}
                         onFocus={() => setActiveIndex(index)}

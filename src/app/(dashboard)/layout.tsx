@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { Toaster } from '@/components/ui/toaster'
+import { useTheme } from '@/components/theme/ThemeProvider'
 
 export default function DashboardLayout({
   children,
@@ -13,13 +14,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const supabase = createClient()
+  const { theme } = useTheme()
   const [isDevMode] = useState(() => {
     return !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
   })
 
   return (
-    <div className="flex h-screen bg-black text-white">
+    <div className="flex h-screen bg-background text-foreground transition-colors duration-200">
       <Sidebar className="w-[240px] flex-shrink-0" />
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header />
@@ -27,7 +29,7 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
-      <Toaster />
+      <Toaster theme={theme} />
     </div>
   )
 }

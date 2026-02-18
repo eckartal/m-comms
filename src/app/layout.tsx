@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "ContentHub - Content Collaboration & Scheduling Platform",
@@ -12,9 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className="antialiased" style={{ fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif' }}>
-        {children}
+        <ThemeProvider defaultTheme="dark">
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

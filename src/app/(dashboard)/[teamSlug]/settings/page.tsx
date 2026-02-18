@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import {
   Globe,
   Clock,
@@ -34,6 +35,8 @@ const workingHours = [
 
 export default function SettingsPage() {
   const router = useRouter()
+  const params = useParams()
+  const teamSlug = params.teamSlug as string
   const { currentTeam, setCurrentTeam, setCurrentUser } = useAppStore()
   const [timezone, setTimezone] = useState('America/New_York')
   const [workingHourStart, setWorkingHourStart] = useState('09:00-17:00')
@@ -201,23 +204,27 @@ export default function SettingsPage() {
               icon="𝕏"
               connected={true}
               account="@yourbrand"
+              teamSlug={teamSlug}
             />
             <IntegrationRow
               name="LinkedIn"
               icon="in"
               connected={true}
               account="Your Company"
+              teamSlug={teamSlug}
             />
             <IntegrationRow
               name="Instagram"
               icon="📷"
               connected={false}
+              teamSlug={teamSlug}
             />
             <IntegrationRow
               name="Blog"
               icon="📝"
               connected={true}
               account="yourblog.com"
+              teamSlug={teamSlug}
             />
           </div>
         </div>
@@ -284,12 +291,26 @@ function IntegrationRow({
   icon,
   connected,
   account,
+  teamSlug,
 }: {
   name: string
   icon: string
   connected: boolean
   account?: string
+  teamSlug: string
 }) {
+  const router = useRouter()
+
+  const handleConnect = () => {
+    if (connected) {
+      // Disconnect logic would go here
+      console.log(`Disconnect ${name}`)
+    } else {
+      // Navigate to integrations page to connect
+      router.push(`/${teamSlug}/integrations`)
+    }
+  }
+
   return (
     <div className="flex items-center justify-between py-3 px-4 border-b border-border last:border-0 hover:bg-muted transition-colors">
       <div className="flex items-center gap-3">
@@ -302,6 +323,7 @@ function IntegrationRow({
         </div>
       </div>
       <button
+        onClick={handleConnect}
         className={cn(
           'px-3 py-1.5 text-[13px] font-medium rounded-[6px] transition-colors',
           connected

@@ -76,7 +76,7 @@ export interface ShareSettings {
 }
 
 export interface PlatformConfig {
-  platform: 'twitter' | 'linkedin' | 'instagram' | 'blog'
+  platform: 'twitter' | 'linkedin' | 'instagram'
   enabled: boolean
   text?: string
   media?: string[]
@@ -158,7 +158,7 @@ export interface ContentVersion {
 }
 
 // Platform Types
-export type PlatformType = 'twitter' | 'linkedin' | 'instagram' | 'blog'
+export type PlatformType = 'twitter' | 'linkedin' | 'instagram'
 
 export interface PlatformStats {
   platform: PlatformType
