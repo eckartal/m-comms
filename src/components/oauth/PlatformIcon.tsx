@@ -26,7 +26,7 @@ const LinkedInIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-// Instagram Official SVG Icon (gradient style)
+// Instagram Official SVG Icon (2026 gradient style)
 const InstagramIcon = ({ className }: { className?: string }) => (
   <svg
     viewBox="0 0 24 24"
@@ -44,16 +44,9 @@ const InstagramIcon = ({ className }: { className?: string }) => (
         <stop offset="100%" stopColor="#FD1D1D" />
       </linearGradient>
     </defs>
-    <rect
-      x="2"
-      y="2"
-      width="20"
-      height="20"
-      rx="5"
-      fill="url(#instagram-gradient)"
-    />
-    <circle cx="12" cy="12" r="4" fill="white" />
-    <circle cx="17.5" cy="6.5" r="1.5" fill="white" />
+    <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#instagram-gradient)" />
+    <rect x="5.5" y="5.5" width="13" height="13" rx="3.5" stroke="white" strokeWidth="1.5" />
+    <circle cx="17" cy="7" r="1" fill="white" />
   </svg>
 )
 

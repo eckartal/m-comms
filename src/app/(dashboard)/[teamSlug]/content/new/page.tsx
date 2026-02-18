@@ -40,6 +40,7 @@ export default function NewContentPage() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
 
   const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
@@ -47,6 +48,7 @@ export default function NewContentPage() {
   const isOverLimit = characterCount > maxChars
   const isNearLimit = characterCount > maxChars * 0.8
   const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
+  const isSaved = !saving
 
   // Load saved draft from localStorage on mount
   useEffect(() => {
@@ -68,7 +70,6 @@ export default function NewContentPage() {
 
   // Auto-save to Supabase and localStorage
   useEffect(() => {
-    setIsSaved(false)
     const timer = setTimeout(async () => {
       const blocks = thread.map((item, index) => ({
         id: item.id,
@@ -96,8 +97,6 @@ export default function NewContentPage() {
         })
         setSaving(false)
       }
-
-      setIsSaved(true)
     }, 1000)
     return () => clearTimeout(timer)
   }, [thread, selectedPlatform, isBookmarked, teamSlug, contentId, currentTeam, title, setSaving])

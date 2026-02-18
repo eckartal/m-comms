@@ -209,7 +209,7 @@ export default function IntegrationsPage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#171717]">
                         {integration.id === 'twitter' && <div className="text-white"><platformIcons.twitter className="h-6 w-6" /></div>}
                         {integration.id === 'linkedin' && <div className="text-[#0077B5]"><platformIcons.linkedin className="h-6 w-6" /></div>}
-                        {integration.id === 'instagram' && <div className="text-[#E1306C]"><platformIcons.instagram className="h-6 w-6" /></div>}
+                        {integration.id === 'instagram' && <div className="h-6 w-6"><platformIcons.instagram className="h-6 w-6" /></div>}
                         {integration.id === 'blog' && <div className="text-[#6B7280]"><platformIcons.blog className="h-6 w-6" /></div>}
                       </div>
                       <div>
