@@ -9,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { Check, Plus, RefreshCw, Settings, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/stores'
-import { OAuthPopup } from '@/components/oauth/OAuthPopup'
 import { platformIcons } from '@/components/oauth/PlatformIcon'
 
 type Account = {
@@ -69,8 +68,6 @@ export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
-  const [popupOpen, setPopupOpen] = useState(false)
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
 
   useEffect(() => {
     // Check for connection success/error
@@ -131,9 +128,8 @@ export default function IntegrationsPage() {
       })
       const data = await res.json()
       if (data.authUrl) {
-        // Open OAuth popup instead of full redirect
-        setSelectedPlatform(platform)
-        setPopupOpen(true)
+        // Redirect to OAuth - simple full-page redirect
+        window.location.href = data.authUrl
       } else {
         toast.error(data.error || 'Failed to initiate connection')
       }
@@ -142,25 +138,6 @@ export default function IntegrationsPage() {
       toast.error('Failed to connect platform')
     } finally {
       setConnecting(null)
-    }
-  }
-
-  // Handle the actual OAuth redirect when popup opens
-  const handlePopupConnect = async (platform: string) => {
-    if (!currentTeam?.id) return
-    try {
-      const res = await fetch('/api/platforms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform, teamId: currentTeam.id }),
-      })
-      const data = await res.json()
-      if (data.authUrl) {
-        // Redirect to OAuth
-        window.location.href = data.authUrl
-      }
-    } catch (error) {
-      console.error('Failed to initiate OAuth:', error)
     }
   }
 
@@ -325,17 +302,6 @@ export default function IntegrationsPage() {
             ))}
           </div>
         </div>
-      )}
-
-      {/* OAuth Popup */}
-      {selectedPlatform && (
-        <OAuthPopup
-          platform={selectedPlatform}
-          isOpen={popupOpen}
-          onClose={() => setPopupOpen(false)}
-          onConnect={handlePopupConnect}
-          teamId={currentTeam?.id || ''}
-        />
       )}
 
       {/* API Configuration */}

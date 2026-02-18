@@ -1,6 +1,31 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Helper functions
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return base64UrlEncode(array)
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(verifier)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return base64UrlEncode(new Uint8Array(hash))
+}
+
+function generateRandomStateToken(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return base64UrlEncode(array)
+}
+
+function base64UrlEncode(buffer: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...buffer))
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 // GET /api/platforms - List connected platform accounts
 export async function GET(request: Request) {
   try {
@@ -113,7 +138,7 @@ export async function POST(request: Request) {
       instagram: {
         clientId: process.env.INSTAGRAM_CLIENT_ID || '',
         authUrl: 'https://api.instagram.com/oauth/authorize',
-        scope: 'instagram_basic media_repository',
+        scope: 'instagram_basic user_profile',
       },
     }
 
@@ -126,11 +151,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `${platform} OAuth not configured` }, { status: 500 })
     }
 
-    // Generate PKCE code verifier
+    // Generate PKCE code verifier and random state token
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = await generateCodeChallenge(codeVerifier)
+    const stateToken = generateRandomStateToken()
 
-    // Store code verifier for callback
+    // Store both code verifier and state token for callback verification
     await supabase
       .from('oauth_states')
       .insert({
@@ -138,6 +164,7 @@ export async function POST(request: Request) {
         team_id: teamId,
         platform,
         code_verifier: codeVerifier,
+        state_token: stateToken,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
       })
 
@@ -147,7 +174,7 @@ export async function POST(request: Request) {
       client_id: config.clientId,
       redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/api/platforms/${platform}/callback`,
       scope: config.scope,
-      state: `${teamId}:${user.id}`,
+      state: stateToken,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
     })
@@ -221,23 +248,4 @@ export async function DELETE(request: Request) {
     console.error('Error in DELETE /api/platforms:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
-
-// Helper functions
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(32)
-  crypto.getRandomValues(array)
-  return base64UrlEncode(array)
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(verifier)
-  const hash = await crypto.subtle.digest('SHA-256', data)
-  return base64UrlEncode(new Uint8Array(hash))
-}
-
-function base64UrlEncode(buffer: Uint8Array): string {
-  const base64 = btoa(String.fromCharCode(...buffer))
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }

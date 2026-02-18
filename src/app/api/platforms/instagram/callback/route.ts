@@ -18,7 +18,7 @@ export async function GET(
     if (error) {
       console.error(`${platform} OAuth error:`, error, errorDescription)
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/${state?.split(':')[0] || 'dashboard'}/integrations?error=${encodeURIComponent(errorDescription || error)}`
+        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=${encodeURIComponent(errorDescription || error)}`
       )
     }
 
@@ -28,15 +28,31 @@ export async function GET(
       )
     }
 
-    const [teamId, userId] = state.split(':')
+    const supabase = await createClient()
 
-    if (!teamId || !userId) {
+    // Verify state token matches stored value
+    const { data: storedState } = await supabase
+      .from('oauth_states')
+      .select('team_id, user_id, expires_at')
+      .eq('state_token', state)
+      .single()
+
+    if (!storedState) {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=invalid_state`
       )
     }
 
-    const supabase = await createClient()
+    // Check if state has expired
+    const expiresAt = new Date(storedState.expires_at).getTime()
+    if (Date.now() > expiresAt) {
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=state_expired`
+      )
+    }
+
+    const teamId = storedState.team_id
+    const userId = storedState.user_id
 
     // Exchange code for token
     const tokenResponse = await exchangeCodeForToken(platform, code, teamId)

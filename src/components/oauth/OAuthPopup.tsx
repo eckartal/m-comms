@@ -34,8 +34,7 @@ export function OAuthPopup({ platform, isOpen, onClose, onConnect, teamId }: OAu
 
     try {
       onConnect(platform)
-      // The OAuth redirect happens in the parent window
-      // Close the popup after a brief delay since we expect to be redirected
+      // Close the popup after triggering connection
       setTimeout(() => {
         onClose()
       }, 1000)

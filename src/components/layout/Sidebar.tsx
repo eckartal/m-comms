@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
-import { Home, BarChart3, Calendar, Settings, Zap, Plus, Image, Bookmark, MessageSquare, Hash, Users } from 'lucide-react'
+import { Home, BarChart3, Calendar, Settings, Hash, Plus, Users } from 'lucide-react'
 
 interface Draft {
   id: string
@@ -25,14 +24,6 @@ export function Sidebar({ className }: { className?: string }) {
     { icon: Hash, href: `/${teamSlug}/collaboration`, label: "Collaboration" },
     { icon: Calendar, href: `/${teamSlug}/calendar`, label: "Calendar" },
     { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
-  ]
-
-  const secondaryNavItems = [
-    { icon: Image, href: `/${teamSlug}/content`, label: "Drafts", tooltip: "Drafts" },
-    { icon: Users, href: `/${teamSlug}/team`, label: "Team", tooltip: "Team" },
-    { icon: Bookmark, href: `/${teamSlug}/saved`, label: "Saved", tooltip: "Saved" },
-    { icon: MessageSquare, href: `/${teamSlug}/threads`, label: "Threads", tooltip: "Threads" },
-    { icon: Zap, href: `/${teamSlug}/features`, label: "Features", tooltip: "Features" },
   ]
 
   const [drafts] = useState<Draft[]>([
@@ -55,21 +46,21 @@ export function Sidebar({ className }: { className?: string }) {
   // activePrimaryItem not used currently, kept for future use
 
   return (
-    <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border w-[275px] transition-colors duration-200", className)}>
+    <aside className={cn("flex flex-col h-full bg-black border-r border-[#262626] w-[275px]", className)}>
       {/* Profile Avatar (Top) */}
-      <div className="px-4 py-3 hover:bg-sidebar-accent transition-colors cursor-pointer">
+      <div className="px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm transition-colors duration-200">
+            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-black font-bold text-sm">
               {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-sidebar"></div>
+            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-black"></div>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-sidebar-foreground truncate">
+            <p className="text-sm font-semibold text-foreground truncate">
               {currentUser?.name || 'User'}
             </p>
-            <p className="text-xs text-sidebar-foreground/70 truncate">
+            <p className="text-xs text-muted-foreground truncate">
               @{currentUser?.email?.split('@')[0] || 'user'}
             </p>
           </div>
@@ -77,7 +68,7 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
 
       {/* New Post button */}
-      <div className="px-4 py-3 border-b border-sidebar-border">
+      <div className="px-4 py-3 border-b border-[#262626]">
         <Link
           href={`/${teamSlug}/content/new`}
           className="flex items-center gap-2 w-full px-4 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-colors dark:bg-white dark:hover:bg-gray-100"
@@ -99,14 +90,14 @@ export function Sidebar({ className }: { className?: string }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-sidebar-accent",
-                    isActive ? "font-semibold text-sidebar-foreground" : "text-sidebar-foreground hover:text-sidebar-foreground"
+                    "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-accent",
+                    isActive ? "font-semibold text-foreground" : "text-foreground hover:text-foreground"
                   )}
                 >
-                  <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-sidebar-primary")} />
+                  <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-primary")} />
                   <span className="text-[15px]">{item.label}</span>
                   {isActive && (
-                    <div className="ml-auto text-sidebar-primary">
+                    <div className="ml-auto text-primary">
                       <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
                     </div>
                   )}
@@ -117,16 +108,16 @@ export function Sidebar({ className }: { className?: string }) {
 
           {/* Drafts Section - Subtle Divider */}
           <div className="my-3 px-4">
-            <div className="h-px bg-sidebar-border"></div>
+            <div className="h-px bg-[#262626]"></div>
           </div>
           <div className="px-4 py-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Drafts
               </span>
               <Link
                 href={`/${teamSlug}/content`}
-                className="text-xs text-sidebar-primary hover:text-sidebar-primary/80"
+                className="text-xs text-primary hover:text-primary/80"
               >
                 Show all
               </Link>
@@ -139,18 +130,18 @@ export function Sidebar({ className }: { className?: string }) {
                     key={draft.id}
                     href={`/${teamSlug}/content/${draft.id}`}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-sidebar-accent transition-colors",
-                      isActive && "bg-sidebar-accent"
+                      "flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-accent transition-colors",
+                      isActive && "bg-accent"
                     )}
                   >
-                    <div className="h-6 w-6 rounded-full bg-sidebar-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] font-semibold text-sidebar-primary">P</span>
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] font-semibold text-primary">P</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm truncate", isActive ? "text-sidebar-foreground font-medium" : "text-sidebar-foreground")}>
+                      <p className={cn("text-sm truncate", isActive ? "text-foreground font-medium" : "text-foreground")}>
                         {draft.title}
                       </p>
-                      <p className="text-[10px] text-sidebar-foreground/70">{getRelativeTime(draft.updatedAt)}</p>
+                      <p className="text-[10px] text-muted-foreground">{getRelativeTime(draft.updatedAt)}</p>
                     </div>
                   </Link>
                 )
@@ -160,36 +151,13 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
       </nav>
 
-      {/* Secondary Navigation */}
-      <div className="border-t border-sidebar-border py-2">
-        <div className="px-2 space-y-1">
-          {secondaryNavItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-sidebar-accent",
-                  isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
-                )}
-                title={item.tooltip}
-              >
-                <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-sidebar-primary")} />
-                <span className="text-[15px]">{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
-
       {/* Sticky Settings Footer */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className="border-t border-[#262626] p-2">
         <Link
           href={`/${teamSlug}/settings`}
           className={cn(
-            "flex items-center gap-4 px-4 py-3 w-full rounded-full hover:bg-sidebar-accent transition-colors",
-            pathname === `/${teamSlug}/settings` ? "text-sidebar-foreground" : "text-sidebar-foreground/70"
+            "flex items-center gap-4 px-4 py-3 w-full rounded-full hover:bg-accent transition-colors",
+            pathname === `/${teamSlug}/settings` ? "text-foreground" : "text-muted-foreground"
           )}
         >
           <Settings className="w-7 h-7 flex-shrink-0" />
