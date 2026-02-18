@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
-import { Home, BarChart3, Calendar, Settings, Zap, Plus, Image, Bookmark, MessageSquare, Hash } from 'lucide-react'
+import { Home, BarChart3, Calendar, Settings, Zap, Plus, Image, Bookmark, MessageSquare, Hash, Users } from 'lucide-react'
 
 interface Draft {
   id: string
@@ -52,8 +52,7 @@ export function Sidebar({ className }: { className?: string }) {
     return `${days}d ago`
   }
 
-  const activePrimaryItem = primaryNavItems.find(item => pathname === item.href)
-  const activeSecondaryItem = secondaryNavItems.find(item => pathname === item.href)
+  // activePrimaryItem not used currently, kept for future use
 
   return (
     <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border w-[275px] transition-colors duration-200", className)}>
