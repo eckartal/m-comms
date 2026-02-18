@@ -66,14 +66,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black p-4">
-      <Card className="w-full max-w-sm border-[#262626]">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm border-border">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className="h-6 w-6 flex items-center justify-center border border-[#262626] bg-white">
-              <span className="text-xs font-bold text-black">C</span>
+            <div className="h-6 w-6 flex items-center justify-center border border-border bg-sidebar">
+              <span className="text-xs font-bold text-sidebar-foreground">C</span>
             </div>
-            <CardTitle className="text-xs uppercase">ContentHub</CardTitle>
+            <CardTitle className="text-xs uppercase text-foreground">ContentHub</CardTitle>
           </div>
           <CardDescription className="text-xs text-muted-foreground">
             Sign in to continue
@@ -88,7 +88,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="email" className="text-xs">Email</Label>
+              <Label htmlFor="email" className="text-xs text-foreground">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -101,8 +101,8 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-xs">Password</Label>
-                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-white">
+                <Label htmlFor="password" className="text-xs text-foreground">Password</Label>
+                <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
                   Forgot?
                 </Link>
               </div>
@@ -116,7 +116,7 @@ export default function LoginPage() {
                 className="h-7"
               />
             </div>
-            <Button type="submit" className="w-full h-7 bg-white text-black hover:bg-white/90" disabled={loading}>
+            <Button type="submit" className="w-full h-7 bg-primary text-primary-foreground hover:bg-primary/90" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
@@ -133,13 +133,13 @@ export default function LoginPage() {
               <Separator />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-black px-2 text-[10px] text-muted-foreground">or</span>
+              <span className="bg-background px-2 text-[10px] text-muted-foreground">or</span>
             </div>
           </div>
 
           <Button
             variant="outline"
-            className="w-full h-7 border-input bg-transparent hover:bg-accent"
+            className="w-full h-7 border-border bg-transparent hover:bg-accent"
             onClick={handleGoogleLogin}
             disabled={loading}
           >
@@ -155,7 +155,7 @@ export default function LoginPage() {
         <CardFooter className="justify-center pt-0">
           <p className="text-xs text-muted-foreground">
             No account?{' '}
-            <Link href="/register" className="text-white hover:underline">
+            <Link href="/register" className="text-primary hover:underline">
               Sign up
             </Link>
           </p>

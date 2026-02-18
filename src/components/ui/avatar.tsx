@@ -46,7 +46,7 @@ function AvatarFallback({
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "bg-white/10 text-white flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs",
+        "bg-sidebar-accent text-sidebar-foreground flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs",
         className
       )}
       {...props}
@@ -59,7 +59,7 @@ function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
     <span
       data-slot="avatar-badge"
       className={cn(
-        "bg-white text-black ring-background absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-sm ring-2 select-none",
+        "bg-sidebar-primary text-sidebar-primary-foreground ring-sidebar ring-offset-background ring-offset-2 absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-sm select-none",
         "group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden",
         "group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2",
         "group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2",

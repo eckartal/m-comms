@@ -45,10 +45,10 @@ import {
 
 // Role configuration
 const roles = {
-  OWNER: { label: 'Owner', icon: Crown, color: 'text-yellow-600 bg-yellow-50' },
-  ADMIN: { label: 'Admin', icon: Shield, color: 'text-purple-600 bg-purple-50' },
-  EDITOR: { label: 'Editor', icon: User, color: 'text-blue-600 bg-blue-50' },
-  VIEWER: { label: 'Viewer', icon: User, color: 'text-gray-600 bg-gray-50' },
+  OWNER: { label: 'Owner', icon: Crown, color: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20' },
+  ADMIN: { label: 'Admin', icon: Shield, color: 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/20' },
+  EDITOR: { label: 'Editor', icon: User, color: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20' },
+  VIEWER: { label: 'Viewer', icon: User, color: 'text-muted-foreground bg-muted' },
 }
 
 type Member = {

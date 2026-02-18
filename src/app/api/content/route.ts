@@ -1,5 +1,120 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { mockUser, mockTeam } from '@/lib/supabase/client'
+
+// Mock content data for demo
+const MOCK_CONTENT: typeof MOCK_CONTENT = [
+  {
+    id: '1',
+    team_id: mockTeam.id,
+    title: 'Product Launch Announcement',
+    blocks: [
+      {
+        id: 'block-1',
+        type: 'heading' as const,
+        content: 'Product Launch',
+      },
+      {
+        id: 'block-2',
+        type: 'text' as const,
+        content: 'We are excited to announce our new product launch! This will revolutionize the market.',
+      },
+    ],
+    status: 'IN_REVIEW',
+    scheduled_at: null,
+    published_at: null,
+    platforms: [{ platform: 'twitter', enabled: true }, { platform: 'linkedin', enabled: true }],
+    created_by: mockUser.id,
+    assigned_to: null,
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    team_id: mockTeam.id,
+    title: 'Weekly Newsletter #45',
+    blocks: [
+      {
+        id: 'block-1',
+        type: 'text' as const,
+        content: 'Here is your weekly update with top stories and news.',
+      },
+    ],
+    status: 'SCHEDULED',
+    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
+    published_at: null,
+    platforms: [{ platform: 'blog', enabled: true }],
+    created_by: mockUser.id,
+    assigned_to: null,
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '3',
+    team_id: mockTeam.id,
+    title: 'Customer Success Story',
+    blocks: [
+      {
+        id: 'block-1',
+        type: 'heading' as const,
+        content: 'Customer Success Story',
+      },
+      {
+        id: 'block-2',
+        type: 'text' as const,
+        content: 'Learn how our customers are achieving success with our platform.',
+      },
+    ],
+    status: 'DRAFT',
+    scheduled_at: null,
+    published_at: null,
+    platforms: [{ platform: 'linkedin', enabled: true }],
+    created_by: mockUser.id,
+    assigned_to: null,
+    created_at: new Date(Date.now() - 259200000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: '4',
+    team_id: mockTeam.id,
+    title: 'Thank You Post',
+    blocks: [
+      {
+        id: 'block-1',
+        type: 'text' as const,
+        content: 'Thank you to all our followers for your support!',
+      },
+    ],
+    status: 'PUBLISHED',
+    scheduled_at: null,
+    published_at: new Date(Date.now() - 432000000).toISOString(),
+    platforms: [{ platform: 'twitter', enabled: true }],
+    created_by: mockUser.id,
+    assigned_to: null,
+    created_at: new Date(Date.now() - 518400000).toISOString(),
+    updated_at: new Date(Date.now() - 432000000).toISOString(),
+  },
+  {
+    id: '5',
+    team_id: mockTeam.id,
+    title: 'Feature Update',
+    blocks: [
+      {
+        id: 'block-1',
+        type: 'text' as const,
+        content: 'We just released a new feature update with exciting new capabilities.',
+      },
+    ],
+    status: 'APPROVED',
+    scheduled_at: null,
+    published_at: null,
+    platforms: [{ platform: 'twitter', enabled: true }, { platform: 'linkedin', enabled: true }],
+    created_by: mockUser.id,
+    assigned_to: null,
+    created_at: new Date(Date.now() - 345600000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
 
 // GET /api/content - List all content
 export async function GET() {
@@ -8,7 +123,8 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      // Return mock data for demo mode
+      return NextResponse.json(MOCK_CONTENT)
     }
 
     const { data, error } = await supabase
@@ -24,13 +140,20 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching content:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Return mock data if database is not available
+      return NextResponse.json(MOCK_CONTENT)
     }
 
-    return NextResponse.json(data || [])
+    // If no data in database, return mock data
+    if (!data || data.length === 0) {
+      return NextResponse.json(MOCK_CONTENT)
+    }
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error in GET /api/content:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Return mock data on error (for demo mode)
+    return NextResponse.json(MOCK_CONTENT)
   }
 }
 

@@ -47,15 +47,15 @@ export function Sidebar({ className }: { className?: string }) {
   // activePrimaryItem not used currently, kept for future use
 
   return (
-    <aside className={cn("flex flex-col h-full bg-black border-r border-[#262626] w-[275px]", className)}>
+    <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border w-[275px]", className)}>
       {/* Profile Avatar (Top) */}
-      <div className="px-4 py-3 hover:bg-accent transition-colors cursor-pointer">
+      <div className="px-4 py-3 hover:bg-sidebar-accent transition-colors cursor-pointer">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-black font-bold text-sm">
+            <div className="h-10 w-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm">
               {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-black"></div>
+            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-sidebar-border"></div>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">
@@ -69,10 +69,10 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
 
       {/* New Post button */}
-      <div className="px-4 py-3 border-b border-[#262626]">
+      <div className="px-4 py-3 border-b border-sidebar-border">
         <Link
           href={`/${teamSlug}/content/new`}
-          className="flex items-center gap-2 w-full px-4 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-colors dark:bg-white dark:hover:bg-gray-100"
+          className="flex items-center gap-2 w-full px-4 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-100"
         >
           <Plus className="w-5 h-5" />
           <span className="flex-1 text-center">Post</span>
@@ -109,7 +109,7 @@ export function Sidebar({ className }: { className?: string }) {
 
           {/* Drafts Section - Subtle Divider */}
           <div className="my-3 px-4">
-            <div className="h-px bg-[#262626]"></div>
+            <div className="h-px bg-sidebar-border"></div>
           </div>
           <div className="px-4 py-2">
             <div className="flex items-center justify-between mb-2">
@@ -153,7 +153,7 @@ export function Sidebar({ className }: { className?: string }) {
       </nav>
 
       {/* Sticky Settings Footer */}
-      <div className="border-t border-[#262626] p-2">
+      <div className="border-t border-sidebar-border p-2">
         <Link
           href={`/${teamSlug}/settings`}
           className={cn(

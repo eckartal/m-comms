@@ -51,49 +51,49 @@ export function TeamSwitcher() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start gap-2 px-2 hover:bg-white/5 rounded-none">
-            <Avatar className="h-6 w-6 border border-white/10">
+          <Button variant="ghost" className="w-full justify-start gap-2 px-2 hover:bg-sidebar-accent rounded-none">
+            <Avatar className="h-6 w-6 border border-sidebar-border">
               <AvatarImage src={currentTeam?.logo || undefined} />
-              <AvatarFallback className="bg-white/10 text-white text-xs">
+              <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-xs">
                 {currentTeam?.name?.charAt(0) || 'T'}
               </AvatarFallback>
             </Avatar>
             <span className="truncate text-xs tracking-wide">{currentTeam?.name || 'Select Team'}</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56 bg-black border-white/10">
-          <DropdownMenuLabel className="text-xs uppercase tracking-widest text-zinc-400">Your Teams</DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuContent align="start" className="w-56 bg-sidebar border-sidebar-border">
+          <DropdownMenuLabel className="text-xs uppercase tracking-widest text-sidebar-foreground/70">Your Teams</DropdownMenuLabel>
+          <DropdownMenuSeparator className="bg-sidebar-border" />
           {teams.map((team) => (
             <DropdownMenuItem
               key={team.id}
               onClick={() => handleTeamChange(team)}
-              className="gap-2 hover:bg-white/5 focus:bg-white/5"
+              className="gap-2 hover:bg-sidebar-accent focus:bg-sidebar-accent"
             >
-              <Avatar className="h-6 w-6 border border-white/10">
+              <Avatar className="h-6 w-6 border border-sidebar-border">
                 <AvatarImage src={team.logo || undefined} />
-                <AvatarFallback className="bg-white/10 text-white text-xs">
+                <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-xs">
                   {team.name.charAt(0)}
                 </AvatarFallback>
               </Avatar>
               <span className="text-xs tracking-wide">{team.name}</span>
               {team.id === currentTeam.id && (
-                <Check className="h-4 w-4 ml-auto text-white" />
+                <Check className="h-4 w-4 ml-auto text-sidebar-primary" />
               )}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator className="bg-white/10" />
+          <DropdownMenuSeparator className="bg-sidebar-border" />
           <Dialog open={showNewTeam} onOpenChange={setShowNewTeam}>
             <DialogTrigger asChild>
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-2 hover:bg-white/5 focus:bg-white/5">
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="gap-2 hover:bg-sidebar-accent focus:bg-sidebar-accent">
                 <Plus className="h-4 w-4" />
                 <span className="text-xs tracking-wide">Create New Team</span>
               </DropdownMenuItem>
             </DialogTrigger>
-            <DialogContent className="bg-black border-white/10">
+            <DialogContent className="bg-background border-border">
               <DialogHeader>
-                <DialogTitle className="text-sm tracking-wide uppercase">Create New Team</DialogTitle>
-                <DialogDescription className="text-xs text-zinc-500">
+                <DialogTitle className="text-sm tracking-wide uppercase text-foreground">Create New Team</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
                   Create a new workspace to manage content with your team.
                 </DialogDescription>
               </DialogHeader>
@@ -105,15 +105,15 @@ export function TeamSwitcher() {
                     placeholder="My Awesome Team"
                     value={newTeamName}
                     onChange={(e) => setNewTeamName(e.target.value)}
-                    className="border-white/10 bg-transparent"
+                    className="border-border bg-transparent"
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowNewTeam(false)} className="border-white/10 hover:bg-white/5">
+                <Button variant="outline" onClick={() => setShowNewTeam(false)} className="border-border hover:bg-accent">
                   <span className="text-xs uppercase tracking-widest">Cancel</span>
                 </Button>
-                <Button onClick={handleCreateTeam} className="bg-white text-black hover:bg-white/90">
+                <Button onClick={handleCreateTeam} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <span className="text-xs uppercase tracking-widest">Create</span>
                 </Button>
               </DialogFooter>
