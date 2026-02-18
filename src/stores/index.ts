@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { User, Team, TeamMember } from '@/types'
-import { isDevMode, mockUser, mockTeam, mockTeamMember } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
+import type { User, Team } from '@/types'
 
 export interface ContentBlock {
   id: string
@@ -226,13 +226,6 @@ export const useAppStore = create<AppState>()(
 
 // Helper hook to fetch user from Supabase and sync with store
 export async function syncUserWithStore() {
-  if (isDevMode()) {
-    // In dev mode, set mock user directly
-    useAppStore.getState().setCurrentUser(mockUser)
-    return
-  }
-
-  const { createClient } = await import('@/lib/supabase/client')
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -257,14 +250,6 @@ export async function syncUserWithStore() {
 
 // Helper hook to fetch user's teams and sync with store
 export async function syncTeamsWithStore() {
-  if (isDevMode()) {
-    // In dev mode, set mock team directly
-    useAppStore.getState().setTeams([mockTeamMember])
-    useAppStore.getState().setCurrentTeam(mockTeam)
-    return
-  }
-
-  const { createClient } = await import('@/lib/supabase/client')
   const supabase = createClient()
 
   const { data } = await supabase

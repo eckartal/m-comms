@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient, isDevMode, mockUser, mockTeam } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { useAppStore, syncUserWithStore, syncTeamsWithStore } from '@/stores'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, Zap } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -65,14 +65,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleDevLogin = async () => {
-    setLoading(true)
-    setCurrentUser(mockUser)
-    setCurrentTeam(mockTeam)
-    router.push('/demo-team')
-    router.refresh()
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-black p-4">
       <Card className="w-full max-w-sm border-[#262626]">
@@ -91,22 +83,6 @@ export default function LoginPage() {
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 p-2 text-xs text-red-500">
               {error}
-            </div>
-          )}
-
-          {isDevMode() && (
-            <div className="bg-[#171717] border border-[#262626] p-2">
-              <p className="text-[10px] text-[#737373] mb-2">Dev mode</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full border-[#262626] bg-transparent hover:bg-white/5"
-                onClick={handleDevLogin}
-                disabled={loading}
-              >
-                <Zap className="mr-1.5 h-3 w-3" />
-                <span className="text-xs">Quick login</span>
-              </Button>
             </div>
           )}
 

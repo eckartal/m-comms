@@ -4,43 +4,43 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Ghostty-inspired Terminal Palette */
+  /* Dark Terminal Palette - Ghostty-inspired with proper contrast */
   --background: #000000;
-  --foreground: #ffffff;
-  --card: transparent;
-  --card-foreground: #ffffff;
-  --popover: #000000;
-  --popover-foreground: #ffffff;
-  --primary: #f97316; /* Orange accent */
+  --foreground: #e5e5e5;
+  --card: #050505;
+  --card-foreground: #e5e5e5;
+  --popover: #0a0a0a;
+  --popover-foreground: #e5e5e5;
+  --primary: #f97316;
   --primary-foreground: #000000;
   --secondary: #0a0a0a;
-  --secondary-foreground: #ffffff;
-  --muted: #0a0a0a;
-  --muted-foreground: #737373;
+  --secondary-foreground: #e5e5e5;
+  --muted: #171717;
+  --muted-foreground: #a3a3a3;
   --accent: #171717;
-  --accent-foreground: #ffffff;
+  --accent-foreground: #e5e5e5;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --input: #171717;
+  --input: #262626;
   --ring: #f97316;
   --border: #262626;
   --radius: 2px;
 
   /* Sidebar */
   --sidebar: #000000;
-  --sidebar-foreground: #ffffff;
+  --sidebar-foreground: #e5e5e5;
   --sidebar-primary: #f97316;
   --sidebar-primary-foreground: #000000;
   --sidebar-accent: #171717;
-  --sidebar-accent-foreground: #ffffff;
+  --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #262626;
   --sidebar-ring: #f97316;
 
-  /* Chart colors - subtle grayscale */
-  --chart-1: #ffffff;
+  /* Chart colors - proper grayscale for dark backgrounds */
+  --chart-1: #e5e5e5;
   --chart-2: #a3a3a3;
-  --chart-3: #525252;
-  --chart-4: #404040;
+  --chart-3: #737373;
+  --chart-4: #525252;
   --chart-5: #262626;
 }
 

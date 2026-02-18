@@ -8,8 +8,8 @@ import {
   Plus,
   Calendar as CalendarIcon,
   Clock,
-  FileText,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import { ContentStatus } from '@/types'
@@ -19,19 +19,10 @@ type ContentItem = {
   title: string
   content?: string
   status: ContentStatus
-  scheduledAt: string | null
-  publishedAt: string | null
+  scheduled_at: string | null
+  published_at: string | null
   platforms: string[]
 }
-
-const mockScheduled: ContentItem[] = [
-  { id: '1', title: 'Product Launch Announcement', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-15T10:00:00Z', publishedAt: null, platforms: ['twitter', 'linkedin'] },
-  { id: '2', title: 'Weekly Newsletter #45', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-18T09:00:00Z', publishedAt: null, platforms: ['blog'] },
-  { id: '3', title: 'Behind the Scenes - Engineering', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-20T14:00:00Z', publishedAt: null, platforms: ['instagram'] },
-  { id: '4', title: 'Industry Insights - AI Trends', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-22T11:00:00Z', publishedAt: null, platforms: ['twitter', 'linkedin'] },
-  { id: '5', title: 'Customer Success Story', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-25T08:00:00Z', publishedAt: null, platforms: ['linkedin', 'blog'] },
-  { id: '6', title: 'Product Hints Teaser', status: 'SCHEDULED' as ContentStatus, scheduledAt: '2025-02-28T15:00:00Z', publishedAt: null, platforms: ['twitter'] },
-]
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = [
@@ -44,6 +35,7 @@ const platformIcons: Record<string, string> = {
   linkedin: 'in',
   instagram: '📷',
   blog: '📝',
+  bluesky: '🌀',
 }
 
 export default function CalendarPage() {
@@ -55,13 +47,21 @@ export default function CalendarPage() {
 
   useEffect(() => {
     async function fetchScheduledContent() {
-      // Simulate API
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setScheduledContent(mockScheduled)
+      if (!currentTeam?.id) return
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('content')
+        .select('id, title, status, scheduled_at, published_at, platforms')
+        .eq('team_id', currentTeam.id)
+        .in('status', ['SCHEDULED', 'PUBLISHED'])
+        .not('scheduled_at', 'is', null)
+
+      setScheduledContent(data || [])
       setLoading(false)
     }
     fetchScheduledContent()
-  }, [])
+  }, [currentTeam?.id])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -85,12 +85,12 @@ export default function CalendarPage() {
 
   const getContentForDate = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return scheduledContent.filter((item) => item.scheduledAt?.startsWith(dateStr))
+    return scheduledContent.filter((item) => item.scheduled_at?.startsWith(dateStr))
   }
 
   const getContentByDate = (date: Date) => {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    return scheduledContent.filter((item) => item.scheduledAt?.startsWith(dateStr))
+    return scheduledContent.filter((item) => item.scheduled_at?.startsWith(dateStr))
   }
 
   const formatTime = (dateStr: string) => {
@@ -299,7 +299,7 @@ export default function CalendarPage() {
                           <div className="flex items-center justify-between mb-2">
                             <span className="flex items-center gap-1.5 text-[12px] text-[#6C6C70]">
                               <Clock className="w-3 h-3" />
-                              {formatTime(item.scheduledAt!)}
+                              {formatTime(item.scheduled_at!)}
                             </span>
                             <div className="flex gap-1">
                               {item.platforms.map((p) => (
@@ -344,7 +344,7 @@ export default function CalendarPage() {
                         {item.title}
                       </p>
                       <p className="text-[12px] text-[#8E8E93]">
-                        {item.scheduledAt && new Date(item.scheduledAt).toLocaleDateString('en-US', {
+                        {item.scheduled_at && new Date(item.scheduled_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           hour: 'numeric',
