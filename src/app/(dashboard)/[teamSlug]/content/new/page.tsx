@@ -273,12 +273,12 @@ export default function NewContentPage() {
                     className={cn(
                       'flex items-center gap-2 px-3 py-2 rounded-[8px] transition-all duration-200',
                       isSelected
-                        ? 'bg-[#171717] text-white border border-[#262626] shadow-sm'
-                        : 'bg-transparent text-muted-foreground hover:bg-[#171717] hover:text-foreground'
+                        ? 'bg-foreground text-primary-foreground border border-border shadow-sm'
+                        : 'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
-                    <PlatformIcon platform={key} className={cn('h-4 w-4', isSelected ? 'text-white' : 'text-current')} />
-                    <span className={cn('text-[13px] font-medium transition-colors', isSelected ? 'text-white' : '')}>
+                    <PlatformIcon platform={key} className={cn('h-4 w-4', isSelected ? 'text-foreground' : 'text-current')} />
+                    <span className={cn('text-[13px] font-medium transition-colors', isSelected ? 'text-foreground' : '')}>
                       {config.name.split(' ')[0]}
                     </span>
                   </button>
