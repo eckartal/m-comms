@@ -145,7 +145,7 @@ export default function SettingsPage() {
                   className={cn(
                     'p-3 rounded-[6px] border text-[14px] font-medium transition-all',
                     workingHourStart === hours.id
-                      ? 'border-foreground bg-foreground text-white'
+                      ? 'border-foreground bg-foreground text-primary-foreground'
                       : 'border-border text-muted-foreground hover:border-foreground'
                   )}
                 >
@@ -239,8 +239,8 @@ export default function SettingsPage() {
             className={cn(
               'px-6 py-2 rounded-[6px] text-[14px] font-medium transition-all',
               saved
-                ? 'bg-emerald-500 text-white'
-                : 'bg-foreground text-white hover:bg-hover'
+                ? 'bg-emerald-500 text-emerald-500'
+                : 'bg-foreground text-foreground hover:bg-hover'
             )}
           >
             {saved ? 'Saved!' : 'Save Changes'}
@@ -328,7 +328,7 @@ function IntegrationRow({
           'px-3 py-1.5 text-[13px] font-medium rounded-[6px] transition-colors',
           connected
             ? 'bg-muted text-muted-foreground hover:bg-border'
-            : 'bg-foreground text-white hover:bg-hover'
+            : 'bg-foreground text-foreground hover:bg-hover'
         )}
       >
         {connected ? 'Disconnect' : 'Connect'}

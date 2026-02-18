@@ -58,9 +58,9 @@ export default function AnalyticsPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-12 py-12">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 w-32 bg-[#333333] rounded" />
-            <div className="h-28 bg-[#333333] rounded" />
-            <div className="h-64 bg-[#333333] rounded" />
+            <div className="h-8 w-32 bg-muted rounded" />
+            <div className="h-28 bg-muted rounded" />
+            <div className="h-64 bg-muted rounded" />
           </div>
         </div>
       </div>
@@ -73,13 +73,13 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
           <div>
-            <h1 className="text-[20px] font-medium text-white">Analytics</h1>
-            <p className="text-[14px] text-gray-400 mt-1">
+            <h1 className="text-[20px] font-medium text-foreground">Analytics</h1>
+            <p className="text-[14px] text-muted-foreground mt-1">
               Track your content performance across platforms
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center bg-gray-900 rounded-[6px] p-1">
+            <div className="flex items-center bg-muted rounded-[6px] p-1">
               {['7d', '30d', '90d'].map((p) => (
                 <button
                   key={p}
@@ -87,8 +87,8 @@ export default function AnalyticsPage() {
                   className={cn(
                     'px-3 py-1.5 text-[13px] font-medium rounded-[4px] transition-all',
                     period === p
-                      ? 'bg-gray-800 text-white shadow-sm'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-foreground text-background shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   {p === '7d' ? '7 days' : p === '30d' ? '30 days' : '90 days'}
@@ -101,11 +101,11 @@ export default function AnalyticsPage() {
         {/* Empty State */}
         {stats === null && (
           <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
-              <Eye className="w-8 h-8 text-gray-400" />
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <Eye className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-[16px] font-medium text-white mb-2">No analytics yet</h3>
-            <p className="text-[14px] text-gray-400 max-w-md text-center">
+            <h3 className="text-[16px] font-medium text-foreground mb-2">No analytics yet</h3>
+            <p className="text-[14px] text-muted-foreground max-w-md text-center">
               Analytics will appear once your content is published and starts getting engagement.
             </p>
           </div>
@@ -129,12 +129,12 @@ function StatCard({
   const isPositive = change.startsWith('+')
 
   return (
-    <div className="border border-gray-800 rounded-[8px] p-4 hover:border-white transition-colors">
+    <div className="border border-border rounded-[8px] p-4 hover:border-foreground transition-colors">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] text-gray-400">{title}</span>
-        <Icon className="w-4 h-4 text-gray-400" />
+        <span className="text-[13px] text-muted-foreground">{title}</span>
+        <Icon className="w-4 h-4 text-muted-foreground" />
       </div>
-      <p className="text-[28px] font-medium text-white">{value}</p>
+      <p className="text-[28px] font-medium text-foreground">{value}</p>
       <div className="flex items-center gap-1 mt-1">
         {isPositive ? (
           <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
@@ -147,7 +147,7 @@ function StatCard({
         )}>
           {change}
         </span>
-        <span className="text-[12px] text-gray-500">vs last period</span>
+        <span className="text-[12px] text-muted-foreground">vs last period</span>
       </div>
     </div>
   )
