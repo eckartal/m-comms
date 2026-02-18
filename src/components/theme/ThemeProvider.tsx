@@ -33,8 +33,14 @@ export function ThemeProvider({ children, defaultTheme = 'dark', storageKey = 't
 
   useEffect(() => {
     const root = window.document.documentElement
-    root.classList.remove('dark', 'light')
-    root.classList.add(theme)
+    // Add light class for light theme, remove it for dark
+    if (theme === 'light') {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    } else {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    }
     localStorage.setItem(storageKey, theme)
   }, [theme, storageKey])
 
