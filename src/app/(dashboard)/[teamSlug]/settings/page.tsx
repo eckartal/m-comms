@@ -220,6 +220,42 @@ export default function SettingsPage() {
               teamSlug={teamSlug}
             />
             <IntegrationRow
+              name="TikTok"
+              icon="🎵"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
+              name="YouTube"
+              icon="▶️"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
+              name="Threads"
+              icon="💬"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
+              name="Bluesky"
+              icon="🔵"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
+              name="Mastodon"
+              icon="🐘"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
+              name="Facebook"
+              icon="f"
+              connected={false}
+              teamSlug={teamSlug}
+            />
+            <IntegrationRow
               name="Blog"
               icon="📝"
               connected={true}

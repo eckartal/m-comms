@@ -62,12 +62,60 @@ const BlogIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+// TikTok Official SVG Icon
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v6.16c0 2.52-1.12 4.84-2.9 6.33-1.72 1.44-4.01 2.08-6.17 1.66-2.64-.52-4.84-2.4-5.7-5.03-.84-2.51-.51-5.22.94-7.49 1.66-2.53 4.37-4.02 7.23-4.02v2.36c-1.43.15-2.76.84-3.75 1.96-1.06 1.18-1.43 2.84-1.03 4.34.38 1.45 1.32 2.7 2.62 3.51 1.34.82 3.01 1.01 4.53.52 1.46-.47 2.68-1.51 3.44-2.87.76-1.36.93-3.05.45-4.57-.46-1.52-1.51-2.82-2.9-3.7-1.42-.9-3.13-1.24-4.74-1.01V.02h.02z" />
+  </svg>
+)
+
+// YouTube Official SVG Icon
+const YouTubeIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.376.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.376-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+)
+
+// Threads Official SVG Icon
+const ThreadsIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93Zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39Z" />
+  </svg>
+)
+
+// Bluesky Official SVG Icon
+const BlueskyIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.7 10.8C6.8 8.6 10.3 7.6 14.3 7.1 13.6 5.4 12.2 3.3 10.3 1.8c3.6.6 6.9 2.4 9.6 4.8-.9 3.3-2.3 6.2-4.1 8.5 2.3-.3 4.3-.9 6.1-1.8-2.1 2.9-5 5.2-8.3 6.7C14.8 21.4 11.3 20.4 7.6 18.9c-1.8 2.3-3.8 4.3-6.1 5.7C2.5 23.9 1.2 22.3.2 20.6c3.2-1.7 5.9-4.2 7.8-7.2Z" />
+  </svg>
+)
+
+// Mastodon Official SVG Icon
+const MastodonIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M23.7 9.4l-3.3 1.4c.4 2.2.6 4.5.6 6.9 0 5.2-3.6 7.3-3.6 7.3-4.2 1.4-6.9.8-6.9.8-5.2-.4-7.4-3.2-7.4-3.2-2.2-2.4-2.6-5.9-2.6-5.9-.4-2.6.1-5.1 1.3-7.1-4.8-.7-8.1-4.1-8.1-9.1 0-2.1.4-4.1 1.1-5.9-.5-1.6-1.2-3.2-1.2-3.2 3.8 3.7 9.1 4.5 9.1 4.5 4.2.8 7.9-.7 7.9-.7 2.4-.8 4.8-1.1 7.2-1.1l1.1 2.4c-1.8.2-3.5.6-5.2 1.3 2.2 2.5 3.5 5.7 3.5 9.2Z" />
+  </svg>
+)
+
+// Facebook Official SVG Icon
+const FacebookIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.198 22h4.004v-8.34h3.184l.492-3.68h-3.676V9.413c0-1.058.06-1.833.164-2.107.686-1.915 2.636-3.135 4.772-3.135 1.311 0 2.623.117 2.623.117v3.594h-1.457c-1.823 0-2.397 1.133-2.397 2.297v1.976h3.661l-.586 3.68h-3.075V22h-4.004v-8.34h-3.184l-.492-3.68h3.676V9.413c0-1.058-.06-1.833-.164-2.107-.686-1.915-2.636-3.135-4.772-3.135-1.311 0-2.623.117-2.623.117v3.594h1.457c1.823 0 2.397 1.133 2.397 2.297v1.976H9.198z" />
+  </svg>
+)
+
 // Platform icon map
 export const platformIcons: Record<string, React.FC<{ className?: string }>> = {
   twitter: TwitterIcon,
   linkedin: LinkedInIcon,
   instagram: InstagramIcon,
   blog: BlogIcon,
+  tiktok: TikTokIcon,
+  youtube: YouTubeIcon,
+  threads: ThreadsIcon,
+  bluesky: BlueskyIcon,
+  mastodon: MastodonIcon,
+  facebook: FacebookIcon,
 }
 
 export function PlatformIcon({ platform, className }: { platform: string; className?: string }) {

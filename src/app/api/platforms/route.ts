@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     }> = [
       {
         id: 'twitter',
-        name: 'Twitter/X',
+        name: 'X (Twitter)',
         description: 'Post threads, schedule tweets, and track engagement',
         icon: '𝕏',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'twitter') || false,
@@ -88,6 +88,54 @@ export async function GET(request: Request) {
         icon: '📷',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'instagram') || false,
         accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'instagram') || [],
+      },
+      {
+        id: 'tiktok',
+        name: 'TikTok',
+        description: 'Create viral video content and reach wider audiences',
+        icon: '🎵',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'tiktok') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'tiktok') || [],
+      },
+      {
+        id: 'youtube',
+        name: 'YouTube',
+        description: 'Publish videos and grow your channel',
+        icon: '▶️',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'youtube') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'youtube') || [],
+      },
+      {
+        id: 'threads',
+        name: 'Threads',
+        description: 'Share short text posts and join conversations',
+        icon: '💬',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'threads') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'threads') || [],
+      },
+      {
+        id: 'bluesky',
+        name: 'Bluesky',
+        description: 'Decentralized social network with community moderation',
+        icon: '🔵',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'bluesky') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'bluesky') || [],
+      },
+      {
+        id: 'mastodon',
+        name: 'Mastodon',
+        description: 'Federated social network with server diversity',
+        icon: '🐘',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'mastodon') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'mastodon') || [],
+      },
+      {
+        id: 'facebook',
+        name: 'Facebook',
+        description: 'Post to your business page and reach customers',
+        icon: 'f',
+        connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'facebook') || false,
+        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'facebook') || [],
       },
       {
         id: 'blog',
@@ -139,6 +187,36 @@ export async function POST(request: Request) {
         clientId: process.env.INSTAGRAM_CLIENT_ID || '',
         authUrl: 'https://api.instagram.com/oauth/authorize',
         scope: 'instagram_basic user_profile',
+      },
+      tiktok: {
+        clientId: process.env.TIKTOK_CLIENT_ID || '',
+        authUrl: 'https://www.tiktok.com/v2/auth/authorize/',
+        scope: 'user.info.basic feed.video.upload',
+      },
+      youtube: {
+        clientId: process.env.YOUTUBE_CLIENT_ID || '',
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        scope: 'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload',
+      },
+      threads: {
+        clientId: process.env.THREADS_CLIENT_ID || '',
+        authUrl: 'https://threads.net/oauth/authorize',
+        scope: 'threads_basic',
+      },
+      bluesky: {
+        clientId: process.env.BSKY_CLIENT_ID || '',
+        authUrl: 'https://bsky.social/comatunity/oauth/authorize',
+        scope: 'write posts',
+      },
+      mastodon: {
+        clientId: process.env.MASTODON_CLIENT_ID || '',
+        authUrl: 'https://mastodon.social/oauth/authorize',
+        scope: 'read write follow',
+      },
+      facebook: {
+        clientId: process.env.FACEBOOK_CLIENT_ID || '',
+        authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
+        scope: 'pages_show_list pages_manage_posts',
       },
     }
 

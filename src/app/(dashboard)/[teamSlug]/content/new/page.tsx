@@ -18,6 +18,12 @@ const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: strin
   twitter: { name: 'X (Twitter)', limit: 280, icon: '𝕏' },
   linkedin: { name: 'LinkedIn', limit: 3000, icon: 'in' },
   instagram: { name: 'Instagram', limit: 2200, icon: '📷' },
+  tiktok: { name: 'TikTok', limit: 2200, icon: '🎵' },
+  youtube: { name: 'YouTube', limit: 5000, icon: '▶️' },
+  threads: { name: 'Threads', limit: 500, icon: '💬' },
+  bluesky: { name: 'Bluesky', limit: 300, icon: '🔵' },
+  mastodon: { name: 'Mastodon', limit: 500, icon: '🐘' },
+  facebook: { name: 'Facebook', limit: 63000, icon: 'f' },
 }
 
 

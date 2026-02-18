@@ -196,6 +196,128 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
     }
   }
 
+  if (platform === 'tiktok') {
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || '',
+      expires_at: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+        : null,
+      scope: data.scope,
+      accountId: data.user_info?.user_id || '',
+      accountName: data.user_info?.display_name || '',
+    }
+  }
+
+  if (platform === 'youtube') {
+    // Get channel info
+    let accountName = ''
+    let accountId = ''
+    try {
+      const channelResponse = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&id=mine', {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      })
+      if (channelResponse.ok) {
+        const channel = await channelResponse.json()
+        if (channel.items?.[0]) {
+          accountId = channel.items[0].id
+          accountName = channel.items[0].snippet.title
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch YouTube channel:', e)
+    }
+
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+        : null,
+      scope: data.scope,
+      accountId,
+      accountName,
+    }
+  }
+
+  if (platform === 'threads') {
+    // Get user profile
+    let accountName = ''
+    try {
+      const profileResponse = await fetch('https://graph.threads.net/v1.0/me?fields=id,username,display_name', {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      })
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json()
+        accountName = profile.display_name || profile.username || ''
+      }
+    } catch (e) {
+      console.error('Failed to fetch Threads profile:', e)
+    }
+
+    return {
+      access_token: data.access_token,
+      refresh_token: '',
+      expires_at: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+        : null,
+      scope: data.scope,
+      accountId: data.id || '',
+      accountName,
+    }
+  }
+
+  if (platform === 'bluesky') {
+    return {
+      access_token: data.accessJwt || data.access_token,
+      refresh_token: '',
+      expires_at: data.expiresAt || null,
+      scope: 'write posts',
+      accountId: data.did || '',
+      accountName: data.handle || '',
+    }
+  }
+
+  if (platform === 'mastodon') {
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token || '',
+      expires_at: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+        : null,
+      scope: data.scope,
+      accountId: data.user.id || '',
+      accountName: data.user.username || '',
+    }
+  }
+
+  if (platform === 'facebook') {
+    // Get page list
+    let accountName = ''
+    try {
+      const pagesResponse = await fetch('https://graph.facebook.com/v18.0/me/accounts?access_token=' + data.access_token)
+      if (pagesResponse.ok) {
+        const pages = await pagesResponse.json()
+        if (pages.data?.[0]) {
+          accountName = pages.data[0].name
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch Facebook pages:', e)
+    }
+
+    return {
+      access_token: data.access_token,
+      refresh_token: '',
+      expires_at: data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+        : null,
+      scope: data.scope,
+      accountId: data.application?.id || 'facebook_user',
+      accountName,
+    }
+  }
+
   return data
 }
 
@@ -204,6 +326,12 @@ function getTokenUrl(platform: string): string {
     twitter: 'https://api.twitter.com/2/oauth2/token',
     linkedin: 'https://www.linkedin.com/oauth/v2/accessToken',
     instagram: 'https://graph.instagram.com/oauth/access_token',
+    tiktok: 'https://open.tiktokapis.com/v2/oauth/token/',
+    youtube: 'https://oauth2.googleapis.com/token',
+    threads: 'https://threads.net/oauth/access_token',
+    bluesky: 'https://bsky.social/xrpc/com.atproto.server.createSession',
+    mastodon: 'https://mastodon.social/oauth/token',
+    facebook: 'https://graph.facebook.com/v18.0/oauth/access_token',
   }
   return urls[platform] || ''
 }
