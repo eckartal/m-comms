@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
-import { Plus, LayoutKanban, List, Calendar, Search } from 'lucide-react'
+import { Plus, LayoutGrid, List, Calendar, Search } from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
@@ -108,7 +108,7 @@ export default function CollaborationPage() {
           {/* View Toggle */}
           <div className="flex bg-[#0a0a0a] rounded-lg p-0.5 border border-gray-900">
             <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
-              <LayoutKanban className="h-4 w-4" />
+              <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
               <List className="h-4 w-4" />
