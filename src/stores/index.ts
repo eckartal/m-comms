@@ -111,6 +111,13 @@ export async function createContent(
   }
 
   useContentStore.getState().addContent(content)
+
+  // Mark onboarding complete if this is the first content (not the welcome draft)
+  const appState = useAppStore.getState()
+  if (!appState.onboarded) {
+    useAppStore.getState().markOnboardingComplete()
+  }
+
   return content
 }
 
@@ -197,7 +204,18 @@ export function autoSaveContent(
   }, 1000) // 1 second debounce
 }
 
-export const useAppStore = create<AppState>()(
+export const useAppStore = create<{
+  currentUser: User | null
+  setCurrentUser: (currentUser: User | null) => void
+  currentTeam: Team | null
+  teams: Team[]
+  setCurrentTeam: (currentTeam: Team | null) => void
+  setTeams: (teams: Team[]) => void
+  onboarded: boolean
+  markOnboardingComplete: () => void
+  sidebarOpen: boolean
+  toggleSidebar: () => void
+}>(
   persist(
     (set) => ({
       // Auth
@@ -210,6 +228,10 @@ export const useAppStore = create<AppState>()(
       setCurrentTeam: (currentTeam) => set({ currentTeam }),
       setTeams: (teams) => set({ teams }),
 
+      // Onboarding
+      onboarded: false,
+      markOnboardingComplete: () => set({ onboarded: true }),
+
       // UI
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -219,6 +241,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         currentTeam: state.currentTeam,
         currentUser: state.currentUser,
+        onboarded: state.onboarded,
       }),
     }
   )

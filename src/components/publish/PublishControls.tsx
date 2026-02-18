@@ -35,8 +35,8 @@ export function PublishControls({
           variant="outline"
           className={cn(
             'flex-1 gap-1.5 font-medium',
-            'border-[#E5E5E7] bg-white text-[#6C6C70]',
-            'hover:bg-[#FAFAFA] hover:text-[#1C1C1E] hover:border-[#1C1C1E]',
+            'border-input bg-background text-foreground',
+            'hover:bg-accent hover:text-accent-foreground hover:border-ring',
             'py-2.5 px-4',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
@@ -45,15 +45,15 @@ export function PublishControls({
         >
           <Calendar className="h-4 w-4" />
           Schedule
-          <ChevronDown className="h-3 w-3 ml-auto text-[#8E8E93]" />
+          <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
         </Button>
 
         {/* Publish - Solid black (primary) */}
         <Button
           className={cn(
             'flex-1 gap-1.5 font-medium',
-            'bg-[#1C1C1E] border-[#1C1C1E] text-white',
-            'hover:bg-[#2C2C2E] hover:border-[#2C2C2E]',
+            'bg-foreground border-foreground text-white',
+            'hover:bg-gray-800 hover:border-gray-800',
             'py-2.5 px-6',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
@@ -73,15 +73,15 @@ export function PublishControls({
 
       {/* Keyboard Shortcut Hint */}
       <div className="text-center">
-        <span className="text-xs text-[#8E8E93]">
-          Press <kbd className="px-1.5 py-0.5 bg-[#F5F5F7] rounded text-[#6C6C70] font-medium">⌘</kbd>
-          <kbd className="px-1.5 py-0.5 bg-[#F5F5F7] rounded text-[#6C6C70] font-medium">↵</kbd> to publish
+        <span className="text-xs text-muted-foreground">
+          Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-medium">⌘</kbd>
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground font-medium">↵</kbd> to publish
         </span>
       </div>
 
       {/* Scheduled Date Display */}
       {scheduledDate && (
-        <div className="flex items-center justify-center gap-2 text-sm text-[#34C759]">
+        <div className="flex items-center justify-center gap-2 text-sm text-emerald-500">
           <CheckCircle2 className="h-4 w-4" />
           <span>Scheduled for {scheduledDate.toLocaleDateString()}</span>
         </div>

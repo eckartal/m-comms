@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Globe,
   Clock,
@@ -32,7 +33,8 @@ const workingHours = [
 ]
 
 export default function SettingsPage() {
-  const { currentTeam, setCurrentTeam } = useAppStore()
+  const router = useRouter()
+  const { currentTeam, setCurrentTeam, setCurrentUser } = useAppStore()
   const [timezone, setTimezone] = useState('America/New_York')
   const [workingHourStart, setWorkingHourStart] = useState('09:00-17:00')
   const [notifications, setNotifications] = useState({
@@ -42,6 +44,27 @@ export default function SettingsPage() {
     published: true,
   })
   const [saved, setSaved] = useState(false)
+
+  // Initialize demo team if no team is set
+  useEffect(() => {
+    if (!currentTeam) {
+      setCurrentTeam({
+        id: '1',
+        name: 'Demo Team',
+        slug: 'demo',
+        logo: null,
+        settings: {},
+        created_at: new Date().toISOString(),
+      })
+      setCurrentUser({
+        id: '1',
+        email: 'demo@example.com',
+        name: 'Demo User',
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+      })
+    }
+  }, [currentTeam, setCurrentTeam, setCurrentUser])
 
   useEffect(() => {
     // Load settings from team settings or use defaults
@@ -60,8 +83,8 @@ export default function SettingsPage() {
       <div className="max-w-3xl mx-auto px-12 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-[20px] font-medium text-[#1C1C1E]">Settings</h1>
-          <p className="text-[14px] text-[#6C6C70] mt-1">
+          <h1 className="text-[20px] font-medium text-foreground">Settings</h1>
+          <p className="text-[14px] text-muted-foreground mt-1">
             Manage your team preferences and integrations
           </p>
         </div>
@@ -69,11 +92,11 @@ export default function SettingsPage() {
         {/* Timezone Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-5 h-5 text-[#6C6C70]" />
-            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Timezone</h2>
+            <Globe className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-[16px] font-medium text-foreground">Timezone</h2>
           </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
-            <p className="text-[14px] text-[#6C6C70] mb-4">
+          <div className="border border-border rounded-[8px] p-4">
+            <p className="text-[14px] text-muted-foreground mb-4">
               Set your timezone for accurate content scheduling
             </p>
             <div className="grid md:grid-cols-2 gap-3">
@@ -84,16 +107,16 @@ export default function SettingsPage() {
                   className={cn(
                     'flex items-center justify-between p-3 rounded-[6px] border transition-all',
                     timezone === tz.id
-                      ? 'border-[#1C1C1E] bg-[#FAFAFA]'
-                      : 'border-[#E5E5E7] hover:border-[#1C1C1E]'
+                      ? 'border-foreground bg-accent'
+                      : 'border-border hover:border-foreground'
                   )}
                 >
                   <div className="text-left">
-                    <p className="text-[14px] font-medium text-[#1C1C1E]">{tz.label}</p>
-                    <p className="text-[12px] text-[#8E8E93]">{tz.offset}</p>
+                    <p className="text-[14px] font-medium text-foreground">{tz.label}</p>
+                    <p className="text-[12px] text-muted-foreground">{tz.offset}</p>
                   </div>
                   {timezone === tz.id && (
-                    <Check className="w-4 h-4 text-[#1C1C1E]" />
+                    <Check className="w-4 h-4 text-foreground" />
                   )}
                 </button>
               ))}
@@ -104,11 +127,11 @@ export default function SettingsPage() {
         {/* Working Hours Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-[#6C6C70]" />
-            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Working Hours</h2>
+            <Clock className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-[16px] font-medium text-foreground">Working Hours</h2>
           </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
-            <p className="text-[14px] text-[#6C6C70] mb-4">
+          <div className="border border-border rounded-[8px] p-4">
+            <p className="text-[14px] text-muted-foreground mb-4">
               Set your team&apos;s working hours for scheduling suggestions
             </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -119,8 +142,8 @@ export default function SettingsPage() {
                   className={cn(
                     'p-3 rounded-[6px] border text-[14px] font-medium transition-all',
                     workingHourStart === hours.id
-                      ? 'border-[#1C1C1E] bg-[#1C1C1E] text-white'
-                      : 'border-[#E5E5E7] text-[#6C6C70] hover:border-[#1C1C1E]'
+                      ? 'border-foreground bg-foreground text-white'
+                      : 'border-border text-muted-foreground hover:border-foreground'
                   )}
                 >
                   {hours.label}
@@ -133,10 +156,10 @@ export default function SettingsPage() {
         {/* Notifications Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Bell className="w-5 h-5 text-[#6C6C70]" />
-            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Notifications</h2>
+            <Bell className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-[16px] font-medium text-foreground">Notifications</h2>
           </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] p-4">
+          <div className="border border-border rounded-[8px] p-4">
             <div className="space-y-4">
               <ToggleOption
                 label="Email notifications"
@@ -169,10 +192,10 @@ export default function SettingsPage() {
         {/* Integrations Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <LinkIcon className="w-5 h-5 text-[#6C6C70]" />
-            <h2 className="text-[16px] font-medium text-[#1C1C1E]">Integrations</h2>
+            <LinkIcon className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-[16px] font-medium text-foreground">Integrations</h2>
           </div>
-          <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
+          <div className="border border-border rounded-[8px] overflow-hidden">
             <IntegrationRow
               name="X (Twitter)"
               icon="𝕏"
@@ -201,7 +224,7 @@ export default function SettingsPage() {
 
         {/* Save Button */}
         <div className="flex items-center justify-between pt-4">
-          <p className="text-[13px] text-[#8E8E93]">
+          <p className="text-[13px] text-muted-foreground">
             Changes are saved automatically
           </p>
           <button
@@ -209,8 +232,8 @@ export default function SettingsPage() {
             className={cn(
               'px-6 py-2 rounded-[6px] text-[14px] font-medium transition-all',
               saved
-                ? 'bg-[#10B981] text-white'
-                : 'bg-[#1C1C1E] text-white hover:bg-[#2C2C2E]'
+                ? 'bg-emerald-500 text-white'
+                : 'bg-foreground text-white hover:bg-hover'
             )}
           >
             {saved ? 'Saved!' : 'Save Changes'}
@@ -235,14 +258,14 @@ function ToggleOption({
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-[14px] font-medium text-[#1C1C1E]">{label}</p>
-        <p className="text-[13px] text-[#8E8E93]">{description}</p>
+        <p className="text-[14px] font-medium text-foreground">{label}</p>
+        <p className="text-[13px] text-muted-foreground">{description}</p>
       </div>
       <button
         onClick={() => onChange(!checked)}
         className={cn(
           'w-11 h-6 rounded-full transition-colors relative',
-          checked ? 'bg-[#1C1C1E]' : 'bg-[#E5E5E7]'
+          checked ? 'bg-foreground' : 'bg-border'
         )}
       >
         <span
@@ -268,13 +291,13 @@ function IntegrationRow({
   account?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-3 px-4 border-b border-[#E5E5E7] last:border-0 hover:bg-[#FAFAFA] transition-colors">
+    <div className="flex items-center justify-between py-3 px-4 border-b border-border last:border-0 hover:bg-muted transition-colors">
       <div className="flex items-center gap-3">
         <span className="text-[20px]">{icon}</span>
         <div>
-          <p className="text-[14px] font-medium text-[#1C1C1E]">{name}</p>
+          <p className="text-[14px] font-medium text-foreground">{name}</p>
           {connected && account && (
-            <p className="text-[12px] text-[#8E8E93]">{account}</p>
+            <p className="text-[12px] text-muted-foreground">{account}</p>
           )}
         </div>
       </div>
@@ -282,8 +305,8 @@ function IntegrationRow({
         className={cn(
           'px-3 py-1.5 text-[13px] font-medium rounded-[6px] transition-colors',
           connected
-            ? 'bg-[#F5F5F7] text-[#6C6C70] hover:bg-[#E5E5E7]'
-            : 'bg-[#1C1C1E] text-white hover:bg-[#2C2C2E]'
+            ? 'bg-muted text-muted-foreground hover:bg-border'
+            : 'bg-foreground text-white hover:bg-hover'
         )}
       >
         {connected ? 'Disconnect' : 'Connect'}

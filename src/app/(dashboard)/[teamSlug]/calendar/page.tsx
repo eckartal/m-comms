@@ -107,8 +107,8 @@ export default function CalendarPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-6xl mx-auto px-12 py-12">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 w-32 bg-[#E5E5E7] rounded" />
-            <div className="h-96 bg-[#E5E5E7] rounded" />
+            <div className="h-8 w-32 bg-border rounded" />
+            <div className="h-96 bg-border rounded" />
           </div>
         </div>
       </div>
@@ -121,14 +121,14 @@ export default function CalendarPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
           <div>
-            <h1 className="text-[20px] font-medium text-[#1C1C1E]">Calendar</h1>
-            <p className="text-[14px] text-[#6C6C70] mt-1">
+            <h1 className="text-[20px] font-medium text-foreground">Calendar</h1>
+            <p className="text-[14px] text-muted-foreground mt-1">
               {scheduledContent.length} posts scheduled this month
             </p>
           </div>
           <Link
             href={`/${currentTeam?.slug}/content/new`}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1C1C1E] text-white text-[14px] font-medium rounded-[6px] hover:bg-[#2C2C2E] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-foreground text-white text-[14px] font-medium rounded-[6px] hover:bg-hover transition-colors"
           >
             <Plus className="w-4 h-4" />
             Schedule post
@@ -140,40 +140,40 @@ export default function CalendarPage() {
           <div className="lg:col-span-3">
             {/* Calendar Header */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-medium text-[#1C1C1E]">
+              <h2 className="text-[16px] font-medium text-foreground">
                 {MONTHS[month]} {year}
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center border border-border rounded-[6px]">
                 <button
                   onClick={goToToday}
-                  className="px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7] rounded-[6px] transition-colors"
+                  className="px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-[6px] transition-colors"
                 >
                   Today
                 </button>
-                <div className="flex items-center border border-[#E5E5E7] rounded-[6px]">
+                <div className="flex items-center border-l border-border rounded-[6px]">
                   <button
                     onClick={prevMonth}
-                    className="p-2 hover:bg-[#F5F5F7] rounded-l-[6px] transition-colors"
+                    className="p-2 hover:bg-muted rounded-l-[6px] transition-colors"
                   >
-                    <ChevronLeft className="w-4 h-4 text-[#6C6C70]" />
+                    <ChevronLeft className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <div className="w-px h-5 bg-[#E5E5E7]" />
+                  <div className="w-px h-5 bg-border" />
                   <button
                     onClick={nextMonth}
-                    className="p-2 hover:bg-[#F5F5F7] rounded-r-[6px] transition-colors"
+                    className="p-2 hover:bg-muted rounded-r-[6px] transition-colors"
                   >
-                    <ChevronRight className="w-4 h-4 text-[#6C6C70]" />
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Day Headers */}
-            <div className="grid grid-cols-7 gap-px bg-[#E5E5E7] rounded-t-[8px] overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-border rounded-t-[8px] overflow-hidden">
               {DAYS.map((day) => (
                 <div
                   key={day}
-                  className="bg-[#F5F5F7] py-2 text-center text-[12px] font-medium text-[#6C6C70]"
+                  className="bg-muted py-2 text-center text-[12px] font-medium text-muted-foreground"
                 >
                   {day}
                 </div>
@@ -181,10 +181,10 @@ export default function CalendarPage() {
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-px bg-[#E5E5E7] border border-[#E5E5E7] border-t-0 rounded-b-[8px] overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-border border border-border border-t-0 rounded-b-[8px] overflow-hidden">
               {/* Empty cells */}
               {Array.from({ length: startingDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="bg-white min-h-[100px] min-w-[100px]" />
+                <div key={`empty-${i}`} className="bg-card min-h-[100px] min-w-[100px]" />
               ))}
 
               {/* Days */}
@@ -199,8 +199,8 @@ export default function CalendarPage() {
                   <div
                     key={day}
                     className={cn(
-                      'bg-white min-h-[100px] p-2 transition-colors cursor-pointer',
-                      isSelected ? 'bg-[#F0F7FF]' : 'hover:bg-[#FAFAFA]'
+                      'bg-card min-h-[100px] p-2 transition-colors cursor-pointer',
+                      isSelected ? 'bg-blue-500/10' : 'hover:bg-accent'
                     )}
                     onClick={() => setSelectedDate(date)}
                   >
@@ -208,14 +208,14 @@ export default function CalendarPage() {
                       <span
                         className={cn(
                           'flex h-6 w-6 items-center justify-center rounded-full text-[13px]',
-                          isToday && 'bg-[#1C1C1E] text-white font-medium',
-                          !isToday && 'text-[#1C1C1E]'
+                          isToday && 'bg-foreground text-white font-medium',
+                          !isToday && 'text-foreground'
                         )}
                       >
                         {day}
                       </span>
                       {dayContent.length > 0 && (
-                        <span className="text-[11px] text-[#8E8E93] bg-[#F5F5F7] px-1.5 py-0.5 rounded">
+                        <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           {dayContent.length}
                         </span>
                       )}
@@ -224,14 +224,14 @@ export default function CalendarPage() {
                       {dayContent.slice(0, 2).map((item) => (
                         <div
                           key={item.id}
-                          className="truncate text-[11px] px-1.5 py-0.5 bg-[#F0F7FF] text-[#3B82F6] rounded"
+                          className="truncate text-[11px] px-1.5 py-0.5 bg-blue-500/10 text-blue-500 rounded"
                           title={item.title}
                         >
                           {item.title}
                         </div>
                       ))}
                       {dayContent.length > 2 && (
-                        <div className="text-[11px] text-[#8E8E93] px-1.5">
+                        <div className="text-[11px] text-muted-foreground px-1.5">
                           +{dayContent.length - 2} more
                         </div>
                       )}
@@ -242,7 +242,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mt-6 text-[13px] text-[#6C6C70]">
+            <div className="flex items-center justify-center gap-6 mt-6 text-[13px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span>𝕏</span> Twitter/X
               </span>
@@ -260,9 +260,9 @@ export default function CalendarPage() {
 
           {/* Selected Date Details */}
           <div>
-            <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
-              <div className="bg-[#F5F5F7] px-4 py-3 border-b border-[#E5E5E7]">
-                <h3 className="text-[14px] font-medium text-[#1C1C1E]">
+            <div className="border border-border rounded-[8px] overflow-hidden">
+              <div className="bg-muted px-4 py-3 border-b border-border">
+                <h3 className="text-[14px] font-medium text-foreground">
                   {selectedDate
                     ? selectedDate.toLocaleDateString('en-US', {
                         weekday: 'short',
@@ -277,13 +277,13 @@ export default function CalendarPage() {
                 {selectedDate ? (
                   selectedDateContent.length === 0 ? (
                     <div className="text-center py-8">
-                      <CalendarIcon className="w-10 h-10 mx-auto text-[#E5E5E7] mb-3" />
-                      <p className="text-[13px] text-[#6C6C70] mb-4">
+                      <CalendarIcon className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-[13px] text-muted-foreground mb-4">
                         No posts scheduled
                       </p>
                       <Link
                         href={`/${currentTeam?.slug}/content/new?date=${selectedDate.toISOString()}`}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1C1C1E] text-white text-[13px] font-medium rounded-[6px] hover:bg-[#2C2C2E] transition-colors"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-foreground text-white text-[13px] font-medium rounded-[6px] hover:bg-hover transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                         Schedule post
@@ -294,22 +294,22 @@ export default function CalendarPage() {
                       {selectedDateContent.map((item) => (
                         <div
                           key={item.id}
-                          className="p-3 border border-[#E5E5E7] rounded-[6px] hover:border-[#1C1C1E] transition-colors"
+                          className="p-3 border border-border rounded-[6px] hover:border-foreground transition-colors"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="flex items-center gap-1.5 text-[12px] text-[#6C6C70]">
+                            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                               <Clock className="w-3 h-3" />
                               {formatTime(item.scheduled_at!)}
                             </span>
                             <div className="flex gap-1">
                               {item.platforms.map((p) => (
-                                <span key={p} className="text-[12px] bg-[#F5F5F7] px-1 rounded">
+                                <span key={p} className="text-[12px] bg-muted px-1 rounded">
                                   {platformIcons[p]}
                                 </span>
                               ))}
                             </div>
                           </div>
-                          <p className="text-[13px] font-medium text-[#1C1C1E]">
+                          <p className="text-[13px] font-medium text-foreground">
                             {item.title}
                           </p>
                         </div>
@@ -318,8 +318,8 @@ export default function CalendarPage() {
                   )
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <CalendarIcon className="w-10 h-10 text-[#E5E5E7] mb-3" />
-                    <p className="text-[13px] text-[#6C6C70]">
+                    <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3" />
+                    <p className="text-[13px] text-muted-foreground">
                       Click on a date to see scheduled posts
                     </p>
                   </div>
@@ -329,21 +329,21 @@ export default function CalendarPage() {
 
             {/* Upcoming This Week */}
             <div className="mt-6">
-              <h3 className="text-[14px] font-medium text-[#1C1C1E] mb-4">Upcoming</h3>
+              <h3 className="text-[14px] font-medium text-foreground mb-4">Upcoming</h3>
               <div className="space-y-2">
                 {scheduledContent.slice(0, 4).map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 p-3 bg-[#FAFAFA] rounded-[6px] hover:bg-[#F5F5F7] transition-colors"
+                    className="flex items-center gap-3 p-3 bg-accent rounded-[6px] hover:bg-muted transition-colors"
                   >
-                    <div className="w-10 h-10 bg-[#F0F7FF] rounded-[6px] flex items-center justify-center text-[#3B82F6]">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-[6px] flex items-center justify-center text-blue-500">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-[#1C1C1E] truncate">
+                      <p className="text-[13px] font-medium text-foreground truncate">
                         {item.title}
                       </p>
-                      <p className="text-[12px] text-[#8E8E93]">
+                      <p className="text-[12px] text-muted-foreground">
                         {item.scheduled_at && new Date(item.scheduled_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',

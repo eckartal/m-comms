@@ -110,6 +110,11 @@ export async function POST(request: Request) {
         authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
         scope: 'r_liteprofile w_member_social',
       },
+      instagram: {
+        clientId: process.env.INSTAGRAM_CLIENT_ID || '',
+        authUrl: 'https://api.instagram.com/oauth/authorize',
+        scope: 'instagram_basic media_repository',
+      },
     }
 
     const config = oauthConfigs[platform]

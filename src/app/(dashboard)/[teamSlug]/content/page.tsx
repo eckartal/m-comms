@@ -55,12 +55,12 @@ const platformConfig: Record<string, { icon: string; name: string; color: string
 }
 
 const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  DRAFT: { label: 'Draft', color: 'text-[#6B7280]', bg: 'bg-[#F3F4F6]', icon: Edit },
-  IN_REVIEW: { label: 'In Review', color: 'text-[#F59E0B]', bg: 'bg-[#FEF3C7]', icon: Eye },
-  APPROVED: { label: 'Approved', color: 'text-[#10B981]', bg: 'bg-[#D1FAE5]', icon: CheckCircle },
-  SCHEDULED: { label: 'Scheduled', color: 'text-[#3B82F6]', bg: 'bg-[#DBEAFE]', icon: Clock },
-  PUBLISHED: { label: 'Published', color: 'text-[#8B5CF6]', bg: 'bg-[#EDE9FE]', icon: CheckCircle },
-  ARCHIVED: { label: 'Archived', color: 'text-[#9CA3AF]', bg: 'bg-[#F3F4F6]', icon: Archive },
+  DRAFT: { label: 'Draft', color: 'text-gray-500', bg: 'bg-gray-100/5', icon: Edit },
+  IN_REVIEW: { label: 'In Review', color: 'text-amber-500', bg: 'bg-amber-500/10', icon: Eye },
+  APPROVED: { label: 'Approved', color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: CheckCircle },
+  SCHEDULED: { label: 'Scheduled', color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Clock },
+  PUBLISHED: { label: 'Published', color: 'text-purple-500', bg: 'bg-purple-500/10', icon: CheckCircle },
+  ARCHIVED: { label: 'Archived', color: 'text-gray-400', bg: 'bg-gray-100/5', icon: Archive },
 }
 
 type SortOption = 'newest' | 'oldest' | 'updated' | 'scheduled'
@@ -176,9 +176,9 @@ export default function ContentPage() {
     return (
       <div className="max-w-5xl mx-auto px-12">
         <div className="animate-pulse space-y-6 py-12">
-          <div className="h-8 w-32 bg-[#E5E5E7] rounded" />
-          <div className="h-12 w-full bg-[#E5E5E7] rounded" />
-          <div className="h-64 w-full bg-[#E5E5E7] rounded" />
+          <div className="h-8 w-32 bg-border rounded" />
+          <div className="h-12 w-full bg-border rounded" />
+          <div className="h-64 w-full bg-border rounded" />
         </div>
       </div>
     )
@@ -190,15 +190,15 @@ export default function ContentPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-[20px] font-medium text-[#1C1C1E]">Content</h1>
-            <p className="text-[14px] text-[#6C6C70] mt-1">
+            <h1 className="text-[20px] font-medium text-foreground">Content</h1>
+            <p className="text-[14px] text-muted-foreground mt-1">
               {filteredContent.length} pieces of content
             </p>
           </div>
 
           <Link
             href={`/${currentTeam?.slug}/content/new`}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1C1C1E] text-white text-[14px] font-medium rounded-[6px] hover:bg-[#2C2C2E] transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-foreground text-white text-[14px] font-medium rounded-[6px] hover:bg-hover transition-colors"
           >
             <Plus className="w-4 h-4" />
             New post
@@ -209,18 +209,18 @@ export default function ContentPage() {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E8E93]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search content..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#F5F5F7] rounded-[6px] text-[14px] text-[#1C1C1E] placeholder:text-[#8E8E93] focus:outline-none focus:ring-2 focus:ring-[#007AFF]"
+              className="w-full pl-9 pr-4 py-2 bg-muted rounded-[6px] text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-1 p-1 bg-[#F5F5F7] rounded-[6px]">
+          <div className="flex items-center gap-1 p-1 bg-muted rounded-[6px]">
             {Object.entries(STATUS_CONFIG).map(([status, config]) => (
               <button
                 key={status}
@@ -228,8 +228,8 @@ export default function ContentPage() {
                 className={cn(
                   'px-3 py-1.5 rounded-[4px] text-[13px] font-medium transition-all',
                   statusFilter === status
-                    ? 'bg-white text-[#1C1C1E] shadow-sm'
-                    : 'text-[#6C6C70] hover:text-[#1C1C1E]'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {status === 'all' ? 'All' : config.label}
@@ -241,11 +241,11 @@ export default function ContentPage() {
           {/* Platform Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 bg-[#F5F5F7] rounded-[6px] text-[13px] font-medium text-[#6C6C70] hover:bg-[#E5E5E7] transition-colors">
+              <button className="flex items-center gap-2 px-3 py-2 bg-muted rounded-[6px] text-[13px] font-medium text-muted-foreground hover:bg-border transition-colors">
                 <Filter className="w-4 h-4" />
                 Platform
                 {platformFilter !== 'all' && (
-                  <span className="w-2 h-2 bg-[#007AFF] rounded-full" />
+                  <span className="w-2 h-2 bg-primary rounded-full" />
                 )}
               </button>
             </DropdownMenuTrigger>
@@ -272,7 +272,7 @@ export default function ContentPage() {
           {/* Sort */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 px-3 py-2 bg-[#F5F5F7] rounded-[6px] text-[13px] font-medium text-[#6C6C70] hover:bg-[#E5E5E7] transition-colors">
+              <button className="flex items-center gap-2 px-3 py-2 bg-muted rounded-[6px] text-[13px] font-medium text-muted-foreground hover:bg-border transition-colors">
                 <ArrowUpDown className="w-4 h-4" />
                 Sort
               </button>
@@ -298,21 +298,21 @@ export default function ContentPage() {
         {/* Content List */}
         {filteredContent.length === 0 ? (
           <div className="text-center py-16">
-            <FileText className="w-12 h-12 mx-auto text-[#E5E5E7] mb-4" />
-            <p className="text-[#6C6C70]">
+            <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">
               {search || statusFilter !== 'all' || platformFilter !== 'all'
                 ? 'No content matches your filters'
                 : 'No content yet'}
             </p>
             <Link
               href={`/${currentTeam?.slug}/content/new`}
-              className="inline-flex items-center gap-2 mt-4 text-[#007AFF] hover:underline text-[14px]"
+              className="inline-flex items-center gap-2 mt-4 text-primary hover:underline text-[14px]"
             >
               Create your first post
             </Link>
           </div>
         ) : (
-          <div className="border border-[#E5E5E7] rounded-[8px] overflow-hidden">
+          <div className="border border-border rounded-[8px] overflow-hidden">
             {filteredContent.map((item, index) => {
               const statusConfig = STATUS_CONFIG[item.status as ContentStatus]
               const StatusIcon = statusConfig.icon
@@ -327,8 +327,8 @@ export default function ContentPage() {
                   key={item.id}
                   href={`/${currentTeam?.slug}/content/${item.id}`}
                   className={cn(
-                    'flex items-start justify-between py-4 px-4 transition-colors hover:bg-[#FAFAFA]',
-                    index !== filteredContent.length - 1 && 'border-b border-[#E5E5E7]'
+                    'flex items-start justify-between py-4 px-4 transition-colors hover:bg-accent',
+                    index !== filteredContent.length - 1 && 'border-b border-border'
                   )}
                 >
                   <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -342,23 +342,23 @@ export default function ContentPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-[14px] font-medium text-[#1C1C1E] truncate">
+                        <h3 className="text-[14px] font-medium text-foreground truncate">
                           {item.title}
                         </h3>
                         {isOverLimit && (
-                          <span className="text-[11px] text-[#ef4444] px-1.5 py-0.5 bg-[#FEF2F2] rounded">
+                          <span className="text-[11px] text-red-500 px-1.5 py-0.5 bg-red-500/10 rounded">
                             Over limit
                           </span>
                         )}
                       </div>
 
                       {contentPreview && (
-                        <p className="text-[13px] text-[#6C6C70] line-clamp-1 mb-2">
+                        <p className="text-[13px] text-muted-foreground line-clamp-1 mb-2">
                           {contentPreview}
                         </p>
                       )}
 
-                      <div className="flex items-center gap-3 text-[12px] text-[#8E8E93]">
+                      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
                         {/* Created date */}
                         <span>Created {formatDate(item.created_at)}</span>
 
@@ -377,7 +377,7 @@ export default function ContentPage() {
                         {item.published_at && (
                           <>
                             <span>·</span>
-                            <span className="flex items-center gap-1 text-[#8B5CF6]">
+                            <span className="flex items-center gap-1 text-purple-500">
                               <CheckCircle className="w-3 h-3" />
                               Published {formatDate(item.published_at)}
                             </span>
@@ -393,7 +393,7 @@ export default function ContentPage() {
                       {(item.platforms || []).map((p: any) => (
                         <span
                           key={p?.type || 'unknown'}
-                          className="text-[13px] w-6 h-6 flex items-center justify-center bg-[#F5F5F7] rounded"
+                          className="text-[13px] w-6 h-6 flex items-center justify-center bg-muted rounded"
                           title={platformConfig[p?.type]?.name || 'Unknown'}
                         >
                           {platformConfig[p?.type]?.icon || '?'}
@@ -404,8 +404,8 @@ export default function ContentPage() {
                     {/* Actions */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
-                        <button className="p-1.5 rounded hover:bg-[#F5F5F7] transition-colors">
-                          <MoreHorizontal className="w-4 h-4 text-[#8E8E93]" />
+                        <button className="p-1.5 rounded hover:bg-muted transition-colors">
+                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
@@ -420,7 +420,7 @@ export default function ContentPage() {
                           Duplicate
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-[#ef4444]">
+                        <DropdownMenuItem className="text-red-500">
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -435,7 +435,7 @@ export default function ContentPage() {
 
         {/* Footer Stats */}
         {filteredContent.length > 0 && (
-          <div className="mt-6 flex items-center gap-6 text-[12px] text-[#8E8E93]">
+          <div className="mt-6 flex items-center gap-6 text-[12px] text-muted-foreground">
             <span>{statusCounts.DRAFT || 0} drafts</span>
             <span>{statusCounts.IN_REVIEW || 0} in review</span>
             <span>{statusCounts.SCHEDULED || 0} scheduled</span>

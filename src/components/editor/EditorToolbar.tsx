@@ -30,13 +30,13 @@ export function EditorToolbar({
   const isNearLimit = characterCount > maxCharacters * 0.8
 
   return (
-    <div className="flex items-center justify-between border-t border-[#E5E5E7] pt-4 pb-2 mt-4">
+    <div className="flex items-center justify-between border-t border-border pt-4 pb-2 mt-4">
       {/* Left - Toolbar Icons */}
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onImageUpload}
           title="Add image"
         >
@@ -45,7 +45,7 @@ export function EditorToolbar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onEmoji}
           title="Add emoji"
         >
@@ -54,7 +54,7 @@ export function EditorToolbar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onAddThread}
           title="Add thread"
         >
@@ -63,7 +63,7 @@ export function EditorToolbar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onAddLink}
           title="Add link"
         >
@@ -72,21 +72,21 @@ export function EditorToolbar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onAddHashtag}
           title="Add hashtag"
         >
           <Hash className="w-5 h-5" />
         </Button>
-        <div className="w-px h-6 bg-[#E5E5E7] mx-1" />
+        <div className="w-px h-6 bg-border mx-1" />
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7]"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
           onClick={onBookmark}
           title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}
         >
-          <Bookmark className={`w-5 h-5 ${isBookmarked ? 'fill-current text-[#007AFF]' : ''}`} />
+          <Bookmark className={`w-5 h-5 ${isBookmarked ? 'fill-current text-primary' : ''}`} />
         </Button>
       </div>
 
@@ -95,10 +95,10 @@ export function EditorToolbar({
         <span
           className={`text-[13px] tabular-nums ${
             isOverLimit
-              ? 'text-[#ef4444] font-medium'
+              ? 'text-red-500 font-medium'
               : isNearLimit
-              ? 'text-[#F59E0B]'
-              : 'text-[#8E8E93]'
+              ? 'text-amber-500'
+              : 'text-muted-foreground'
           }`}
         >
           {characterCount.toLocaleString()} / {maxCharacters.toLocaleString()}

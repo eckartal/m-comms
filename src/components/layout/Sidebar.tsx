@@ -89,7 +89,7 @@ export function Sidebar({ className }: { className?: string }) {
         {/* Drafts Section */}
         <div className="mt-4 px-1.5">
           <div className="flex items-center justify-between px-2 mb-1">
-            <span className="text-[10px] font-medium text-muted-foreground uppercase">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               Drafts
             </span>
             <Link

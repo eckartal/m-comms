@@ -267,24 +267,24 @@ export default function NewContentPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Account Header */}
-      <header className="px-12 py-4 border-b border-[#E5E5E7]">
+      <header className="px-12 py-4 border-b border-border">
         <div className="flex items-center justify-between">
-          <span className="text-[14px] font-medium text-[#1C1C1E]">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
+          <span className="text-[14px] font-medium text-foreground">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
           <div className="flex items-center gap-4">
             {/* Thread count */}
             {thread.length > 1 && (
-              <span className="text-xs text-[#6C6C70]">
+              <span className="text-xs text-muted-foreground">
                 {thread.length} tweets
               </span>
             )}
             {/* Auto-save indicator */}
             <span className={cn(
               'text-xs flex items-center gap-1',
-              isSaved ? 'text-[#8E8E93]' : 'text-[#007AFF]'
+              isSaved ? 'text-muted-foreground' : 'text-primary'
             )}>
               <span className={cn(
                 'w-2 h-2 rounded-full',
-                isSaved ? 'bg-[#34C759]' : 'bg-[#007AFF] animate-pulse'
+                isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
               )} />
               {isSaved ? 'Saved' : 'Saving...'}
             </span>
@@ -305,8 +305,8 @@ export default function NewContentPage() {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all',
                     selectedPlatform === key
-                      ? 'bg-[#1C1C1E] text-white'
-                      : 'bg-[#F5F5F7] text-[#6C6C70] hover:bg-[#E5E5E7]'
+                      ? 'bg-foreground text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-border'
                   )}
                 >
                   <span>{config.icon}</span>
@@ -318,7 +318,7 @@ export default function NewContentPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowTemplates(!showTemplates)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#1C1C1E] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Sparkles className="w-4 h-4" />
                 Templates
@@ -326,7 +326,7 @@ export default function NewContentPage() {
               {thread.some(t => t.content) && (
                 <button
                   onClick={clearAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#6C6C70] hover:text-[#ef4444] transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-red-500 transition-colors"
                 >
                   Clear
                 </button>
@@ -336,17 +336,17 @@ export default function NewContentPage() {
 
           {/* Templates Dropdown */}
           {showTemplates && (
-            <div className="mb-6 p-4 bg-[#FAFAFA] rounded-[8px] border border-[#E5E5E7]">
-              <p className="text-xs font-medium text-[#8E8E93] mb-3 uppercase tracking-wider">Templates for {PLATFORMS[selectedPlatform].name}</p>
+            <div className="mb-6 p-4 bg-accent rounded-[8px] border border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Templates for {PLATFORMS[selectedPlatform].name}</p>
               <div className="grid grid-cols-2 gap-2">
                 {TEMPLATES[selectedPlatform].map((template, idx) => (
                   <button
                     key={idx}
                     onClick={() => applyTemplate(template.content)}
-                    className="text-left px-3 py-2 rounded-[6px] hover:bg-[#E5E5E7] transition-colors"
+                    className="text-left px-3 py-2 rounded-[6px] hover:bg-border transition-colors"
                   >
-                    <span className="text-[14px] font-medium text-[#1C1C1E]">{template.name}</span>
-                    <p className="text-[12px] text-[#8E8E93] mt-0.5 line-clamp-1">
+                    <span className="text-[14px] font-medium text-foreground">{template.name}</span>
+                    <p className="text-[12px] text-muted-foreground mt-0.5 line-clamp-1">
                       {template.content.split('\n')[0]}
                     </p>
                   </button>
@@ -368,7 +368,7 @@ export default function NewContentPage() {
                   {index > 0 && (
                     <div className="flex">
                       <div className="w-8 flex items-center justify-center">
-                        <div className="w-0.5 h-6 bg-[#E5E5E7]" />
+                        <div className="w-0.5 h-6 bg-border" />
                       </div>
                       <div className="flex-1" />
                     </div>
@@ -379,7 +379,7 @@ export default function NewContentPage() {
                     className={cn(
                       'relative rounded-[8px] transition-all cursor-text',
                       isActive
-                        ? 'bg-white'
+                        ? 'bg-card'
                         : 'bg-transparent'
                     )}
                     onClick={() => setActiveIndex(index)}
@@ -388,7 +388,7 @@ export default function NewContentPage() {
                     <div className="absolute left-0 top-3 w-8 flex items-center justify-center">
                       <span className={cn(
                         'text-[13px] font-medium',
-                        isActive ? 'text-[#8E8E93]' : 'text-[#E5E5E7]'
+                        isActive ? 'text-muted-foreground' : 'text-border'
                       )}>
                         {index + 1}
                       </span>
@@ -402,7 +402,7 @@ export default function NewContentPage() {
                         onChange={(e) => handleContentChange(index, e.target.value)}
                         onFocus={() => setActiveIndex(index)}
                         className={cn(
-                          'w-full min-h-[80px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-[#8E8E93]',
+                          'w-full min-h-[80px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground',
                           isActive && 'mt-3'
                         )}
                         style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
@@ -418,7 +418,7 @@ export default function NewContentPage() {
                                   e.stopPropagation()
                                   removeTweet(index)
                                 }}
-                                className="p-1.5 text-[#8E8E93] hover:text-[#ef4444] hover:bg-[#FEF2F2] rounded transition-colors"
+                                className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
                                 title="Remove tweet"
                               >
                                 <X className="w-4 h-4" />
@@ -431,7 +431,7 @@ export default function NewContentPage() {
                                   handleContentChange(index, item.content + ' ' + thread[index + 1].content)
                                   removeTweet(index + 1)
                                 }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7] rounded transition-colors"
+                                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                                 title="Merge with next tweet"
                               >
                                 <Plus className="w-3 h-3" />
@@ -442,10 +442,10 @@ export default function NewContentPage() {
                           <span className={cn(
                             'text-[12px] tabular-nums',
                             itemOverLimit
-                              ? 'text-[#ef4444]'
+                              ? 'text-red-500'
                               : itemCharCount > maxChars * 0.8
-                              ? 'text-[#F59E0B]'
-                              : 'text-[#8E8E93]'
+                              ? 'text-amber-500'
+                              : 'text-muted-foreground'
                           )}>
                             {itemCharCount} / {maxChars}
                           </span>
@@ -462,7 +462,7 @@ export default function NewContentPage() {
           {selectedPlatform === 'twitter' && (
             <button
               onClick={addTweet}
-              className="mt-4 flex items-center gap-2 px-4 py-2 text-[14px] text-[#6C6C70] hover:text-[#1C1C1E] hover:bg-[#F5F5F7] rounded-[6px] transition-colors"
+              className="mt-4 flex items-center gap-2 px-4 py-2 text-[14px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-[6px] transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add tweet
@@ -490,7 +490,7 @@ export default function NewContentPage() {
           {/* Total character count (for threads) */}
           {thread.length > 1 && (
             <div className="mt-4 flex items-center justify-center gap-4">
-              <span className="text-[12px] text-[#8E8E93]">
+              <span className="text-[12px] text-muted-foreground">
                 {totalCharacters.toLocaleString()} total characters • {thread.length} tweets
               </span>
             </div>

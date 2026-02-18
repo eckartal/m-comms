@@ -97,9 +97,6 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      ...(platform === 'twitter' && {
-        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-      }),
     },
     body: params.toString(),
   })
@@ -111,48 +108,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
 
   const data = await response.json()
 
-  // Platform-specific response parsing
-  if (platform === 'twitter') {
-    return {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : null,
-      accountId: data.scope?.includes('users.read') ? 'twitter_user' : '',
-      accountName: '',
-    }
-  }
-
-  if (platform === 'linkedin') {
-    // Get user profile
-    let accountName = ''
-    try {
-      const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
-        headers: {
-          Authorization: `Bearer ${data.access_token}`,
-        },
-      })
-      if (profileResponse.ok) {
-        const profile = await profileResponse.json()
-        accountName = `${profile.localizedFirstName} ${profile.localizedLastName}`
-      }
-    } catch (e) {
-      console.error('Failed to fetch LinkedIn profile:', e)
-    }
-
-    return {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : null,
-      scope: data.scope,
-      accountId: 'linkedin_user',
-      accountName,
-    }
-  }
-
+  // Instagram-specific response parsing
   if (platform === 'instagram') {
     // Get user profile
     let accountName = ''
