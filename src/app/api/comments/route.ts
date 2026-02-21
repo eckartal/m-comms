@@ -1,51 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { mockUser } from '@/lib/supabase/client'
-
-// Mock comments data for demo
-const MOCK_COMMENTS = [
-  {
-    id: 'comment-1',
-    content_id: '1',
-    user_id: mockUser.id,
-    parent_id: null,
-    text: 'Great content! Looking forward to the launch.',
-    mentions: [],
-    resolved_at: null,
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    user: {
-      id: mockUser.id,
-      email: mockUser.email,
-      name: mockUser.name,
-      avatar_url: mockUser.avatar_url,
-    },
-    replies: [
-      {
-        id: 'comment-1-reply-1',
-        content_id: '1',
-        user_id: mockUser.id,
-        parent_id: 'comment-1',
-        text: 'Thanks! We are excited too!',
-        mentions: [],
-        resolved_at: null,
-        created_at: new Date(Date.now() - 1800000).toISOString(),
-        user: {
-          id: mockUser.id,
-          email: mockUser.email,
-          name: mockUser.name,
-          avatar_url: mockUser.avatar_url,
-        },
-      },
-    ],
-  },
-]
 
 // GET /api/comments - List comments for a content
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const contentId = searchParams.get('contentId')
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     if (!contentId) {
       return NextResponse.json({ error: 'Content ID is required' }, { status: 400 })
@@ -54,12 +14,7 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    // If no user (or for demo), return mock comments
     if (!user) {
-      if (demoMode) {
-        const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-        return NextResponse.json({ data: filteredComments })
-      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -80,11 +35,6 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching comments:', error)
-      if (demoMode) {
-        // Return mock comments if database is not available
-        const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-        return NextResponse.json({ data: filteredComments })
-      }
       return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 })
     }
 
@@ -113,14 +63,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: rootComments })
   } catch (error) {
     console.error('Error in GET /api/comments:', error)
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-    if (demoMode) {
-      // Return mock comments on error
-      const { searchParams } = new URL(request.url)
-      const contentId = searchParams.get('contentId')
-      const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-      return NextResponse.json({ data: filteredComments })
-    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

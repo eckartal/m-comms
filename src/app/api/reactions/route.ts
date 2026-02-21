@@ -1,34 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { mockUser } from '@/lib/supabase/client'
-
-// Mock reactions data for demo
-const MOCK_REACTIONS = {
-  like: [
-    {
-      id: 'reaction-1',
-      content_id: '1',
-      user_id: mockUser.id,
-      type: 'like',
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      user: {
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.name,
-        avatar_url: mockUser.avatar_url,
-      },
-    },
-  ],
-  love: [],
-  laugh: [],
-}
 
 // GET /api/reactions - Get reactions for a content
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const contentId = searchParams.get('contentId')
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     if (!contentId) {
       return NextResponse.json({ error: 'Content ID is required' }, { status: 400 })
@@ -37,15 +14,7 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    // If no user (or for demo), return mock reactions
     if (!user) {
-      if (demoMode) {
-        const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-          acc[type] = reactions.filter((r) => r.content_id === contentId)
-          return acc
-        }, {} as Record<string, typeof reactions>)
-        return NextResponse.json({ data: filteredReactions })
-      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -66,14 +35,6 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching reactions:', error)
-      if (demoMode) {
-        // Return mock reactions if database is not available
-        const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-          acc[type] = reactions.filter((r) => r.content_id === contentId)
-          return acc
-        }, {} as Record<string, typeof reactions>)
-        return NextResponse.json({ data: filteredReactions })
-      }
       return NextResponse.json({ error: 'Failed to fetch reactions' }, { status: 500 })
     }
 
@@ -87,17 +48,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: grouped })
   } catch (error) {
     console.error('Error in GET /api/reactions:', error)
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-    if (demoMode) {
-      // Return mock reactions on error
-      const { searchParams } = new URL(request.url)
-      const contentId = searchParams.get('contentId')
-      const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-        acc[type] = reactions.filter((r) => r.content_id === contentId)
-        return acc
-      }, {} as Record<string, typeof reactions>)
-      return NextResponse.json({ data: filteredReactions })
-    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

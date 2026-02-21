@@ -1,133 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { mockUser, mockTeam } from '@/lib/supabase/client'
-
-// Mock content data for demo
-const MOCK_CONTENT: typeof MOCK_CONTENT = [
-  {
-    id: '1',
-    team_id: mockTeam.id,
-    title: 'Product Launch Announcement',
-    blocks: [
-      {
-        id: 'block-1',
-        type: 'heading' as const,
-        content: 'Product Launch',
-      },
-      {
-        id: 'block-2',
-        type: 'text' as const,
-        content: 'We are excited to announce our new product launch! This will revolutionize the market.',
-      },
-    ],
-    status: 'IN_REVIEW',
-    scheduled_at: null,
-    published_at: null,
-    platforms: [{ platform: 'twitter', enabled: true }, { platform: 'linkedin', enabled: true }],
-    created_by: mockUser.id,
-    assigned_to: null,
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    team_id: mockTeam.id,
-    title: 'Weekly Newsletter #45',
-    blocks: [
-      {
-        id: 'block-1',
-        type: 'text' as const,
-        content: 'Here is your weekly update with top stories and news.',
-      },
-    ],
-    status: 'SCHEDULED',
-    scheduled_at: new Date(Date.now() + 86400000).toISOString(),
-    published_at: null,
-    platforms: [{ platform: 'blog', enabled: true }],
-    created_by: mockUser.id,
-    assigned_to: null,
-    created_at: new Date(Date.now() - 172800000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    team_id: mockTeam.id,
-    title: 'Customer Success Story',
-    blocks: [
-      {
-        id: 'block-1',
-        type: 'heading' as const,
-        content: 'Customer Success Story',
-      },
-      {
-        id: 'block-2',
-        type: 'text' as const,
-        content: 'Learn how our customers are achieving success with our platform.',
-      },
-    ],
-    status: 'DRAFT',
-    scheduled_at: null,
-    published_at: null,
-    platforms: [{ platform: 'linkedin', enabled: true }],
-    created_by: mockUser.id,
-    assigned_to: null,
-    created_at: new Date(Date.now() - 259200000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    team_id: mockTeam.id,
-    title: 'Thank You Post',
-    blocks: [
-      {
-        id: 'block-1',
-        type: 'text' as const,
-        content: 'Thank you to all our followers for your support!',
-      },
-    ],
-    status: 'PUBLISHED',
-    scheduled_at: null,
-    published_at: new Date(Date.now() - 432000000).toISOString(),
-    platforms: [{ platform: 'twitter', enabled: true }],
-    created_by: mockUser.id,
-    assigned_to: null,
-    created_at: new Date(Date.now() - 518400000).toISOString(),
-    updated_at: new Date(Date.now() - 432000000).toISOString(),
-  },
-  {
-    id: '5',
-    team_id: mockTeam.id,
-    title: 'Feature Update',
-    blocks: [
-      {
-        id: 'block-1',
-        type: 'text' as const,
-        content: 'We just released a new feature update with exciting new capabilities.',
-      },
-    ],
-    status: 'APPROVED',
-    scheduled_at: null,
-    published_at: null,
-    platforms: [{ platform: 'twitter', enabled: true }, { platform: 'linkedin', enabled: true }],
-    created_by: mockUser.id,
-    assigned_to: null,
-    created_at: new Date(Date.now() - 345600000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
 
 // GET /api/content - List all content
 export async function GET() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
-      if (demoMode) {
-        // Return mock data for demo mode
-        return NextResponse.json({ data: MOCK_CONTENT })
-      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -144,10 +26,6 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching content:', error)
-      if (demoMode) {
-        // Return mock data if database is not available
-        return NextResponse.json({ data: MOCK_CONTENT })
-      }
       return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 })
     }
 
@@ -184,11 +62,6 @@ export async function GET() {
     return NextResponse.json({ data: enriched })
   } catch (error) {
     console.error('Error in GET /api/content:', error)
-    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-    if (demoMode) {
-      // Return mock data on error (for demo mode)
-      return NextResponse.json({ data: MOCK_CONTENT })
-    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -197,7 +70,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -207,10 +82,7 @@ export async function POST(request: Request) {
     const { title, blocks, platforms, status, scheduled_at, team_id } = body
 
     if (!title || !team_id) {
-      return NextResponse.json(
-        { error: 'Title and team_id are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Title and team_id are required' }, { status: 400 })
     }
 
     const { data, error } = await supabase
