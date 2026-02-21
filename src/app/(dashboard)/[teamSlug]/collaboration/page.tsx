@@ -9,17 +9,31 @@ import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
 import { cn } from '@/lib/utils'
 
+type TeamMemberItem = {
+  id: string
+  role: string
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+    avatar_url?: string | null
+  } | null
+}
+
 export default function CollaborationPage() {
   const { currentTeam } = useAppStore()
   const [content, setContent] = useState<Content[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
 
   useEffect(() => {
     if (currentTeam) {
       fetchContent()
+      fetchTeamMembers()
     }
   }, [currentTeam])
 
@@ -40,6 +54,18 @@ export default function CollaborationPage() {
       console.error(err)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await fetch(`/api/teams/${currentTeam?.id}/members`)
+      if (response.ok) {
+        const data = await response.json()
+        setTeamMembers(Array.isArray(data.data) ? data.data : [])
+      }
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -69,9 +95,13 @@ export default function CollaborationPage() {
     }
   }
 
-  const filteredContent = content.filter((item) =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredContent = content.filter((item) => {
+    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!matchesSearch) return false
+    if (assigneeFilter === 'all') return true
+    const assignedId = (item as any).assigned_to || (item as any).assignedTo?.id
+    return assignedId === assigneeFilter
+  })
 
   if (!currentTeam) {
     return (
@@ -104,6 +134,22 @@ export default function CollaborationPage() {
               className="h-8 pl-9 bg-[#0a0a0a] border-gray-900 text-xs"
             />
           </div>
+
+          {/* Assignee Filter */}
+          <select
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            className="h-8 px-2 bg-[#0a0a0a] border border-gray-900 text-xs text-foreground rounded"
+          >
+            <option value="all">All owners</option>
+            {teamMembers
+              .filter((member) => member.user?.id)
+              .map((member) => (
+                <option key={member.id} value={member.user?.id}>
+                  {member.user?.full_name || member.user?.email || 'Unknown'}
+                </option>
+              ))}
+          </select>
 
           <div className="h-6 w-px bg-gray-900" />
 

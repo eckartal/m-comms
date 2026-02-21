@@ -166,7 +166,7 @@ export async function fetchContents(teamId: string): Promise<Content[]> {
 
   const { data, error } = await supabase
     .from('content')
-    .select('*, createdBy:created_by(id, name, email, avatar_url)')
+    .select('*, createdBy:created_by(id, name, email, avatar_url), assignedTo:assigned_to(id, name, email, avatar_url)')
     .eq('team_id', teamId)
     .order('created_at', { ascending: false })
 

@@ -45,6 +45,13 @@ type ContentItem = {
     email: string
     avatar_url?: string
   }
+  assigned_to?: string | null
+  assignedTo?: {
+    id: string
+    name: string | null
+    email: string
+    avatar_url?: string | null
+  } | null
 }
 
 const platformConfig: Record<string, { icon: string; name: string; color: string }> = {
@@ -71,6 +78,8 @@ export default function ContentPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all')
   const [platformFilter, setPlatformFilter] = useState<string>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all')
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [loading, setLoading] = useState(true)
 
@@ -92,6 +101,22 @@ export default function ContentPage() {
     }
     loadContent()
   }, [currentTeam, fetchContents])
+
+  useEffect(() => {
+    async function loadMembers() {
+      if (!currentTeam?.id) return
+      try {
+        const response = await fetch(`/api/teams/${currentTeam.id}/members`)
+        if (response.ok) {
+          const data = await response.json()
+          setTeamMembers(Array.isArray(data.data) ? data.data : [])
+        }
+      } catch (error) {
+        console.error('Error fetching team members:', error)
+      }
+    }
+    loadMembers()
+  }, [currentTeam?.id])
 
   const filteredContent = useMemo(() => {
     let result = [...contents]
@@ -122,6 +147,14 @@ export default function ContentPage() {
       )
     }
 
+    // Assignee filter
+    if (assigneeFilter !== 'all') {
+      result = result.filter(item => {
+        const assignedId = (item as any).assigned_to || (item as any).assignedTo?.id
+        return assignedId === assigneeFilter
+      })
+    }
+
     // Sort
     result.sort((a: any, b: any) => {
       switch (sortBy) {
@@ -142,7 +175,7 @@ export default function ContentPage() {
     })
 
     return result
-  }, [contents, search, statusFilter, platformFilter, sortBy])
+  }, [contents, search, statusFilter, platformFilter, assigneeFilter, sortBy])
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: contents.length }
@@ -217,6 +250,24 @@ export default function ContentPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-muted rounded-[6px] text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
+          </div>
+
+          {/* Assignee Filter */}
+          <div className="min-w-[180px]">
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-muted rounded-[6px] text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="all">All owners</option>
+              {teamMembers
+                .filter((member) => member.user?.id)
+                .map((member) => (
+                  <option key={member.id} value={member.user?.id}>
+                    {member.user?.full_name || member.user?.email || 'Unknown'}
+                  </option>
+                ))}
+            </select>
           </div>
 
           {/* Status Filter */}
