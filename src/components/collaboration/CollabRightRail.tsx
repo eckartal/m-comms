@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Content } from '@/types'
 import { Button } from '@/components/ui/button'
+import { getContentTitle } from '@/lib/contentText'
 
 type RailTab = 'activity' | 'attention'
 
@@ -152,13 +153,13 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
   const openAnnotationCount = openAnnotations.length
 
   return (
-    <aside className="hidden xl:flex xl:w-80 xl:flex-col xl:border-l xl:border-gray-900 xl:bg-[#040404]">
-      <div className="border-b border-gray-900 p-3">
+    <aside className="hidden xl:flex xl:w-80 xl:flex-col xl:border-l xl:border-border xl:bg-card/30">
+      <div className="border-b border-border p-3">
         <h2 className="text-sm font-medium text-foreground">Collaboration Feed</h2>
         <p className="mt-1 text-xs text-muted-foreground">Team updates and items needing attention</p>
       </div>
 
-      <div className="flex gap-1 p-3 border-b border-gray-900">
+      <div className="flex gap-1 border-b border-border p-3">
         <Button
           size="sm"
           variant={tab === 'activity' ? 'default' : 'outline'}
@@ -197,10 +198,10 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
               return (
                 <button
                   key={item.id}
-                  className="w-full rounded-lg border border-[#222] bg-[#0a0a0a] p-3 text-left hover:border-[#333]"
+                  className="w-full rounded-lg border border-border bg-card p-3 text-left hover:border-ring/40"
                   onClick={() => onOpenContent(item)}
                 >
-                  <p className="truncate text-xs text-foreground">{item.title}</p>
+                  <p className="truncate text-xs text-foreground">{getContentTitle(item.title)}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground truncate">
                     {actor} updated this {formatRelativeTime(meta.latest_activity?.created_at || item.updated_at)}
                   </p>
@@ -218,19 +219,19 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
               return (
                 <button
                   key={item.id}
-                  className="w-full rounded-lg border border-[#222] bg-[#0a0a0a] p-3 text-left hover:border-[#333]"
+                  className="w-full rounded-lg border border-border bg-card p-3 text-left hover:border-ring/40"
                   onClick={() => onOpenContent(item)}
                 >
-                  <p className="truncate text-xs text-foreground">{item.title}</p>
+                  <p className="truncate text-xs text-foreground">{getContentTitle(item.title)}</p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {review ? (
-                      <span className="rounded bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-300">In Review</span>
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">In Review</span>
                     ) : null}
                     {unassigned ? (
-                      <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-300">Unassigned</span>
+                      <span className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">Unassigned</span>
                     ) : null}
                     {overdue ? (
-                      <span className="rounded bg-red-950/40 px-2 py-0.5 text-[10px] text-red-300">Overdue</span>
+                      <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] text-red-700 dark:bg-red-900/40 dark:text-red-300">Overdue</span>
                     ) : null}
                   </div>
                   <p className="mt-2 text-[10px] text-muted-foreground">Updated {formatRelativeTime(item.updated_at)}</p>
@@ -254,7 +255,7 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
                 <button
                   key={annotation.id}
                   type="button"
-                  className="w-full rounded-lg border border-[#222] bg-[#0a0a0a] p-3 text-left hover:border-[#333]"
+                  className="w-full rounded-lg border border-border bg-card p-3 text-left hover:border-ring/40"
                   onClick={() => {
                     if (linkedContent) {
                       onOpenContent(linkedContent)
@@ -262,7 +263,7 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
                   }}
                 >
                   <p className="truncate text-xs text-foreground">
-                    {contentValue?.title || 'Untitled content'}
+                    {getContentTitle(contentValue?.title, 'Untitled content')}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
                     {annotation.text_snapshot}
@@ -277,25 +278,25 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
         ) : null}
 
         {tab === 'activity' && recentActivity.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
             No recent activity yet.
           </div>
         ) : null}
 
         {tab === 'attention' && attentionItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
             Nothing needs attention right now.
           </div>
         ) : null}
 
         {tab === 'attention' && annotationsError ? (
-          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
             {annotationsError}
           </div>
         ) : null}
 
         {tab === 'attention' && isLoadingAnnotations ? (
-          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
             Loading open threads...
           </div>
         ) : null}

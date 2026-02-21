@@ -6,7 +6,8 @@
     "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lint:layout": "bash scripts/check-dashboard-layout.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

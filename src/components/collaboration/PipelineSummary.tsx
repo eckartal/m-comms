@@ -40,17 +40,17 @@ export function PipelineSummary({ content, activeFilter = null, onSelectFilter }
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-6 py-3 border-b border-gray-900 bg-[#050505]">
+    <div className="grid grid-cols-2 gap-2 border-b border-border bg-card/40 px-6 py-3 md:grid-cols-4">
       {metrics.map((metric) => (
         <button
           key={metric.label}
           type="button"
           onClick={() => onSelectFilter?.(metric.filter)}
           className={cn(
-            'rounded-lg border bg-[#0a0a0a] px-3 py-2 text-left transition-colors',
+            'rounded-lg border bg-card px-3 py-2 text-left transition-colors',
             activeFilter === metric.filter
-              ? 'border-white/30 bg-[#111111]'
-              : 'border-[#262626] hover:border-[#3a3a3a]'
+              ? 'border-ring bg-accent'
+              : 'border-border hover:border-ring/40'
           )}
         >
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{metric.label}</p>

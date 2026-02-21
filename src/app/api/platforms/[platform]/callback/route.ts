@@ -1,6 +1,52 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+type OAuthStateRow = {
+  team_id: string
+  user_id: string
+  expires_at: string
+  team_slug: string | null
+  return_to: string | null
+  connect_mode: 'redirect' | 'popup' | null
+}
+
+function sanitizeReturnTo(returnTo?: string | null, fallback = '/dashboard/integrations'): string {
+  if (!returnTo) return fallback
+  if (!returnTo.startsWith('/')) return fallback
+  if (returnTo.startsWith('//')) return fallback
+  return returnTo
+}
+
+function withQuery(path: string, key: string, value: string): string {
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}${key}=${encodeURIComponent(value)}`
+}
+
+function popupCompletionHtml(
+  appOrigin: string,
+  payload: { status: 'success' | 'error'; platform: string; error?: string; returnTo: string }
+) {
+  const safePayload = JSON.stringify(payload)
+  const safeOrigin = JSON.stringify(appOrigin)
+  return `<!DOCTYPE html>
+<html>
+  <head><meta charset="utf-8"><title>Connection Complete</title></head>
+  <body style="font-family: sans-serif; padding: 24px;">
+    <p>${payload.status === 'success' ? 'Connection successful. You can close this window.' : 'Connection failed. You can close this window.'}</p>
+    <script>
+      (function () {
+        var payload = ${safePayload};
+        var targetOrigin = ${safeOrigin};
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'platform_oauth_result', payload: payload }, targetOrigin);
+        }
+        window.close();
+      })();
+    </script>
+  </body>
+</html>`
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ platform: string }> }
@@ -14,53 +60,93 @@ export async function GET(
     const state = searchParams.get('state')
     const error = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
-
-    if (error) {
-      console.error(`${platform} OAuth error:`, error, errorDescription)
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/${state?.split(':')[0] || 'dashboard'}/integrations?error=${encodeURIComponent(errorDescription || error)}`
-      )
-    }
-
-    if (!code || !state) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=missing_params`
-      )
-    }
+    const appBase = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'
+    const appOrigin = new URL(appBase).origin
 
     const supabase = await createClient()
 
-    // Verify state token matches stored value
-    const { data: storedState } = await supabase
-      .from('oauth_states')
-      .select('team_id, user_id, expires_at')
-      .eq('state_token', state)
-      .single()
+    let storedState: OAuthStateRow | null = null
+    if (state) {
+      const { data } = await supabase
+        .from('oauth_states')
+        .select('team_id, user_id, expires_at, team_slug, return_to, connect_mode')
+        .eq('state_token', state)
+        .single()
+      storedState = (data as OAuthStateRow | null) || null
+    }
+
+    const fallbackPath = storedState?.team_slug
+      ? `/${storedState.team_slug}/integrations`
+      : '/dashboard/integrations'
+    const baseReturnTo = sanitizeReturnTo(storedState?.return_to, fallbackPath)
+    const isPopupFlow = storedState?.connect_mode === 'popup'
+
+    if (error) {
+      console.error(`${platform} OAuth error:`, error, errorDescription)
+      const message = errorDescription || error
+      if (state) {
+        await supabase.from('oauth_states').delete().eq('state_token', state)
+      }
+      if (isPopupFlow) {
+        return new Response(
+          popupCompletionHtml(appOrigin, {
+            status: 'error',
+            platform,
+            error: message,
+            returnTo: baseReturnTo,
+          }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )
+      }
+      return NextResponse.redirect(`${appBase}${withQuery(baseReturnTo, 'error', message)}`)
+    }
+
+    if (!code || !state) {
+      return NextResponse.redirect(`${appBase}/dashboard/integrations?error=missing_params`)
+    }
 
     if (!storedState) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=invalid_state`
-      )
+      return NextResponse.redirect(`${appBase}/dashboard/integrations?error=invalid_state`)
     }
 
     // Check if state has expired
     const expiresAt = new Date(storedState.expires_at).getTime()
     if (Date.now() > expiresAt) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/dashboard/integrations?error=state_expired`
-      )
+      await supabase.from('oauth_states').delete().eq('state_token', state)
+      if (isPopupFlow) {
+        return new Response(
+          popupCompletionHtml(appOrigin, {
+            status: 'error',
+            platform,
+            error: 'state_expired',
+            returnTo: baseReturnTo,
+          }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )
+      }
+      return NextResponse.redirect(`${appBase}${withQuery(baseReturnTo, 'error', 'state_expired')}`)
     }
 
     const teamId = storedState.team_id
     const userId = storedState.user_id
 
     // Exchange code for token
-    const tokenResponse = await exchangeCodeForToken(platform, code, teamId)
+    const tokenResponse = await exchangeCodeForToken(platform, code)
 
     if (!tokenResponse.access_token) {
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/${teamId}/integrations?error=token_exchange_failed`
-      )
+      await supabase.from('oauth_states').delete().eq('state_token', state)
+      if (isPopupFlow) {
+        return new Response(
+          popupCompletionHtml(appOrigin, {
+            status: 'error',
+            platform,
+            error: 'token_exchange_failed',
+            returnTo: baseReturnTo,
+          }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )
+      }
+      return NextResponse.redirect(`${appBase}${withQuery(baseReturnTo, 'error', 'token_exchange_failed')}`)
     }
 
     // Store the platform account
@@ -71,22 +157,46 @@ export async function GET(
         platform,
         account_id: tokenResponse.accountId || userId,
         account_name: tokenResponse.accountName || '',
+        account_handle: tokenResponse.accountHandle || null,
         access_token: tokenResponse.access_token,
         refresh_token: tokenResponse.refresh_token,
         token_expires_at: tokenResponse.expires_at,
         scope: tokenResponse.scope,
+        connection_mode: 'real_oauth',
+        connection_status: 'connected',
       })
 
     if (insertError) {
       console.error('Error storing platform account:', insertError)
-      return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/${teamId}/integrations?error=storage_failed`
+      await supabase.from('oauth_states').delete().eq('state_token', state)
+      if (isPopupFlow) {
+        return new Response(
+          popupCompletionHtml(appOrigin, {
+            status: 'error',
+            platform,
+            error: 'storage_failed',
+            returnTo: baseReturnTo,
+          }),
+          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        )
+      }
+      return NextResponse.redirect(`${appBase}${withQuery(baseReturnTo, 'error', 'storage_failed')}`)
+    }
+
+    await supabase.from('oauth_states').delete().eq('state_token', state)
+
+    if (isPopupFlow) {
+      return new Response(
+        popupCompletionHtml(appOrigin, {
+          status: 'success',
+          platform,
+          returnTo: baseReturnTo,
+        }),
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       )
     }
 
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'}/${teamId}/integrations?connected=${platform}`
-    )
+    return NextResponse.redirect(`${appBase}${withQuery(baseReturnTo, 'connected', platform)}`)
   } catch (err) {
     console.error(`Error in ${platform} callback:`, err)
     return NextResponse.redirect(
@@ -95,7 +205,7 @@ export async function GET(
   }
 }
 
-async function exchangeCodeForToken(platform: string, code: string, teamId: string) {
+async function exchangeCodeForToken(platform: string, code: string) {
   const tokenUrl = getTokenUrl(platform)
   const clientId = process.env[`${platform.toUpperCase()}_CLIENT_ID`]
   const clientSecret = process.env[`${platform.toUpperCase()}_CLIENT_SECRET`]
@@ -137,6 +247,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
         : null,
       accountId: data.scope?.includes('users.read') ? 'twitter_user' : '',
       accountName: '',
+      accountHandle: '',
     }
   }
 
@@ -166,6 +277,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId: 'linkedin_user',
       accountName,
+      accountHandle: '',
     }
   }
 
@@ -193,6 +305,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId,
       accountName,
+      accountHandle: accountName ? `@${accountName}` : '',
     }
   }
 
@@ -206,6 +319,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId: data.user_info?.user_id || '',
       accountName: data.user_info?.display_name || '',
+      accountHandle: data.user_info?.username ? `@${data.user_info.username}` : '',
     }
   }
 
@@ -237,6 +351,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId,
       accountName,
+      accountHandle: '',
     }
   }
 
@@ -264,6 +379,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId: data.id || '',
       accountName,
+      accountHandle: '',
     }
   }
 
@@ -275,6 +391,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: 'write posts',
       accountId: data.did || '',
       accountName: data.handle || '',
+      accountHandle: data.handle ? `@${data.handle}` : '',
     }
   }
 
@@ -288,6 +405,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId: data.user.id || '',
       accountName: data.user.username || '',
+      accountHandle: data.user.username ? `@${data.user.username}` : '',
     }
   }
 
@@ -315,6 +433,7 @@ async function exchangeCodeForToken(platform: string, code: string, teamId: stri
       scope: data.scope,
       accountId: data.application?.id || 'facebook_user',
       accountName,
+      accountHandle: '',
     }
   }
 

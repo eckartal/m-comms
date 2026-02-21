@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import {
   ChevronDown,
   Calendar,
@@ -48,12 +47,12 @@ export function PublishControls({
           <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
         </Button>
 
-        {/* Publish - Solid black (primary) */}
+        {/* Publish - Primary action */}
         <Button
           className={cn(
             'flex-1 gap-1.5 font-medium',
-            'bg-foreground border-foreground text-white',
-            'hover:bg-gray-800 hover:border-gray-800',
+            'border-foreground bg-foreground text-background',
+            'hover:bg-foreground/90 hover:border-foreground/90',
             'py-2.5 px-6',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}

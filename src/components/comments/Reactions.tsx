@@ -35,7 +35,7 @@ export function Reactions({ contentId, currentUserId, initialReactions = {} }: R
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({})
 
   // Calculate counts from reactions
-  React.useEffect(() => {
+  useEffect(() => {
     const counts: Record<string, number> = {}
     Object.entries(reactions).forEach(([type, items]) => {
       counts[type] = items.length

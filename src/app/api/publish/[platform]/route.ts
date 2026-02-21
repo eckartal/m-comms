@@ -6,6 +6,22 @@ import { createClient } from '@/lib/supabase/server'
 import { postToTwitter, postThreadToTwitter } from '@/lib/platforms/twitter'
 import { postToLinkedIn, postArticleToLinkedIn } from '@/lib/platforms/linkedin'
 
+type TeamMemberRow = { user_id: string }
+type ContentBlockRow = {
+  type?: string
+  content?: {
+    text?: string
+    tweets?: string[]
+    title?: string
+    description?: string
+    url?: string
+    thumbnailUrl?: string
+    [key: string]: unknown
+  }
+}
+
+type PublishResult = { success: boolean; error?: string; data?: { id?: string } }
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ platform: string }> }
@@ -43,7 +59,7 @@ export async function POST(
 
     // Verify user has access to the team
     const hasAccess = content.team.members.some(
-      (m: any) => m.user_id === user.id
+      (m: TeamMemberRow) => m.user_id === user.id
     )
 
     if (!hasAccess) {
@@ -64,20 +80,20 @@ export async function POST(
 
     // Parse blocks
     const blocks = typeof content.blocks === 'string'
-      ? JSON.parse(content.blocks)
-      : content.blocks || []
+      ? (JSON.parse(content.blocks) as ContentBlockRow[])
+      : ((content.blocks || []) as ContentBlockRow[])
 
     // Build post based on platform
-    let result: { success: boolean; error?: string; data?: any }
+    let result: PublishResult
 
     switch (platform.toLowerCase()) {
       case 'twitter': {
         // Extract tweets from blocks
         const threadTweets = blocks
-          .filter((b: any) => b.type === 'thread')
-          .flatMap((b: any) => b.content?.tweets || [])
+          .filter((b) => b.type === 'thread')
+          .flatMap((b) => b.content?.tweets || [])
 
-        const textBlock = blocks.find((b: any) => b.type === 'text')
+        const textBlock = blocks.find((b) => b.type === 'text')
         if (textBlock && !threadTweets.length) {
           threadTweets.push(textBlock.content?.text || '')
         }
@@ -99,9 +115,9 @@ export async function POST(
       }
 
       case 'linkedin': {
-        const textBlock = blocks.find((b: any) => b.type === 'text')
-        const linkBlock = blocks.find((b: any) => b.type === 'link')
-        const imageBlock = blocks.find((b: any) => b.type === 'image')
+        const textBlock = blocks.find((b) => b.type === 'text')
+        const linkBlock = blocks.find((b) => b.type === 'link')
+        const imageBlock = blocks.find((b) => b.type === 'image')
 
         if (linkBlock) {
           result = await postArticleToLinkedIn(content.team_id, platformAccountId, {

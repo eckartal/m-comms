@@ -22,6 +22,19 @@ export interface LinkedInPostResult {
   createdAt: string
 }
 
+type LinkedInShareMedia = {
+  status: 'READY'
+  originalUrl: string
+  title: string
+  description: string
+}
+
+type LinkedInShareContent = {
+  shareCommentary: { text: string }
+  shareMediaCategory: 'NONE' | 'ARTICLE' | 'IMAGE'
+  media?: LinkedInShareMedia[]
+}
+
 export async function getLinkedInCredentials(
   teamId: string,
   platformAccountId: string
@@ -59,7 +72,7 @@ export async function postToLinkedIn(
   }
 
   try {
-    const shareContent: any = {
+    const shareContent: LinkedInShareContent = {
       shareCommentary: {
         text: post.text,
       },

@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+type CommentNode = {
+  id: string
+  parent_id: string | null
+  replies?: CommentNode[]
+  [key: string]: unknown
+}
+
 // GET /api/comments - List comments for a content
 export async function GET(request: Request) {
   try {
@@ -43,13 +50,13 @@ export async function GET(request: Request) {
     const rootComments: typeof comments = []
 
     // First pass: create map
-    comments?.forEach((comment: any) => {
+    comments?.forEach((comment: CommentNode) => {
       comment.replies = []
       commentMap.set(comment.id, comment)
     })
 
     // Second pass: build tree
-    comments?.forEach((comment: any) => {
+    comments?.forEach((comment: CommentNode) => {
       if (comment.parent_id) {
         const parent = commentMap.get(comment.parent_id)
         if (parent) {

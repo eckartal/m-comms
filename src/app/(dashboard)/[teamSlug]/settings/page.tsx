@@ -1,17 +1,30 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Globe,
-  Clock,
   Bell,
   Link as LinkIcon,
-  Check,
+  Loader2,
 } from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { platformIcons } from '@/components/oauth/PlatformIcon'
+import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlatform'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
+import { getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
+import { useConnectionMode } from '@/hooks/useConnectionMode'
+import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const timezones = [
   { id: 'America/New_York', label: 'Eastern Time (ET)', offset: 'UTC-5' },
@@ -23,19 +36,28 @@ const timezones = [
   { id: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 'UTC+9' },
 ]
 
-const workingHours = [
-  { id: '09:00-17:00', label: '9 AM - 5 PM' },
-  { id: '08:00-16:00', label: '8 AM - 4 PM' },
-  { id: '10:00-18:00', label: '10 AM - 6 PM' },
-  { id: '12:00-20:00', label: '12 PM - 8 PM' },
-]
+type IntegrationAccount = {
+  id: string
+  account_name: string
+  source?: 'real_oauth' | 'local_sandbox' | 'unknown'
+}
+
+type Integration = {
+  id: string
+  name: string
+  connected: boolean
+  accounts: IntegrationAccount[]
+}
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
   const params = useParams()
+  const searchParams = useSearchParams()
   const teamSlug = params.teamSlug as string
-  const { currentTeam } = useAppStore()
+  const { currentTeam, setCurrentTeam } = useAppStore()
   const [timezone, setTimezone] = useState('America/New_York')
-  const [workingHourStart, setWorkingHourStart] = useState('09:00-17:00')
+  const [timezoneSaving, setTimezoneSaving] = useState(false)
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -46,6 +68,11 @@ export default function SettingsPage() {
     statusChanges: true,
   })
   const [saved, setSaved] = useState(false)
+  const [integrations, setIntegrations] = useState<Integration[]>([])
+  const [integrationsLoading, setIntegrationsLoading] = useState(true)
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
+  const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<string | null>(null)
+  const { mode: connectionMode } = useConnectionMode(teamSlug)
 
   useEffect(() => {
     // Load settings from team settings or use defaults
@@ -54,14 +81,160 @@ export default function SettingsPage() {
     }
   }, [currentTeam?.settings])
 
+  useEffect(() => {
+    const fetchIntegrations = async () => {
+      try {
+        setIntegrationsLoading(true)
+        const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
+        const data = await res.json()
+        const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
+        const integrationsData = ((data.data || []) as Integration[]).map((integration) => ({
+          ...integration,
+          connected: integration.connected || Boolean(localConnections[integration.id]),
+          accounts:
+            integration.accounts.length === 0 && localConnections[integration.id]
+              ? [{
+                  id: `local:${integration.id}`,
+                  account_name: localConnections[integration.id].account_name,
+                  source: 'local_sandbox',
+                }]
+              : integration.accounts,
+        }))
+        if (res.ok) {
+          setIntegrations(integrationsData)
+        } else {
+          setIntegrations(integrationsData)
+        }
+      } catch (error) {
+        console.error('Failed to load integrations in settings:', error)
+        setIntegrations([])
+      } finally {
+        setIntegrationsLoading(false)
+      }
+    }
+
+    fetchIntegrations()
+  }, [teamSlug, currentTeam?.id])
+
+  const refreshIntegrations = useCallback(async () => {
+    const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
+    const data = await res.json()
+    if (res.ok) {
+      const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
+      setIntegrations(((data.data || []) as Integration[]).map((integration) => ({
+        ...integration,
+        connected: integration.connected || Boolean(localConnections[integration.id]),
+        accounts:
+          integration.accounts.length === 0 && localConnections[integration.id]
+            ? [{
+                id: `local:${integration.id}`,
+                account_name: localConnections[integration.id].account_name,
+                source: 'local_sandbox',
+              }]
+            : integration.accounts,
+      })))
+    }
+  }, [teamSlug, currentTeam?.id])
+
+  useEffect(() => {
+    const connected = searchParams.get('connected')
+    const error = searchParams.get('error')
+
+    if (connected) {
+      toast.success(`${connected.charAt(0).toUpperCase() + connected.slice(1)} connected.`)
+      refreshIntegrations()
+    }
+
+    if (error) {
+      toast.error(`Connection failed: ${getConnectErrorMessage(decodeURIComponent(error))}`)
+    }
+
+    if (connected || error) {
+      router.replace(pathname)
+    }
+  }, [searchParams, router, pathname, refreshIntegrations])
+
+  const runQuickConnect = async (platform: string, skipSandboxConfirmation = false) => {
+    setConnectingPlatform(platform)
+
+    try {
+      await connectPlatform({
+        platform,
+        teamId: currentTeam?.id,
+        teamSlug,
+        returnTo: `/${teamSlug}/settings`,
+        mode: 'popup',
+        source: 'settings',
+        skipSandboxConfirmation,
+        onSuccess: async (connectedPlatform) => {
+          toast.success(`${connectedPlatform.charAt(0).toUpperCase() + connectedPlatform.slice(1)} connected.`)
+          await refreshIntegrations()
+        },
+        onError: (message) => {
+          toast.error(`Connection failed: ${message}`)
+        },
+      })
+    } catch (error) {
+      console.error('Quick connect failed:', error)
+    } finally {
+      setConnectingPlatform(null)
+    }
+  }
+
+  const handleQuickConnect = async (platform: string) => {
+    if (connectionMode === 'local_sandbox') {
+      setSandboxConnectPlatform(platform)
+      return
+    }
+    await runQuickConnect(platform)
+  }
+
   const handleSave = () => {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const handleTimezoneChange = async (nextTimezone: string) => {
+    if (!currentTeam?.id) {
+      setTimezone(nextTimezone)
+      return
+    }
+
+    const previousTimezone = timezone
+    const nextSettings = {
+      ...(currentTeam.settings || {}),
+      timezone: nextTimezone,
+    }
+
+    setTimezone(nextTimezone)
+    setTimezoneSaving(true)
+
+    try {
+      const res = await fetch(`/api/teams/${currentTeam.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ settings: nextSettings }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to update timezone')
+      }
+
+      setCurrentTeam({ ...currentTeam, settings: nextSettings })
+      toast.success('Timezone updated')
+    } catch (error) {
+      console.error('Failed to save timezone:', error)
+      setTimezone(previousTimezone)
+      toast.error('Could not save timezone')
+    } finally {
+      setTimezoneSaving(false)
+    }
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-12 py-12">
+    <DashboardContainer className="max-w-3xl py-8 md:py-10">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-[20px] font-medium text-foreground">Settings</h1>
@@ -69,6 +242,17 @@ export default function SettingsPage() {
             Manage your team preferences and integrations
           </p>
         </div>
+
+        <SandboxConfirmDialog
+          open={Boolean(sandboxConnectPlatform)}
+          platformName={sandboxConnectPlatform || 'platform'}
+          onCancel={() => setSandboxConnectPlatform(null)}
+          onConfirm={async () => {
+            const platform = sandboxConnectPlatform
+            setSandboxConnectPlatform(null)
+            if (platform) await runQuickConnect(platform, true)
+          }}
+        />
 
         {/* Timezone Section */}
         <div className="mb-8">
@@ -80,57 +264,18 @@ export default function SettingsPage() {
             <p className="text-[14px] text-muted-foreground mb-4">
               Set your timezone for accurate content scheduling
             </p>
-            <div className="grid md:grid-cols-2 gap-3">
-              {timezones.map((tz) => (
-                <button
-                  key={tz.id}
-                  onClick={() => setTimezone(tz.id)}
-                  className={cn(
-                    'flex items-center justify-between p-3 rounded-[6px] border transition-all',
-                    timezone === tz.id
-                      ? 'border-foreground bg-accent'
-                      : 'border-border hover:border-foreground'
-                  )}
-                >
-                  <div className="text-left">
-                    <p className="text-[14px] font-medium text-foreground">{tz.label}</p>
-                    <p className="text-[12px] text-muted-foreground">{tz.offset}</p>
-                  </div>
-                  {timezone === tz.id && (
-                    <Check className="w-4 h-4 text-foreground" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Working Hours Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-muted-foreground" />
-            <h2 className="text-[16px] font-medium text-foreground">Working Hours</h2>
-          </div>
-          <div className="border border-border rounded-[8px] p-4">
-            <p className="text-[14px] text-muted-foreground mb-4">
-              Set your team&apos;s working hours for scheduling suggestions
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {workingHours.map((hours) => (
-                <button
-                  key={hours.id}
-                  onClick={() => setWorkingHourStart(hours.id)}
-                  className={cn(
-                    'p-3 rounded-[6px] border text-[14px] font-medium transition-all',
-                    workingHourStart === hours.id
-                      ? 'border-foreground bg-foreground text-primary-foreground'
-                      : 'border-border text-muted-foreground hover:border-foreground'
-                  )}
-                >
-                  {hours.label}
-                </button>
-              ))}
-            </div>
+            <Select value={timezone} onValueChange={handleTimezoneChange} disabled={timezoneSaving}>
+              <SelectTrigger className="w-full h-10 rounded-[6px] text-[14px] tracking-normal">
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start" className="w-[--radix-select-trigger-width]">
+                {timezones.map((tz) => (
+                  <SelectItem key={tz.id} value={tz.id} className="text-[13px] tracking-normal">
+                    {tz.label} ({tz.offset})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -195,15 +340,63 @@ export default function SettingsPage() {
             <h2 className="text-[16px] font-medium text-foreground">Integrations</h2>
           </div>
           <div className="border border-border rounded-[8px] p-4">
-            <p className="text-[14px] text-muted-foreground">
-              Connect social accounts from the integrations page. Platform status is shown from your real team
-              connections.
+            <p className="text-[14px] text-muted-foreground mb-4">
+              Connect socials right here without leaving Settings. Use Integrations only for advanced account management.
             </p>
+
+            {integrationsLoading ? (
+              <p className="text-[13px] text-muted-foreground">Loading platforms...</p>
+            ) : (
+              <div className="space-y-2">
+                {integrations
+                  .filter((integration) => integration.id !== 'blog')
+                  .slice(0, 5)
+                  .map((integration) => {
+                    const Icon = platformIcons[integration.id]
+                    return (
+                      <div key={integration.id} className="flex items-center justify-between rounded-[8px] border border-border px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-[6px] bg-accent flex items-center justify-center">
+                            {Icon ? <Icon className="h-4 w-4" /> : null}
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-medium text-foreground">{integration.name}</p>
+                            <p className="text-[12px] text-muted-foreground">
+                              {integration.connected
+                                ? `${integration.accounts.length} account${integration.accounts.length !== 1 ? 's' : ''} connected${integration.accounts[0]?.source === 'local_sandbox' ? ' (Sandbox)' : ''}`
+                                : 'Not connected'}
+                            </p>
+                          </div>
+                        </div>
+                        {integration.connected ? (
+                          <span className="text-[12px] text-emerald-500 font-medium">Connected</span>
+                        ) : (
+                          <button
+                            onClick={() => handleQuickConnect(integration.id)}
+                            disabled={connectingPlatform === integration.id}
+                            className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
+                          >
+                            {connectingPlatform === integration.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Connecting
+                              </>
+                            ) : (
+                              'Connect'
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
             <Link
               href={`/${teamSlug}/integrations`}
-              className="mt-3 inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[13px] font-medium text-background hover:bg-hover"
+              className="mt-3 inline-flex items-center rounded-[6px] border border-border px-3 py-1.5 text-[13px] font-medium text-foreground hover:bg-accent"
             >
-              Open Integrations
+              Manage All Integrations
             </Link>
           </div>
         </div>
@@ -225,8 +418,7 @@ export default function SettingsPage() {
             {saved ? 'Saved!' : 'Save Changes'}
           </button>
         </div>
-      </div>
-    </div>
+    </DashboardContainer>
   )
 }
 

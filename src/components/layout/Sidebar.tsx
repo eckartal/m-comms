@@ -6,7 +6,8 @@ import { usePathname, useParams } from 'next/navigation'
 import { useAppStore, useContentStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import { getContentTitle } from '@/lib/contentText'
-import { Home, BarChart3, Calendar, Settings, Hash, Plus } from 'lucide-react'
+import { getRecentPosts, isUnassigned } from '@/lib/collaborationMetrics'
+import { Home, BarChart3, Calendar, Settings, Hash, Plus, Plug } from 'lucide-react'
 
 type SidebarProps = {
   className?: string
@@ -29,21 +30,24 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
     { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
   ]
 
+  const recentPosts = useMemo(() => getRecentPosts(contents, 3), [contents])
+  const unassignedCount = useMemo(() => contents.filter(isUnassigned).length, [contents])
+
   const recentItems = useMemo(
     () =>
-      contents
-        .filter((content) => content.status !== 'ARCHIVED' && (content.item_type || 'POST') === 'POST')
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-        .slice(0, 3)
-        .map((content) => ({
-          id: content.id,
-          title: getContentTitle(content.title),
-          status: content.status,
-          itemType: content.item_type || 'POST',
-          updatedAt: new Date(content.updated_at),
-        })),
-    [contents]
+      recentPosts.map((content) => ({
+        id: content.id,
+        title: getContentTitle(content.title),
+        status: content.status,
+        itemType: content.item_type || 'POST',
+        updatedAt: new Date(content.updated_at),
+      })),
+    [recentPosts]
   )
+  const integrationsPath = `/${teamSlug}/integrations`
+  const settingsPath = `/${teamSlug}/settings`
+  const integrationsActive = pathname === integrationsPath
+  const settingsActive = pathname === settingsPath
 
   const getRelativeTime = (date: Date) => {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
@@ -133,12 +137,25 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
             <div className="px-3 py-1">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Recent ({recentItems.length})
+                  Recent posts ({recentItems.length})
                 </span>
                 <Link href={`/${teamSlug}/content`} onClick={onNavigate} className="text-xs text-primary hover:text-primary/80">
                   Show all
                 </Link>
               </div>
+              <div className="mb-2 flex items-center justify-between rounded-md border border-sidebar-border px-2 py-1.5">
+                <p className="text-[11px] text-muted-foreground">Unassigned tasks</p>
+                <Link
+                  href={`/${teamSlug}/collaboration?quickFilter=unassigned`}
+                  onClick={onNavigate}
+                  className="text-[11px] font-medium text-primary hover:text-primary/80"
+                >
+                  {unassignedCount} in queue
+                </Link>
+              </div>
+              <p className="mb-2 px-1 text-[10px] text-muted-foreground">
+                Latest non-archived posts sorted by last update.
+              </p>
               <div className="max-h-[200px] space-y-1 overflow-y-auto custom-scrollbar">
                 {contentLoading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading recent items...</p>}
                 {!contentLoading && recentItems.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No recent posts yet</p>}
@@ -176,13 +193,27 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
 
       <div className={cn('shrink-0 border-t border-sidebar-border bg-sidebar p-2', collapsed && 'px-1.5')}>
         <Link
-          href={`/${teamSlug}/settings`}
+          href={integrationsPath}
+          onClick={onNavigate}
+          title={collapsed ? 'Integrations' : undefined}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
+            collapsed && 'justify-center px-2',
+            integrationsActive ? 'text-foreground' : 'text-muted-foreground'
+          )}
+        >
+          <Plug className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span className="text-sm">Integrations</span>}
+        </Link>
+
+        <Link
+          href={settingsPath}
           onClick={onNavigate}
           title={collapsed ? 'Settings' : undefined}
           className={cn(
             'flex w-full items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
             collapsed && 'justify-center px-2',
-            pathname === `/${teamSlug}/settings` ? 'text-foreground' : 'text-muted-foreground'
+            settingsActive ? 'text-foreground' : 'text-muted-foreground'
           )}
         >
           <Settings className="h-5 w-5 flex-shrink-0" />

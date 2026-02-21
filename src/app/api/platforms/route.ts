@@ -26,14 +26,82 @@ function base64UrlEncode(buffer: Uint8Array): string {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+function sanitizeReturnTo(returnTo?: string | null, fallback = '/dashboard/integrations'): string {
+  if (!returnTo) return fallback
+  if (!returnTo.startsWith('/')) return fallback
+  if (returnTo.startsWith('//')) return fallback
+  return returnTo
+}
+
+function isDevConnectEnabled() {
+  return process.env.ENABLE_DEV_PLATFORM_CONNECT === 'true' || process.env.NODE_ENV === 'development'
+}
+
+function shouldForceDevConnect() {
+  if (!isDevConnectEnabled()) return false
+  return process.env.FORCE_REAL_OAUTH_IN_DEV !== 'true'
+}
+
+async function resolveTeamContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  input: { teamId?: string; teamSlug?: string }
+) {
+  if (input.teamSlug) {
+    const { data: teamBySlug } = await supabase
+      .from('teams')
+      .select('id, slug')
+      .eq('slug', input.teamSlug)
+      .single()
+
+    if (!teamBySlug) return null
+
+    const { data: membershipBySlug } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('team_id', teamBySlug.id)
+      .single()
+
+    if (!membershipBySlug) return null
+    return {
+      teamId: membershipBySlug.team_id,
+      teamSlug: teamBySlug.slug || input.teamSlug,
+    }
+  }
+
+  if (!input.teamId) return null
+
+  const { data: membershipById } = await supabase
+    .from('team_members')
+    .select('team_id')
+    .eq('team_id', input.teamId)
+    .eq('user_id', userId)
+    .single()
+
+  if (!membershipById) return null
+
+  const { data: teamById } = await supabase
+    .from('teams')
+    .select('slug')
+    .eq('id', membershipById.team_id)
+    .single()
+
+  return {
+    teamId: membershipById.team_id,
+    teamSlug: teamById?.slug || '',
+  }
+}
+
 // GET /api/platforms - List connected platform accounts
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const teamId = searchParams.get('teamId')
+    const teamSlug = searchParams.get('teamSlug')
 
-    if (!teamId) {
-      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 })
+    if (!teamId && !teamSlug) {
+      return NextResponse.json({ error: 'Team ID or team slug is required' }, { status: 400 })
     }
 
     const supabase = await createClient()
@@ -43,18 +111,36 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const resolvedTeam = await resolveTeamContext(supabase, user.id, {
+      teamId: teamId || undefined,
+      teamSlug: teamSlug || undefined,
+    })
+    if (!resolvedTeam) {
+      return NextResponse.json({ error: 'You do not have access to this team' }, { status: 403 })
+    }
+
     // Get connected platform accounts
     const { data: accounts, error } = await supabase
       .from('platform_accounts')
       .select('*')
-      .eq('team_id', teamId)
+      .eq('team_id', resolvedTeam.teamId)
 
     if (error) {
       console.error('Error fetching platform accounts:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    type PlatformAccount = { platform: string; id: string; account_name: string }
+    type PlatformAccount = {
+      platform: string
+      id: string
+      account_name: string
+      account_id: string
+      account_handle?: string | null
+      connection_mode?: string | null
+      connection_status?: string | null
+      connected_at?: string | null
+      created_at?: string | null
+    }
 
     // Build integration list with connection status
     const integrations: Array<{
@@ -63,7 +149,16 @@ export async function GET(request: Request) {
       description: string
       icon: string
       connected: boolean
-      accounts: PlatformAccount[]
+      accounts: Array<{
+        id: string
+        account_name: string
+        account_id: string
+        account_handle: string | null
+        source: 'real_oauth' | 'local_sandbox' | 'unknown'
+        status: 'connected' | 'degraded'
+        connected_at: string | null
+      }>
+      connection_status: 'connected' | 'degraded' | 'disconnected'
     }> = [
       {
         id: 'twitter',
@@ -71,7 +166,16 @@ export async function GET(request: Request) {
         description: 'Post threads, schedule tweets, and track engagement',
         icon: '𝕏',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'twitter') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'twitter') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'twitter') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'twitter') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'linkedin',
@@ -79,7 +183,16 @@ export async function GET(request: Request) {
         description: 'Share articles, updates, and company news',
         icon: 'in',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'linkedin') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'linkedin') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'linkedin') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'linkedin') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'instagram',
@@ -87,7 +200,16 @@ export async function GET(request: Request) {
         description: 'Post images, stories, and track visual content',
         icon: '📷',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'instagram') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'instagram') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'instagram') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'instagram') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'tiktok',
@@ -95,7 +217,16 @@ export async function GET(request: Request) {
         description: 'Create viral video content and reach wider audiences',
         icon: '🎵',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'tiktok') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'tiktok') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'tiktok') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'tiktok') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'youtube',
@@ -103,7 +234,16 @@ export async function GET(request: Request) {
         description: 'Publish videos and grow your channel',
         icon: '▶️',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'youtube') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'youtube') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'youtube') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'youtube') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'threads',
@@ -111,7 +251,16 @@ export async function GET(request: Request) {
         description: 'Share short text posts and join conversations',
         icon: '💬',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'threads') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'threads') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'threads') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'threads') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'bluesky',
@@ -119,7 +268,16 @@ export async function GET(request: Request) {
         description: 'Decentralized social network with community moderation',
         icon: '🔵',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'bluesky') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'bluesky') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'bluesky') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'bluesky') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'mastodon',
@@ -127,7 +285,16 @@ export async function GET(request: Request) {
         description: 'Federated social network with server diversity',
         icon: '🐘',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'mastodon') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'mastodon') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'mastodon') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'mastodon') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'facebook',
@@ -135,7 +302,16 @@ export async function GET(request: Request) {
         description: 'Post to your business page and reach customers',
         icon: 'f',
         connected: (accounts as PlatformAccount[])?.some(a => a.platform === 'facebook') || false,
-        accounts: (accounts as PlatformAccount[])?.filter(a => a.platform === 'facebook') || [],
+        accounts: ((accounts as PlatformAccount[])?.filter(a => a.platform === 'facebook') || []).map((a) => ({
+          id: a.id,
+          account_name: a.account_name,
+          account_id: a.account_id,
+          account_handle: a.account_handle || null,
+          source: a.connection_mode === 'local_sandbox' ? 'local_sandbox' : 'real_oauth',
+          status: a.connection_status === 'degraded' ? 'degraded' : 'connected',
+          connected_at: a.connected_at || a.created_at || null,
+        })),
+        connection_status: ((accounts as PlatformAccount[])?.some(a => a.platform === 'facebook') || false) ? 'connected' : 'disconnected',
       },
       {
         id: 'blog',
@@ -144,10 +320,17 @@ export async function GET(request: Request) {
         icon: '📝',
         connected: false,
         accounts: [],
+        connection_status: 'disconnected',
       },
     ]
 
-    return NextResponse.json({ data: integrations })
+    return NextResponse.json({
+      data: integrations,
+      meta: {
+        default_connection_mode: shouldForceDevConnect() ? 'local_sandbox' : 'real_oauth',
+        environment: process.env.NODE_ENV || 'development',
+      },
+    })
   } catch (error) {
     console.error('Error in GET /api/platforms:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -165,11 +348,40 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { platform, teamId } = body
+    const {
+      platform,
+      teamId,
+      teamSlug,
+      returnTo,
+      connectMode,
+    }: {
+      platform?: string
+      teamId?: string
+      teamSlug?: string
+      returnTo?: string
+      connectMode?: 'redirect' | 'popup'
+    } = body
 
-    if (!platform || !teamId) {
-      return NextResponse.json({ error: 'Platform and team ID are required' }, { status: 400 })
+    if (!platform || (!teamId && !teamSlug)) {
+      return NextResponse.json({ error: 'Platform and team context are required' }, { status: 400 })
     }
+
+    const resolvedTeam = await resolveTeamContext(supabase, user.id, {
+      teamId,
+      teamSlug,
+    })
+    if (!resolvedTeam) {
+      return NextResponse.json({ error: 'You do not have access to this team' }, { status: 403 })
+    }
+
+    const resolvedTeamId = resolvedTeam.teamId
+    const resolvedTeamSlug = resolvedTeam.teamSlug
+
+    const fallbackReturnPath = resolvedTeamSlug
+      ? `/${resolvedTeamSlug}/integrations`
+      : '/dashboard/integrations'
+    const safeReturnTo = sanitizeReturnTo(returnTo, fallbackReturnPath)
+    const safeConnectMode: 'redirect' | 'popup' = connectMode === 'popup' ? 'popup' : 'redirect'
 
     // OAuth configurations
     const oauthConfigs: Record<string, { clientId: string; authUrl: string; scope: string }> = {
@@ -205,7 +417,7 @@ export async function POST(request: Request) {
       },
       bluesky: {
         clientId: process.env.BSKY_CLIENT_ID || '',
-        authUrl: 'https://bsky.social/comatunity/oauth/authorize',
+        authUrl: 'https://bsky.social/oauth/authorize',
         scope: 'write posts',
       },
       mastodon: {
@@ -225,6 +437,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unsupported platform' }, { status: 400 })
     }
 
+    if (shouldForceDevConnect()) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3004'
+      const devParams = new URLSearchParams({
+        platform,
+        teamId: resolvedTeamId,
+        returnTo: safeReturnTo,
+        mode: safeConnectMode,
+      })
+      return NextResponse.json({
+        data: {
+          authUrl: `${appUrl}/api/platforms/dev-connect?${devParams.toString()}`,
+        },
+      })
+    }
+
     if (!config.clientId) {
       return NextResponse.json({ error: `${platform} OAuth not configured` }, { status: 500 })
     }
@@ -239,10 +466,13 @@ export async function POST(request: Request) {
       .from('oauth_states')
       .insert({
         user_id: user.id,
-        team_id: teamId,
+        team_id: resolvedTeamId,
         platform,
         code_verifier: codeVerifier,
         state_token: stateToken,
+        team_slug: resolvedTeamSlug || null,
+        return_to: safeReturnTo,
+        connect_mode: safeConnectMode,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes
       })
 

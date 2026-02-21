@@ -29,7 +29,7 @@ export function CollabSkeleton({ view }: CollabSkeletonProps) {
   return (
     <div className="flex gap-4 p-4 h-full overflow-x-auto">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="min-w-[320px] w-[320px] flex-1 border border-[#262626] rounded-xl bg-[#050505] p-3 space-y-3">
+        <div key={i} className="min-w-[320px] w-[320px] flex-1 space-y-3 rounded-xl border border-border bg-card p-3">
           <Skeleton className="h-6 w-40" />
           {Array.from({ length: 3 }).map((__, cardIndex) => (
             <Skeleton key={cardIndex} className="h-28 w-full" />

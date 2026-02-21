@@ -29,6 +29,7 @@ import { CommentList } from '@/components/comments/CommentList'
 import { InlineComments } from '@/components/comments/InlineComments'
 import { ShareModal } from '@/components/share/ShareModal'
 import { PublishModal } from '@/components/publish/PublishModal'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 // Platform character limits
 const PLATFORM_LIMITS = {
@@ -64,6 +65,23 @@ function getBlockText(block: ContentBlock): string {
   return ''
 }
 
+type InlineCommentItem = {
+  id: string
+  annotationId?: string
+  text: string
+  startPos: number
+  endPos: number
+  user_id: string
+  created_at: string
+  user?: {
+    name: string | null
+    avatar_url: string | null
+    email: string
+  }
+  replies?: InlineCommentItem[]
+  resolved?: boolean
+}
+
 // Block-based content editor component
 function BlockEditor({
   blocks,
@@ -76,7 +94,7 @@ function BlockEditor({
   readOnly?: boolean
   inlineComments?: {
     currentUserId: string
-    getComments: (blockId: string) => any[]
+    getComments: (blockId: string) => InlineCommentItem[]
     onAdd: (blockId: string, text: string, startPos: number, endPos: number, blockText: string) => void
     onResolve: (annotationId: string) => void
     onReply: (annotationId: string, text: string) => void
@@ -296,6 +314,11 @@ type TeamMemberItem = {
   } | null
 }
 
+type DiffPayload = {
+  from?: { blocks?: ContentBlock[] }
+  to?: { blocks?: ContentBlock[] }
+}
+
 export default function EditContentPage() {
   const router = useRouter()
   const params = useParams()
@@ -321,7 +344,7 @@ export default function EditContentPage() {
   const [annotationsLoading, setAnnotationsLoading] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [diffOpen, setDiffOpen] = useState(false)
-  const [diffData, setDiffData] = useState<any>(null)
+  const [diffData, setDiffData] = useState<DiffPayload | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
 
   useEffect(() => {
@@ -460,7 +483,12 @@ export default function EditContentPage() {
   const latestReason = (item: ActivityItem) => item.changeNote?.[0]?.reason || null
 
   const canShowDiff = (item: ActivityItem) => {
-    return item.action === 'CONTENT_UPDATED' && item.metadata?.['diff_available'] && item.from_version_id && item.to_version_id
+    return Boolean(
+      item.action === 'CONTENT_UPDATED' &&
+      item.metadata?.['diff_available'] &&
+      item.from_version_id &&
+      item.to_version_id
+    )
   }
 
   const openDiff = async (item: ActivityItem) => {
@@ -621,15 +649,15 @@ export default function EditContentPage() {
   }
 
   if (isLoading) {
-    return <div className="max-w-4xl mx-auto py-8 text-[#9ca3af]">Loading...</div>
+    return <DashboardContainer className="max-w-4xl py-8 text-[#9ca3af]">Loading...</DashboardContainer>
   }
 
   if (!content) {
-    return <div className="max-w-4xl mx-auto py-8 text-[#37352f]">Content not found</div>
+    return <DashboardContainer className="max-w-4xl py-8 text-[#37352f]">Content not found</DashboardContainer>
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <DashboardContainer className="max-w-4xl py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-[#9ca3af] hover:text-[#37352f]">
@@ -866,12 +894,18 @@ export default function EditContentPage() {
           ) : diffData ? (
             <div className="space-y-4">
               {diffBlocks().map((pair, index) => {
-                const fromText = typeof pair.from?.content === 'string'
-                  ? pair.from?.content
-                  : pair.from?.content?.text || ''
-                const toText = typeof pair.to?.content === 'string'
-                  ? pair.to?.content
-                  : pair.to?.content?.text || ''
+                const getBlockPreviewText = (block?: { content?: unknown }) => {
+                  if (!block) return ''
+                  if (typeof block.content === 'string') return block.content
+                  if (block.content && typeof block.content === 'object' && 'text' in block.content) {
+                    const text = (block.content as { text?: unknown }).text
+                    return typeof text === 'string' ? text : ''
+                  }
+                  return ''
+                }
+
+                const fromText = getBlockPreviewText(pair.from as { content?: unknown } | undefined)
+                const toText = getBlockPreviewText(pair.to as { content?: unknown } | undefined)
                 const changed = fromText !== toText
                 const fromType = pair.from?.type || 'text'
                 const toType = pair.to?.type || 'text'
@@ -896,6 +930,6 @@ export default function EditContentPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </DashboardContainer>
   )
 }

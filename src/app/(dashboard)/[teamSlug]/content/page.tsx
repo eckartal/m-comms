@@ -26,31 +26,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { useAppStore, useContentStore } from '@/stores'
+import { useAppStore, useContentStore, fetchContents } from '@/stores'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { ContentStatus } from '@/types'
 
-type ContentItem = {
+type BlockEntry = { type?: string; content?: { text?: string } | string }
+type PlatformEntry = { type?: string; platform?: string }
+type TeamMemberItem = {
   id: string
-  title: string
-  blocks: any[]
-  status: ContentStatus
-  scheduled_at: string | null
-  published_at: string | null
-  platforms: string[]
-  created_at: string
-  updated_at: string
-  createdBy?: {
-    id: string
-    name: string
-    email: string
-    avatar_url?: string
-  }
-  assigned_to?: string | null
-  assignedTo?: {
-    id: string
-    name: string | null
-    email: string
-    avatar_url?: string | null
+  user?: {
+    id?: string
+    full_name?: string | null
+    email?: string | null
   } | null
 }
 
@@ -74,12 +61,12 @@ type SortOption = 'newest' | 'oldest' | 'updated' | 'scheduled'
 
 export default function ContentPage() {
   const { currentTeam } = useAppStore()
-  const { contents, setContents, fetchContents } = useContentStore()
+  const { contents } = useContentStore()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all')
   const [platformFilter, setPlatformFilter] = useState<string>('all')
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all')
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [loading, setLoading] = useState(true)
 
@@ -124,9 +111,9 @@ export default function ContentPage() {
     // Search filter - extract text from blocks
     if (search) {
       result = result.filter(item => {
-        const textContent = item.blocks
-          ?.filter((b: any) => b.type === 'text')
-          ?.map((b: any) => b.content?.text || '')
+        const textContent = (item.blocks as BlockEntry[])
+          ?.filter((b) => b.type === 'text')
+          ?.map((b) => (typeof b.content === 'object' && b.content ? b.content.text || '' : ''))
           ?.join(' ') || ''
         return (
           item.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -143,20 +130,20 @@ export default function ContentPage() {
     // Platform filter
     if (platformFilter !== 'all') {
       result = result.filter(item =>
-        item.platforms?.some((p: any) => p.type === platformFilter)
+        item.platforms?.some((p) => (p as PlatformEntry)?.type === platformFilter)
       )
     }
 
     // Assignee filter
     if (assigneeFilter !== 'all') {
       result = result.filter(item => {
-        const assignedId = (item as any).assigned_to || (item as any).assignedTo?.id
+        const assignedId = item.assigned_to || item.assignedTo?.id
         return assignedId === assigneeFilter
       })
     }
 
     // Sort
-    result.sort((a: any, b: any) => {
+    result.sort((a, b) => {
       switch (sortBy) {
         case 'newest':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -179,7 +166,7 @@ export default function ContentPage() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: contents.length }
-    contents.forEach((item: any) => {
+    contents.forEach((item) => {
       counts[item.status] = (counts[item.status] || 0) + 1
     })
     return counts
@@ -196,10 +183,10 @@ export default function ContentPage() {
   }
 
   // Extract text from blocks for display
-  const getContentPreview = (blocks: any[]) => {
+  const getContentPreview = (blocks: unknown[]) => {
     if (!blocks || !Array.isArray(blocks)) return null
-    const textBlock = blocks.find((b: any) => b.type === 'text')
-    if (textBlock?.content?.text) {
+    const textBlock = (blocks as BlockEntry[]).find((b) => b.type === 'text')
+    if (textBlock && typeof textBlock.content === 'object' && textBlock.content?.text) {
       return textBlock.content.text
     }
     return null
@@ -207,19 +194,18 @@ export default function ContentPage() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-12">
+      <DashboardContainer>
         <div className="animate-pulse space-y-6 py-12">
           <div className="h-8 w-32 bg-border rounded" />
           <div className="h-12 w-full bg-border rounded" />
           <div className="h-64 w-full bg-border rounded" />
         </div>
-      </div>
+      </DashboardContainer>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-12 py-12">
+    <DashboardContainer className="py-8 md:py-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -368,8 +354,9 @@ export default function ContentPage() {
               const statusConfig = STATUS_CONFIG[item.status as ContentStatus]
               const StatusIcon = statusConfig.icon
               const contentPreview = getContentPreview(item.blocks)
-              const isOverLimit = item.platforms?.some((p: any) => {
-                const limit = p?.type === 'twitter' ? 280 : p?.type === 'linkedin' ? 3000 : 2200
+              const isOverLimit = item.platforms?.some((p) => {
+                const platform = p as PlatformEntry
+                const limit = platform?.type === 'twitter' ? 280 : platform?.type === 'linkedin' ? 3000 : 2200
                 return (contentPreview?.length || 0) > limit
               })
 
@@ -451,15 +438,18 @@ export default function ContentPage() {
                   <div className="flex items-center gap-4 flex-shrink-0 ml-4">
                     {/* Platforms */}
                     <div className="flex gap-1">
-                      {(item.platforms || []).map((p: any) => (
+                      {(item.platforms || []).map((p) => {
+                        const platform = p as PlatformEntry
+                        return (
                         <span
-                          key={p?.type || 'unknown'}
+                          key={platform?.type || 'unknown'}
                           className="text-[13px] w-6 h-6 flex items-center justify-center bg-muted rounded"
-                          title={platformConfig[p?.type]?.name || 'Unknown'}
+                          title={platformConfig[platform?.type || '']?.name || 'Unknown'}
                         >
-                          {platformConfig[p?.type]?.icon || '?'}
+                          {platformConfig[platform?.type || '']?.icon || '?'}
                         </span>
-                      ))}
+                        )
+                      })}
                     </div>
 
                     {/* Actions */}
@@ -503,7 +493,6 @@ export default function ContentPage() {
             <span>{statusCounts.PUBLISHED || 0} shared</span>
           </div>
         )}
-      </div>
-    </div>
+    </DashboardContainer>
   )
 }

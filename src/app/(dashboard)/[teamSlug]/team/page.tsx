@@ -35,6 +35,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useAppStore } from '@/stores'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,7 +163,7 @@ export default function TeamPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <DashboardContainer className="space-y-6 py-8 md:py-10">
         <div className="flex justify-between items-center">
           <div>
             <Skeleton className="h-8 w-32 mb-2" />
@@ -174,12 +175,12 @@ export default function TeamPage() {
             <Skeleton key={i} className="h-20 w-full" />
           ))}
         </div>
-      </div>
+      </DashboardContainer>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardContainer className="space-y-6 py-8 md:py-10">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -404,6 +405,6 @@ export default function TeamPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </DashboardContainer>
   )
 }

@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import { ContentStatus } from '@/types'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 type ContentItem = {
   id: string
@@ -28,7 +29,11 @@ type ContentItem = {
     email: string
     avatar_url?: string | null
   } | null
+  activity_count?: number
 }
+
+type ContentRow = Omit<ContentItem, 'activity_count'> & { id: string }
+type ActivityRow = { content_id: string }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = [
@@ -65,18 +70,19 @@ export default function CalendarPage() {
         .in('status', ['SCHEDULED', 'PUBLISHED'])
         .or('scheduled_at.not.is.null,published_at.not.is.null')
 
-      const contentIds = (data || []).map((item: any) => item.id)
+      const contentRows = (data || []) as ContentRow[]
+      const contentIds = contentRows.map((item) => item.id)
       const { data: activities } = await supabase
         .from('content_activity')
         .select('content_id')
         .in('content_id', contentIds)
 
       const activityCount: Record<string, number> = {}
-      ;(activities || []).forEach((activity: any) => {
+      ;((activities || []) as ActivityRow[]).forEach((activity) => {
         activityCount[activity.content_id] = (activityCount[activity.content_id] || 0) + 1
       })
 
-      const enriched = (data || []).map((item: any) => ({
+      const enriched = contentRows.map((item) => ({
         ...item,
         activity_count: activityCount[item.id] || 0,
       }))
@@ -139,20 +145,17 @@ export default function CalendarPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-12 py-12">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 w-32 bg-border rounded" />
-            <div className="h-96 bg-border rounded" />
-          </div>
+      <DashboardContainer className="py-8 md:py-10">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 w-32 bg-border rounded" />
+          <div className="h-96 bg-border rounded" />
         </div>
-      </div>
+      </DashboardContainer>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-12 py-12">
+    <DashboardContainer className="py-8 md:py-10">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
           <div>
@@ -350,9 +353,9 @@ export default function CalendarPage() {
                           <p className="text-[13px] font-medium text-foreground">
                             {item.title}
                           </p>
-                          {(item as any).activity_count > 0 && (
+                          {(item.activity_count || 0) > 0 && (
                             <p className="text-[11px] text-muted-foreground mt-1">
-                              {(item as any).activity_count} updates
+                              {item.activity_count} updates
                             </p>
                           )}
                           {item.assignedTo && (
@@ -406,7 +409,6 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardContainer>
   )
 }

@@ -9,12 +9,12 @@ const ThemeProviderContext = createContext<{
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
 }>({
-  theme: 'dark',
+  theme: 'light',
   setTheme: () => {},
   toggleTheme: () => {},
 })
 
-export function ThemeProvider({ children, defaultTheme = 'dark', storageKey = 'theme' }: { children: React.ReactNode; defaultTheme?: Theme; storageKey?: string }) {
+export function ThemeProvider({ children, defaultTheme = 'light', storageKey = 'theme' }: { children: React.ReactNode; defaultTheme?: Theme; storageKey?: string }) {
   const [theme, setTheme] = useState<Theme>(defaultTheme)
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export function ThemeProvider({ children, defaultTheme = 'dark', storageKey = 't
         setTheme('light')
       }
     }
-  }, [])
+  }, [storageKey])
 
   useEffect(() => {
     const root = window.document.documentElement

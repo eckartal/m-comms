@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Bell, Search, Sun, Moon, PanelLeft, PanelLeftClose, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme/ThemeProvider'
 import { createClient } from '@/lib/supabase/client'
 import { useAppStore, useContentStore } from '@/stores'
+import { useConnectionMode } from '@/hooks/useConnectionMode'
 
 type HeaderProps = {
   className?: string
@@ -32,7 +33,10 @@ export function Header({
   onMobileMenuClick,
 }: HeaderProps) {
   const router = useRouter()
+  const params = useParams()
+  const teamSlug = params.teamSlug as string | undefined
   const { theme, toggleTheme } = useTheme()
+  const { mode } = useConnectionMode(teamSlug)
   const currentUser = useAppStore((state) => state.currentUser)
   const setCurrentUser = useAppStore((state) => state.setCurrentUser)
   const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
@@ -95,6 +99,17 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-1.5">
+        <div
+          className={cn(
+            'hidden md:inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+            mode === 'real_oauth'
+              ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
+              : 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+          )}
+        >
+          {mode === 'real_oauth' ? 'Real OAuth Mode' : 'Sandbox Mode'}
+        </div>
+
         <Button
           variant="ghost"
           size="icon"

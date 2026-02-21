@@ -11,8 +11,8 @@ interface CollabErrorStateProps {
 export function CollabErrorState({ message, showRetry = true, onRetry, onGoToTeam }: CollabErrorStateProps) {
   return (
     <div className="flex h-full items-center justify-center px-6">
-      <div className="max-w-md w-full border border-[#262626] rounded-xl bg-[#050505] p-6 text-center">
-        <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-red-950/40 flex items-center justify-center text-red-400">
+      <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-center">
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400">
           <AlertTriangle className="h-5 w-5" />
         </div>
         <h2 className="text-base font-semibold text-foreground">Couldn&apos;t load collaboration data</h2>

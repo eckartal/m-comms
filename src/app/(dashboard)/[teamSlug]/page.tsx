@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon:
   IN_REVIEW: { label: 'In Review', color: 'text-amber-500', icon: Eye },
   APPROVED: { label: 'Approved', color: 'text-emerald-500', icon: CheckCircle },
   SCHEDULED: { label: 'Scheduled', color: 'text-amber-500', icon: Clock },
-  PUBLISHED: { label: 'Shared', color: 'text-white', icon: CheckCircle },
+  PUBLISHED: { label: 'Shared', color: 'text-primary', icon: CheckCircle },
   ARCHIVED: { label: 'Archived', color: 'text-gray-500', icon: FileText },
 }
 
@@ -128,7 +128,7 @@ export default function DashboardPage() {
         </div>
 
         {showWelcome && (
-          <div className="mb-4 rounded-lg border border-[#262626] bg-[#0a0a0a] p-4">
+          <div className="mb-4 rounded-lg border border-border bg-card p-4">
             <div className="flex items-start gap-3">
               <div className="mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#f97316]/10 text-[#f97316]">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,20 +136,20 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-white">Welcome to ContentHub</h3>
-                <p className="mt-1 text-xs text-[#737373]">
+                <h3 className="text-sm font-medium text-foreground">Welcome to ContentHub</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Your first post is a draft called &quot;This is your draft&quot;. Edit it or create your own.
                 </p>
                 <button
                   onClick={completeOnboarding}
-                  className="mt-3 text-xs font-medium text-[#f97316] hover:text-white transition-colors"
+                  className="mt-3 text-xs font-medium text-[#f97316] hover:text-foreground transition-colors"
                 >
                   Got it, start creating
                 </button>
               </div>
               <button
                 onClick={completeOnboarding}
-                className="mt-1 text-[#737373] hover:text-white transition-colors"
+                className="mt-1 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -157,9 +157,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-4 gap-px bg-gray-900 mb-4">
+        <div className="mb-4 grid grid-cols-4 gap-px bg-border">
           {stats.map((stat) => (
-            <div key={stat.label} className="bg-black p-3">
+            <div key={stat.label} className="bg-card p-3">
               <p className="text-[10px] text-muted-foreground uppercase">{stat.label}</p>
               <p className="text-lg text-foreground mt-0.5">{stat.value}</p>
             </div>
@@ -176,7 +176,7 @@ export default function DashboardPage() {
                 all
               </Link>
             </div>
-            <div className="border border-gray-900">
+            <div className="border border-border">
               {loading && <p className="px-3 py-3 text-xs text-muted-foreground">Loading content...</p>}
               {!loading && recentContent.length === 0 && (
                 <p className="px-3 py-3 text-xs text-muted-foreground">No content yet.</p>
@@ -194,8 +194,8 @@ export default function DashboardPage() {
                     href={`/${currentTeam.slug}/content/${content.id}`}
                     onClick={() => setSelectedId(content.id)}
                     className={cn(
-                      'flex items-center gap-2 py-2 px-3 border-b border-gray-900 last:border-0 transition-colors',
-                      isSelected ? 'bg-gray-900' : 'hover:bg-black'
+                      'flex items-center gap-2 py-2 px-3 border-b border-border last:border-0 transition-colors',
+                      isSelected ? 'bg-[#00A0E3]/16' : 'hover:bg-[#00A0E3]/12'
                     )}
                   >
                     <div className={cn('w-6 h-6 flex items-center justify-center text-xs', statusConfig.color)}>
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2">
                       <div className="flex gap-0.5">
                         {normalizedPlatforms.filter(Boolean).map((platform) => (
-                          <span key={`${content.id}-${platform}`} className="text-[9px] bg-gray-900 px-1 py-0.5 text-muted-foreground">
+                          <span key={`${content.id}-${platform}`} className="text-[9px] bg-muted px-1 py-0.5 text-muted-foreground">
                             {platformIcons[platform] || platform}
                           </span>
                         ))}
@@ -223,7 +223,7 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div>
               <h2 className="text-xs font-medium text-foreground uppercase mb-1">Quick</h2>
-              <div className="border border-gray-900">
+              <div className="border border-border">
                 {[
                   { href: `/${currentTeam.slug}/content/new`, icon: Plus, label: 'New' },
                   { href: `/${currentTeam.slug}/calendar`, icon: Calendar, label: 'Calendar' },
@@ -233,10 +233,10 @@ export default function DashboardPage() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center gap-2 py-1.5 px-3 border-b border-gray-900 last:border-0 hover:bg-gray-900 transition-colors"
+                    className="group flex items-center gap-2 py-1.5 px-3 border-b border-border last:border-0 hover:bg-[#00A0E3]/12 transition-colors"
                   >
-                    <item.icon className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{item.label}</span>
+                    <item.icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+                    <span className="text-xs text-muted-foreground group-hover:text-foreground">{item.label}</span>
                   </Link>
                 ))}
               </div>

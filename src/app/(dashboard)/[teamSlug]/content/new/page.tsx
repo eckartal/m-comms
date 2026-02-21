@@ -28,6 +28,8 @@ import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlat
 import { toast } from 'sonner'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
+import { useConnectionMode } from '@/hooks/useConnectionMode'
+import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
 
 // Platform configurations with character limits
 const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
@@ -91,6 +93,8 @@ export default function NewContentPage() {
   const [connectionsLoading, setConnectionsLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
   const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
+  const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<PlatformType | null>(null)
+  const { mode: connectionMode } = useConnectionMode(teamSlug)
 
   const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
@@ -167,7 +171,7 @@ export default function NewContentPage() {
     }
   }, [teamSlug, currentTeam?.id])
 
-  const handleConnectPlatform = async (platform: PlatformType) => {
+  const runConnectPlatform = async (platform: PlatformType, skipSandboxConfirmation = false) => {
     setConnectingPlatform(platform)
 
     try {
@@ -178,6 +182,7 @@ export default function NewContentPage() {
         returnTo: `/${teamSlug}/content/new`,
         mode: 'popup',
         source: 'composer',
+        skipSandboxConfirmation,
         onSuccess: async () => {
           await fetchConnectedPlatforms()
         },
@@ -187,6 +192,14 @@ export default function NewContentPage() {
     } finally {
       setConnectingPlatform(null)
     }
+  }
+
+  const handleConnectPlatform = async (platform: PlatformType) => {
+    if (connectionMode === 'local_sandbox') {
+      setSandboxConnectPlatform(platform)
+      return
+    }
+    await runConnectPlatform(platform)
   }
 
   // Load saved draft from localStorage on mount
@@ -788,6 +801,17 @@ export default function NewContentPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <SandboxConfirmDialog
+        open={Boolean(sandboxConnectPlatform)}
+        platformName={sandboxConnectPlatform ? PLATFORMS[sandboxConnectPlatform].name : 'platform'}
+        onCancel={() => setSandboxConnectPlatform(null)}
+        onConfirm={async () => {
+          const platform = sandboxConnectPlatform
+          setSandboxConnectPlatform(null)
+          if (platform) await runConnectPlatform(platform, true)
+        }}
+      />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,11 +12,12 @@ import {
   SlidersHorizontal,
   Check,
 } from 'lucide-react'
-import { useAppStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
 import { cn } from '@/lib/utils'
 import { getContentTitle } from '@/lib/contentText'
+import { QuickFilter, getOwnerId, isUnassigned, parseQuickFilter } from '@/lib/collaborationMetrics'
 import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
@@ -65,7 +66,6 @@ type ViewState =
   | 'empty_filtered'
   | 'ready'
 
-type QuickFilter = 'all' | 'mine' | 'unassigned' | 'needs_review' | 'overdue' | 'approved'
 type ItemTypeFilter = 'all' | 'IDEA' | 'POST'
 
 function isOverdue(item: Content) {
@@ -89,7 +89,9 @@ function trackCollabEvent(name: string, payload: Record<string, unknown> = {}) {
 
 export default function CollaborationPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { currentTeam, currentUser } = useAppStore()
+  const setContents = useContentStore((state) => state.setContents)
   const [content, setContent] = useState<Content[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -107,6 +109,11 @@ export default function CollaborationPage() {
   const [isIdeaPanelOpen, setIsIdeaPanelOpen] = useState(false)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
+  const quickFilterFromQuery = parseQuickFilter(searchParams.get('quickFilter'))
+
+  useEffect(() => {
+    setQuickFilter(quickFilterFromQuery)
+  }, [quickFilterFromQuery])
 
   const parseRequestError = async (response: Response, fallbackMessage: string) => {
     let message = fallbackMessage
@@ -165,10 +172,12 @@ export default function CollaborationPage() {
 
     if (contentResult.status === 'fulfilled') {
       setContent(contentResult.value)
+      setContents(contentResult.value)
     } else {
       const reason = contentResult.reason
       const isRequestError = reason instanceof RequestError
       setContent([])
+      setContents([])
       setLoadError(isRequestError ? reason.message : 'Failed to load content')
       setLoadErrorStatus(isRequestError ? reason.status : 500)
       setLoadErrorRetryable(isRequestError ? reason.retryable : true)
@@ -183,7 +192,7 @@ export default function CollaborationPage() {
     }
 
     setIsLoading(false)
-  }, [currentTeam?.id, fetchContentData, fetchTeamMembersData])
+  }, [currentTeam?.id, fetchContentData, fetchTeamMembersData, setContents])
 
   useEffect(() => {
     if (currentTeam?.id) {
@@ -193,9 +202,9 @@ export default function CollaborationPage() {
 
   const handleStatusChange = async (contentId: string, newStatus: Content['status']) => {
     const previous = content
-    setContent((prev) =>
-      prev.map((item) => (item.id === contentId ? { ...item, status: newStatus } : item))
-    )
+    const optimistic = previous.map((item) => (item.id === contentId ? { ...item, status: newStatus } : item))
+    setContent(optimistic)
+    setContents(optimistic)
 
     try {
       const response = await fetch(`/api/content/${contentId}`, {
@@ -213,15 +222,16 @@ export default function CollaborationPage() {
 
       const { data } = await response.json()
       if (data) {
-        setContent((prev) =>
-          prev.map((item) => (item.id === contentId ? { ...item, ...data } : item))
-        )
+        const next = optimistic.map((item) => (item.id === contentId ? { ...item, ...data } : item))
+        setContent(next)
+        setContents(next)
       }
 
     } catch (err) {
       console.error(err)
       setActionError(err instanceof Error ? err.message : 'Failed to update status')
       setContent(previous)
+      setContents(previous)
     }
   }
 
@@ -238,28 +248,28 @@ export default function CollaborationPage() {
       }
 
       const member = teamMembers.find((m) => m.user?.id === userId) || null
-      setContent((prev) =>
-        prev.map((item) =>
-          item.id === contentId
-            ? {
-                ...item,
-                assigned_to: userId,
-                assignedTo: member?.user
-                  ? {
-                      id: member.user.id,
-                      name: member.user.name || member.user.full_name || null,
-                      email: member.user.email || '',
-                      avatar_url: member.user.avatar_url || null,
-                      created_at:
-                        item.assignedTo?.created_at ||
-                        item.createdBy?.created_at ||
-                        new Date().toISOString(),
-                    }
-                  : undefined,
-              }
-            : item
-        )
+      const next = content.map((item) =>
+        item.id === contentId
+          ? {
+              ...item,
+              assigned_to: userId,
+              assignedTo: member?.user
+                ? {
+                    id: member.user.id,
+                    name: member.user.name || member.user.full_name || null,
+                    email: member.user.email || '',
+                    avatar_url: member.user.avatar_url || null,
+                    created_at:
+                      item.assignedTo?.created_at ||
+                      item.createdBy?.created_at ||
+                      new Date().toISOString(),
+                  }
+                : undefined,
+            }
+          : item
       )
+      setContent(next)
+      setContents(next)
     } catch (err) {
       console.error(err)
       setActionError(err instanceof Error ? err.message : 'Failed to update owner')
@@ -308,16 +318,16 @@ export default function CollaborationPage() {
         if (itemTypeFilter !== 'all' && (item.item_type || 'POST') !== itemTypeFilter) return false
 
         if (quickFilter === 'mine') {
-          const ownerId = item.assigned_to || item.assignedTo?.id
+          const ownerId = getOwnerId(item)
           if (!currentUser?.id || ownerId !== currentUser.id) return false
         }
-        if (quickFilter === 'unassigned' && (item.assigned_to || item.assignedTo?.id)) return false
+        if (quickFilter === 'unassigned' && !isUnassigned(item)) return false
         if (quickFilter === 'needs_review' && item.status !== 'IN_REVIEW') return false
         if (quickFilter === 'overdue' && !isOverdue(item)) return false
         if (quickFilter === 'approved' && item.status !== 'APPROVED') return false
 
         if (assigneeFilter === 'all') return true
-        const assignedId = item.assigned_to || item.assignedTo?.id
+        const assignedId = getOwnerId(item)
         return assignedId === assigneeFilter
       }),
     [content, searchQuery, assigneeFilter, quickFilter, itemTypeFilter, currentUser?.id]
@@ -330,14 +340,14 @@ export default function CollaborationPage() {
         id: 'mine' as const,
         label: 'Mine',
         count: content.filter((item) => {
-          const ownerId = item.assigned_to || item.assignedTo?.id
+          const ownerId = getOwnerId(item)
           return !!currentUser?.id && ownerId === currentUser.id
         }).length,
       },
       {
         id: 'unassigned' as const,
         label: 'Unassigned',
-        count: content.filter((item) => !item.assigned_to && !item.assignedTo?.id).length,
+        count: content.filter(isUnassigned).length,
       },
       {
         id: 'needs_review' as const,
@@ -442,7 +452,9 @@ export default function CollaborationPage() {
       const idea = body?.data as Content | undefined
       if (!idea) return
 
-      setContent((prev) => [idea, ...prev])
+      const next = [idea, ...content]
+      setContent(next)
+      setContents(next)
       setSearchQuery('')
       setAssigneeFilter('all')
       setQuickFilter('all')
@@ -488,17 +500,17 @@ export default function CollaborationPage() {
       const alreadyConverted = Boolean(body?.data?.already_converted)
 
       if (updatedIdea) {
-        setContent((prev) =>
-          prev.map((item) => (item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item))
+        const next = content.map((item) =>
+          item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item
         )
+        setContent(next)
+        setContents(next)
       }
 
       if (post) {
-        setContent((prev) => {
-          const exists = prev.some((item) => item.id === post.id)
-          if (exists) return prev
-          return [post, ...prev]
-        })
+        const next = content.some((item) => item.id === post.id) ? content : [post, ...content]
+        setContent(next)
+        setContents(next)
         trackCollabEvent('idea_converted_to_post', {
           idea_id: ideaId,
           post_id: post.id,
@@ -782,9 +794,11 @@ export default function CollaborationPage() {
         teamMembers={teamMembers}
         onOpenChange={setIsIdeaPanelOpen}
         onIdeaUpdated={(updatedIdea) => {
-          setContent((prev) =>
-            prev.map((item) => (item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item))
+          const next = content.map((item) =>
+            item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item
           )
+          setContent(next)
+          setContents(next)
         }}
         onConvertIdea={handleConvertIdea}
         onOpenLinkedPost={openPost}

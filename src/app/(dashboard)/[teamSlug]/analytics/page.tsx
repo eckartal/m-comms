@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 const platformIcons: Record<string, string> = {
   twitter: '𝕏',
@@ -55,21 +56,18 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-12 py-12">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 w-32 bg-muted rounded" />
-            <div className="h-28 bg-muted rounded" />
-            <div className="h-64 bg-muted rounded" />
-          </div>
+      <DashboardContainer className="py-8 md:py-10">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 w-32 bg-muted rounded" />
+          <div className="h-28 bg-muted rounded" />
+          <div className="h-64 bg-muted rounded" />
         </div>
-      </div>
+      </DashboardContainer>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-5xl mx-auto px-12 py-12">
+    <DashboardContainer className="py-8 md:py-10">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
           <div>
@@ -110,8 +108,7 @@ export default function AnalyticsPage() {
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </DashboardContainer>
   )
 }
 
