@@ -88,6 +88,7 @@ export default function CollaborationPage() {
   const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>('all')
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
+  const [isCreatingIdea, setIsCreatingIdea] = useState(false)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
 
@@ -376,6 +377,7 @@ export default function CollaborationPage() {
     if (!currentTeam?.id) return
 
     try {
+      setIsCreatingIdea(true)
       const response = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -398,13 +400,23 @@ export default function CollaborationPage() {
       if (!idea) return
 
       setContent((prev) => [idea, ...prev])
+      setSearchQuery('')
+      setAssigneeFilter('all')
+      setQuickFilter('all')
       setItemTypeFilter('IDEA')
+      setView('kanban')
       trackCollabEvent('idea_created', {
         team_id: currentTeam.id,
         idea_id: idea.id,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create idea')
+      if (err instanceof RequestError) {
+        setErrorStatus(err.status)
+        setErrorRetryable(err.retryable)
+      }
+    } finally {
+      setIsCreatingIdea(false)
     }
   }
 
@@ -553,9 +565,13 @@ export default function CollaborationPage() {
             </Button>
           </div>
 
-          <Button className="h-8 bg-amber-300 text-black hover:bg-amber-200 text-xs" onClick={createIdea}>
+          <Button
+            className="h-8 bg-amber-300 text-black hover:bg-amber-200 text-xs"
+            onClick={createIdea}
+            disabled={isCreatingIdea}
+          >
             <Plus className="h-3.5 w-3.5 mr-2" />
-            New Idea
+            {isCreatingIdea ? 'Creating...' : 'New Idea'}
           </Button>
           <Button className="h-8 bg-white text-black hover:bg-gray-200 text-xs" onClick={goToNewPost}>
             <Plus className="h-3.5 w-3.5 mr-2" />
