@@ -183,7 +183,7 @@ export default function SettingsPage() {
                 onChange={(v) => setNotifications({ ...notifications, scheduled: v })}
               />
               <ToggleOption
-                label="Published notifications"
+                label="Shared notifications"
                 description="Get notified when posts are published"
                 checked={notifications.published}
                 onChange={(v) => setNotifications({ ...notifications, published: v })}

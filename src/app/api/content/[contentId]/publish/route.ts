@@ -116,6 +116,16 @@ export async function POST(
       })
       .eq('id', contentId)
 
+    await supabase.from('content_activity').insert({
+      content_id: contentId,
+      team_id: content.team_id,
+      user_id: user.id,
+      action: 'STATUS_CHANGED',
+      from_status: content.status,
+      to_status: 'PUBLISHED',
+      metadata: { source: 'publish' },
+    })
+
     const successCount = results.filter(r => r.success).length
 
     return NextResponse.json({

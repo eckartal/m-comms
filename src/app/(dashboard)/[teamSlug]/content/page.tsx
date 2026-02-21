@@ -59,7 +59,7 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; bg: s
   IN_REVIEW: { label: 'In Review', color: 'text-amber-500', bg: 'bg-amber-500/10', icon: Eye },
   APPROVED: { label: 'Approved', color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: CheckCircle },
   SCHEDULED: { label: 'Scheduled', color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Clock },
-  PUBLISHED: { label: 'Published', color: 'text-purple-500', bg: 'bg-purple-500/10', icon: CheckCircle },
+  PUBLISHED: { label: 'Shared', color: 'text-purple-500', bg: 'bg-purple-500/10', icon: CheckCircle },
   ARCHIVED: { label: 'Archived', color: 'text-gray-400', bg: 'bg-gray-100/5', icon: Archive },
 }
 
@@ -373,13 +373,13 @@ export default function ContentPage() {
                           </>
                         )}
 
-                        {/* Published date */}
+                        {/* Shared date */}
                         {item.published_at && (
                           <>
                             <span>·</span>
                             <span className="flex items-center gap-1 text-purple-500">
                               <CheckCircle className="w-3 h-3" />
-                              Published {formatDate(item.published_at)}
+                              Shared {formatDate(item.published_at)}
                             </span>
                           </>
                         )}
@@ -439,7 +439,7 @@ export default function ContentPage() {
             <span>{statusCounts.DRAFT || 0} drafts</span>
             <span>{statusCounts.IN_REVIEW || 0} in review</span>
             <span>{statusCounts.SCHEDULED || 0} scheduled</span>
-            <span>{statusCounts.PUBLISHED || 0} published</span>
+            <span>{statusCounts.PUBLISHED || 0} shared</span>
           </div>
         )}
       </div>

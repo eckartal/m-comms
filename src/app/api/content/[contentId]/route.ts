@@ -208,6 +208,16 @@ export async function PUT(
     const body = await request.json()
     const { title, blocks, platforms, status, scheduled_at, assigned_to } = body
 
+    const { data: currentContent, error: currentError } = await supabase
+      .from('content')
+      .select('status, scheduled_at, assigned_to, team_id')
+      .eq('id', contentId)
+      .single()
+
+    if (currentError || !currentContent) {
+      return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+    }
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
@@ -232,6 +242,50 @@ export async function PUT(
     if (error) {
       console.error('Error updating content:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const activityEntries: Record<string, unknown>[] = []
+
+    if (status !== undefined && status !== currentContent.status) {
+      activityEntries.push({
+        content_id: contentId,
+        team_id: currentContent.team_id,
+        user_id: user.id,
+        action: 'STATUS_CHANGED',
+        from_status: currentContent.status,
+        to_status: status,
+      })
+    }
+
+    if (scheduled_at !== undefined && scheduled_at !== currentContent.scheduled_at) {
+      activityEntries.push({
+        content_id: contentId,
+        team_id: currentContent.team_id,
+        user_id: user.id,
+        action: 'SCHEDULE_UPDATED',
+        from_scheduled_at: currentContent.scheduled_at,
+        to_scheduled_at: scheduled_at,
+      })
+    }
+
+    if (assigned_to !== undefined && assigned_to !== currentContent.assigned_to) {
+      activityEntries.push({
+        content_id: contentId,
+        team_id: currentContent.team_id,
+        user_id: user.id,
+        action: 'ASSIGNEE_UPDATED',
+        from_assigned_to: currentContent.assigned_to,
+        to_assigned_to: assigned_to,
+      })
+    }
+
+    if (activityEntries.length > 0) {
+      const { error: activityError } = await supabase
+        .from('content_activity')
+        .insert(activityEntries)
+      if (activityError) {
+        console.error('Error logging content activity:', activityError)
+      }
     }
 
     return NextResponse.json(data)

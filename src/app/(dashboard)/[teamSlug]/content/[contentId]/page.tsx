@@ -189,8 +189,27 @@ const statusLabels: Record<string, string> = {
   IN_REVIEW: 'In Review',
   APPROVED: 'Approved',
   SCHEDULED: 'Scheduled',
-  PUBLISHED: 'Published',
+  PUBLISHED: 'Shared',
   ARCHIVED: 'Archived',
+}
+
+type ActivityItem = {
+  id: string
+  action: string
+  from_status?: string | null
+  to_status?: string | null
+  from_scheduled_at?: string | null
+  to_scheduled_at?: string | null
+  from_assigned_to?: string | null
+  to_assigned_to?: string | null
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  user?: {
+    id: string
+    name: string | null
+    email: string
+    avatar_url?: string | null
+  } | null
 }
 
 export default function EditContentPage() {
@@ -209,9 +228,14 @@ export default function EditContentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [activityLoading, setActivityLoading] = useState(true)
 
   useEffect(() => {
-    if (contentId) fetchContent()
+    if (contentId) {
+      fetchContent()
+      fetchActivity()
+    }
   }, [contentId])
 
   const fetchContent = async () => {
@@ -234,6 +258,21 @@ export default function EditContentPage() {
     }
   }
 
+  const fetchActivity = async () => {
+    try {
+      setActivityLoading(true)
+      const response = await fetch(`/api/content/${contentId}/activity`)
+      if (response.ok) {
+        const data = await response.json()
+        setActivity(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Error fetching activity:', error)
+    } finally {
+      setActivityLoading(false)
+    }
+  }
+
   const handleSave = async (publishStatus?: ContentStatus) => {
     setIsSubmitting(true)
     try {
@@ -252,6 +291,7 @@ export default function EditContentPage() {
         router.push(`/${teamSlug}/content`)
       } else {
         await fetchContent()
+        await fetchActivity()
       }
     } catch (error) {
       console.error('Error saving content:', error)
@@ -266,6 +306,23 @@ export default function EditContentPage() {
   }
 
   const totalChars = getTotalChars(blocks)
+
+  const renderActivityLabel = (item: ActivityItem) => {
+    if (item.action === 'STATUS_CHANGED') {
+      const fromLabel = item.from_status ? statusLabels[item.from_status] || item.from_status : 'Unknown'
+      const toLabel = item.to_status ? statusLabels[item.to_status] || item.to_status : 'Unknown'
+      return `Status changed: ${fromLabel} → ${toLabel}`
+    }
+    if (item.action === 'SCHEDULE_UPDATED') {
+      const fromDate = item.from_scheduled_at ? new Date(item.from_scheduled_at).toLocaleString() : 'Not set'
+      const toDate = item.to_scheduled_at ? new Date(item.to_scheduled_at).toLocaleString() : 'Not set'
+      return `Schedule updated: ${fromDate} → ${toDate}`
+    }
+    if (item.action === 'ASSIGNEE_UPDATED') {
+      return 'Assignee updated'
+    }
+    return item.action.replace(/_/g, ' ').toLowerCase()
+  }
 
   if (isLoading) {
     return <div className="max-w-4xl mx-auto py-8 text-[#9ca3af]">Loading...</div>
@@ -350,6 +407,29 @@ export default function EditContentPage() {
         </div>
       </div>
 
+      {/* Activity */}
+      <div className="mb-12">
+        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Activity</h2>
+        {activityLoading ? (
+          <div className="text-sm text-[#9ca3af]">Loading activity...</div>
+        ) : activity.length === 0 ? (
+          <div className="text-sm text-[#9ca3af]">No activity yet</div>
+        ) : (
+          <div className="space-y-3">
+            {activity.map((item) => (
+              <div key={item.id} className="flex items-start justify-between gap-4 border border-[#e5e5e5] rounded-[6px] p-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-[#37352f]">{renderActivityLabel(item)}</p>
+                  <p className="text-xs text-[#9ca3af]">
+                    {item.user?.name || item.user?.email || 'Unknown user'} · {new Date(item.created_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Schedule */}
       <div className="mb-12">
         <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Schedule</h2>
@@ -371,7 +451,7 @@ export default function EditContentPage() {
             <option value="DRAFT">Save as Draft</option>
             <option value="IN_REVIEW">Submit for Review</option>
             <option value="SCHEDULED">Schedule</option>
-            <option value="PUBLISHED">Publish Now</option>
+            <option value="PUBLISHED">Share Now</option>
           </select>
         </div>
       </div>
@@ -385,7 +465,7 @@ export default function EditContentPage() {
           </Button>
           <Button onClick={() => handleSave(status === 'SCHEDULED' ? 'SCHEDULED' : 'PUBLISHED')} disabled={isSubmitting} className="bg-[#2383e2] text-white hover:bg-[#1a6fb8]">
             <Send className="h-4 w-4 mr-2" />
-            {status === 'SCHEDULED' ? 'Schedule' : 'Publish'}
+            {status === 'SCHEDULED' ? 'Schedule' : 'Share'}
           </Button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Plus, LayoutGrid, List, Calendar, Search } from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
+import { cn } from '@/lib/utils'
 
 export default function CollaborationPage() {
   const { currentTeam } = useAppStore()
@@ -14,6 +15,7 @@ export default function CollaborationPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
 
   useEffect(() => {
     if (currentTeam) {
@@ -107,13 +109,37 @@ export default function CollaborationPage() {
 
           {/* View Toggle */}
           <div className="flex bg-[#0a0a0a] rounded-lg p-0.5 border border-gray-900">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView('kanban')}
+              className={cn(
+                'h-7 px-2',
+                view === 'kanban' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
               <LayoutGrid className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView('list')}
+              className={cn(
+                'h-7 px-2',
+                view === 'list' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
               <List className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView('calendar')}
+              className={cn(
+                'h-7 px-2',
+                view === 'calendar' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
               <Calendar className="h-4 w-4" />
             </Button>
           </div>
@@ -144,6 +170,8 @@ export default function CollaborationPage() {
             onStatusChange={handleStatusChange}
             onCardClick={handleCardClick}
             teamId={currentTeam.id}
+            view={view}
+            onViewChange={setView}
           />
         )}
       </div>

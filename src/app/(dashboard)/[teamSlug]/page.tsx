@@ -46,7 +46,7 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon:
   IN_REVIEW: { label: 'In Review', color: 'text-amber-500', icon: Eye },
   APPROVED: { label: 'Approved', color: 'text-emerald-500', icon: CheckCircle },
   SCHEDULED: { label: 'Scheduled', color: 'text-amber-500', icon: Clock },
-  PUBLISHED: { label: 'Published', color: 'text-white', icon: CheckCircle },
+  PUBLISHED: { label: 'Shared', color: 'text-white', icon: CheckCircle },
   ARCHIVED: { label: 'Archived', color: 'text-gray-500', icon: FileText },
 }
 

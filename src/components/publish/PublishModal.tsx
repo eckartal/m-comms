@@ -187,7 +187,7 @@ export function PublishModal({ contentId }: PublishModalProps) {
           <div className="space-y-4">
             <div className="text-center">
               <CheckCircle className="h-8 w-8 mx-auto text-green-600" />
-              <p className="mt-2 font-medium">Published successfully!</p>
+              <p className="mt-2 font-medium">Shared successfully!</p>
               <p className="text-sm text-gray-500">
                 {publishResult.summary?.successful} of {publishResult.summary?.total} platforms
               </p>

@@ -90,6 +90,7 @@ model Content {
   versions    ContentVersion[]
   schedules   ContentSchedule[]
   comments    Comment[]
+  activities  ContentActivity[]
 
   @@index([team_id])
   @@index([status])
@@ -133,6 +134,31 @@ model ContentSchedule {
   platformAccount PlatformAccount @relation(fields: [platform_account_id], references: [id], onDelete: Cascade)
 
   @@map("content_schedules")
+}
+
+model ContentActivity {
+  id               String   @id @default(cuid())
+  content_id       String
+  team_id          String
+  user_id          String
+  action           String
+  from_status      String?
+  to_status        String?
+  from_scheduled_at DateTime?
+  to_scheduled_at   DateTime?
+  from_assigned_to String?
+  to_assigned_to   String?
+  metadata         Json     @default("{}")
+  created_at       DateTime @default(now())
+
+  content Content @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([content_id])
+  @@index([team_id])
+  @@index([created_at])
+  @@map("content_activity")
 }
 
 enum ScheduleStatus {

@@ -45,6 +45,8 @@ export default function CalendarPage() {
   const [scheduledContent, setScheduledContent] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
 
+  const getItemDate = (item: ContentItem) => item.published_at || item.scheduled_at
+
   useEffect(() => {
     async function fetchScheduledContent() {
       if (!currentTeam?.id) return
@@ -55,7 +57,7 @@ export default function CalendarPage() {
         .select('id, title, status, scheduled_at, published_at, platforms')
         .eq('team_id', currentTeam.id)
         .in('status', ['SCHEDULED', 'PUBLISHED'])
-        .not('scheduled_at', 'is', null)
+        .or('scheduled_at.not.is.null,published_at.not.is.null')
 
       setScheduledContent(data || [])
       setLoading(false)
@@ -85,12 +87,12 @@ export default function CalendarPage() {
 
   const getContentForDate = (day: number) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return scheduledContent.filter((item) => item.scheduled_at?.startsWith(dateStr))
+    return scheduledContent.filter((item) => getItemDate(item)?.startsWith(dateStr))
   }
 
   const getContentByDate = (date: Date) => {
     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    return scheduledContent.filter((item) => item.scheduled_at?.startsWith(dateStr))
+    return scheduledContent.filter((item) => getItemDate(item)?.startsWith(dateStr))
   }
 
   const formatTime = (dateStr: string) => {
@@ -101,6 +103,17 @@ export default function CalendarPage() {
   }
 
   const selectedDateContent = selectedDate ? getContentByDate(selectedDate) : []
+  const monthContentCount = scheduledContent.filter((item) => {
+    const dateStr = getItemDate(item)
+    if (!dateStr) return false
+    const date = new Date(dateStr)
+    return date.getFullYear() === year && date.getMonth() === month
+  }).length
+
+  const upcomingScheduled = scheduledContent
+    .filter((item) => item.status === 'SCHEDULED' && item.scheduled_at)
+    .slice()
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
 
   if (loading) {
     return (
@@ -123,7 +136,7 @@ export default function CalendarPage() {
           <div>
             <h1 className="text-[20px] font-medium text-foreground">Calendar</h1>
             <p className="text-[14px] text-muted-foreground mt-1">
-              {scheduledContent.length} posts scheduled this month
+              {monthContentCount} posts scheduled or shared this month
             </p>
           </div>
           <Link
@@ -279,7 +292,7 @@ export default function CalendarPage() {
                     <div className="text-center py-8">
                       <CalendarIcon className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
                       <p className="text-[13px] text-muted-foreground mb-4">
-                        No posts scheduled
+                        No posts scheduled or shared
                       </p>
                       <Link
                         href={`/${currentTeam?.slug}/content/new?date=${selectedDate.toISOString()}`}
@@ -299,7 +312,10 @@ export default function CalendarPage() {
                           <div className="flex items-center justify-between mb-2">
                             <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                               <Clock className="w-3 h-3" />
-                              {formatTime(item.scheduled_at!)}
+                              {formatTime(getItemDate(item)!)}
+                              <span className="ml-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                {item.status === 'PUBLISHED' ? 'Shared' : 'Scheduled'}
+                              </span>
                             </span>
                             <div className="flex gap-1">
                               {item.platforms.map((p) => (
@@ -320,7 +336,7 @@ export default function CalendarPage() {
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <CalendarIcon className="w-10 h-10 text-muted-foreground mb-3" />
                     <p className="text-[13px] text-muted-foreground">
-                      Click on a date to see scheduled posts
+                      Click on a date to see scheduled or shared posts
                     </p>
                   </div>
                 )}
@@ -331,7 +347,7 @@ export default function CalendarPage() {
             <div className="mt-6">
               <h3 className="text-[14px] font-medium text-foreground mb-4">Upcoming</h3>
               <div className="space-y-2">
-                {scheduledContent.slice(0, 4).map((item) => (
+                {upcomingScheduled.slice(0, 4).map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-3 p-3 bg-accent rounded-[6px] hover:bg-muted transition-colors"
