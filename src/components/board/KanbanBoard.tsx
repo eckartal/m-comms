@@ -28,6 +28,16 @@ interface KanbanBoardProps {
   onAssign?: (contentId: string, userId: string | null) => void
 }
 
+type ContentWithActivity = Content & {
+  latest_activity?: {
+    user?: {
+      name?: string | null
+      email?: string | null
+    } | null
+  } | null
+  activity_count?: number
+}
+
 // Group content by status
 function groupByStatus(content: Content[]): Record<string, Content[]> {
   const grouped: Record<string, Content[]> = {
@@ -56,6 +66,15 @@ const STATUS_COLUMNS: { id: Content['status']; label: string; color: string }[] 
   { id: 'PUBLISHED', label: 'Shared', color: 'bg-blue-950/30' },
   { id: 'ARCHIVED', label: 'Archived', color: 'bg-gray-900' },
 ]
+
+const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
+  DRAFT: 'No drafts yet',
+  IN_REVIEW: 'Nothing in review yet',
+  APPROVED: 'No approved posts yet',
+  SCHEDULED: 'Nothing scheduled yet',
+  PUBLISHED: 'No shared posts yet',
+  ARCHIVED: 'No archived posts',
+}
 
 export function KanbanBoard({
   content,
@@ -132,6 +151,7 @@ export function KanbanBoard({
               </div>
               <div className="divide-y divide-[#1f1f1f]">
                     {content.map((item) => {
+                      const itemWithActivity = item as ContentWithActivity
                       const ownerName =
                         item.assignedTo?.name ||
                         item.assignedTo?.email ||
@@ -140,10 +160,10 @@ export function KanbanBoard({
                         'Unassigned'
                       const ownerId = item.assignedTo?.id || null
                       const latestUpdater =
-                        (item as any).latest_activity?.user?.name ||
-                        (item as any).latest_activity?.user?.email ||
+                        itemWithActivity.latest_activity?.user?.name ||
+                        itemWithActivity.latest_activity?.user?.email ||
                         null
-                      const activityCount = (item as any).activity_count || 0
+                      const activityCount = itemWithActivity.activity_count || 0
                       const dateStr = item.published_at || item.scheduled_at
                       const dateLabel = dateStr
                         ? new Date(dateStr).toLocaleDateString('en-US', {
@@ -326,7 +346,7 @@ export function KanbanBoard({
             ))}
             {groupedContent[column.id]?.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border-2 border-dashed border-gray-800 rounded-lg">
-                <p className="text-xs">No content</p>
+                <p className="text-xs">{EMPTY_COLUMN_COPY[column.id]}</p>
               </div>
             )}
           </Column>

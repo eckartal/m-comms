@@ -44,9 +44,17 @@ type ViewState =
   | 'empty_filtered'
   | 'ready'
 
+type QuickFilter = 'all' | 'mine' | 'unassigned' | 'needs_review' | 'overdue'
+
+function isOverdue(item: Content) {
+  if (!item.scheduled_at) return false
+  if (item.status === 'PUBLISHED' || item.status === 'ARCHIVED') return false
+  return new Date(item.scheduled_at).getTime() < Date.now()
+}
+
 export default function CollaborationPage() {
   const router = useRouter()
-  const { currentTeam } = useAppStore()
+  const { currentTeam, currentUser } = useAppStore()
   const [content, setContent] = useState<Content[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -55,6 +63,7 @@ export default function CollaborationPage() {
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
 
@@ -210,18 +219,28 @@ export default function CollaborationPage() {
     }
   }
 
-  const hasActiveFilters = searchQuery.trim().length > 0 || assigneeFilter !== 'all'
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 || assigneeFilter !== 'all' || quickFilter !== 'all'
 
   const filteredContent = useMemo(
     () =>
       content.filter((item) => {
         const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
         if (!matchesSearch) return false
+
+        if (quickFilter === 'mine') {
+          const ownerId = item.assigned_to || item.assignedTo?.id
+          if (!currentUser?.id || ownerId !== currentUser.id) return false
+        }
+        if (quickFilter === 'unassigned' && (item.assigned_to || item.assignedTo?.id)) return false
+        if (quickFilter === 'needs_review' && item.status !== 'IN_REVIEW') return false
+        if (quickFilter === 'overdue' && !isOverdue(item)) return false
+
         if (assigneeFilter === 'all') return true
         const assignedId = item.assigned_to || item.assignedTo?.id
         return assignedId === assigneeFilter
       }),
-    [content, searchQuery, assigneeFilter]
+    [content, searchQuery, assigneeFilter, quickFilter, currentUser?.id]
   )
 
   const viewState: ViewState = useMemo(() => {
@@ -336,6 +355,39 @@ export default function CollaborationPage() {
       </div>
 
       <PipelineSummary content={content} />
+      <div className="px-6 py-2 border-b border-gray-900 bg-[#050505] flex items-center gap-2 overflow-x-auto">
+        {[
+          { id: 'all' as const, label: 'All' },
+          { id: 'mine' as const, label: 'Mine' },
+          { id: 'unassigned' as const, label: 'Unassigned' },
+          { id: 'needs_review' as const, label: 'Needs Review' },
+          { id: 'overdue' as const, label: 'Overdue' },
+        ].map((filter) => (
+          <Button
+            key={filter.id}
+            size="sm"
+            variant={quickFilter === filter.id ? 'default' : 'outline'}
+            className="h-7 text-xs whitespace-nowrap"
+            onClick={() => setQuickFilter(filter.id)}
+          >
+            {filter.label}
+          </Button>
+        ))}
+        {hasActiveFilters ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs text-muted-foreground hover:text-foreground ml-1"
+            onClick={() => {
+              setSearchQuery('')
+              setAssigneeFilter('all')
+              setQuickFilter('all')
+            }}
+          >
+            Clear filters
+          </Button>
+        ) : null}
+      </div>
 
       <div className="px-6 py-2 border-b border-gray-900">
         <button
@@ -376,6 +428,7 @@ export default function CollaborationPage() {
             onClearFilters={() => {
               setSearchQuery('')
               setAssigneeFilter('all')
+              setQuickFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
@@ -388,6 +441,7 @@ export default function CollaborationPage() {
             onClearFilters={() => {
               setSearchQuery('')
               setAssigneeFilter('all')
+              setQuickFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
@@ -400,6 +454,7 @@ export default function CollaborationPage() {
             onClearFilters={() => {
               setSearchQuery('')
               setAssigneeFilter('all')
+              setQuickFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
