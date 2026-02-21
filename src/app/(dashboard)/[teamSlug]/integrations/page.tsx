@@ -127,9 +127,9 @@ export default function IntegrationsPage() {
         body: JSON.stringify({ platform, teamId: currentTeam.id }),
       })
       const data = await res.json()
-      if (data.authUrl) {
+      if (data.data?.authUrl) {
         // Redirect to OAuth - simple full-page redirect
-        window.location.href = data.authUrl
+        window.location.href = data.data.authUrl
       } else {
         toast.error(data.error || 'Failed to initiate connection')
       }

@@ -263,7 +263,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      authUrl: `${config.authUrl}?${params.toString()}`,
+      data: {
+        authUrl: `${config.authUrl}?${params.toString()}`,
+      },
     })
   } catch (error) {
     console.error('Error in POST /api/platforms:', error)
@@ -321,7 +323,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('Error in DELETE /api/platforms:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
