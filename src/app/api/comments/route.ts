@@ -45,6 +45,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const contentId = searchParams.get('contentId')
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     if (!contentId) {
       return NextResponse.json({ error: 'Content ID is required' }, { status: 400 })
@@ -55,8 +56,11 @@ export async function GET(request: Request) {
 
     // If no user (or for demo), return mock comments
     if (!user) {
-      const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-      return NextResponse.json({ data: filteredComments })
+      if (demoMode) {
+        const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
+        return NextResponse.json({ data: filteredComments })
+      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get comments with user info
@@ -76,9 +80,12 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching comments:', error)
-      // Return mock comments if database is not available
-      const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-      return NextResponse.json({ data: filteredComments })
+      if (demoMode) {
+        // Return mock comments if database is not available
+        const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
+        return NextResponse.json({ data: filteredComments })
+      }
+      return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 })
     }
 
     // Build comment tree
@@ -106,11 +113,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: rootComments })
   } catch (error) {
     console.error('Error in GET /api/comments:', error)
-    // Return mock comments on error
-    const { searchParams } = new URL(request.url)
-    const contentId = searchParams.get('contentId')
-    const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
-    return NextResponse.json({ data: filteredComments })
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    if (demoMode) {
+      // Return mock comments on error
+      const { searchParams } = new URL(request.url)
+      const contentId = searchParams.get('contentId')
+      const filteredComments = MOCK_COMMENTS.filter((c) => c.content_id === contentId)
+      return NextResponse.json({ data: filteredComments })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -275,7 +286,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('Error in DELETE /api/comments:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

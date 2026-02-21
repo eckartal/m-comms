@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const contentId = searchParams.get('contentId')
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     if (!contentId) {
       return NextResponse.json({ error: 'Content ID is required' }, { status: 400 })
@@ -38,11 +39,14 @@ export async function GET(request: Request) {
 
     // If no user (or for demo), return mock reactions
     if (!user) {
-      const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-        acc[type] = reactions.filter((r) => r.content_id === contentId)
-        return acc
-      }, {} as Record<string, typeof reactions>)
-      return NextResponse.json({ data: filteredReactions })
+      if (demoMode) {
+        const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
+          acc[type] = reactions.filter((r) => r.content_id === contentId)
+          return acc
+        }, {} as Record<string, typeof reactions>)
+        return NextResponse.json({ data: filteredReactions })
+      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get reactions with user info
@@ -62,12 +66,15 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching reactions:', error)
-      // Return mock reactions if database is not available
-      const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-        acc[type] = reactions.filter((r) => r.content_id === contentId)
-        return acc
-      }, {} as Record<string, typeof reactions>)
-      return NextResponse.json({ data: filteredReactions })
+      if (demoMode) {
+        // Return mock reactions if database is not available
+        const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
+          acc[type] = reactions.filter((r) => r.content_id === contentId)
+          return acc
+        }, {} as Record<string, typeof reactions>)
+        return NextResponse.json({ data: filteredReactions })
+      }
+      return NextResponse.json({ error: 'Failed to fetch reactions' }, { status: 500 })
     }
 
     // Group reactions by type
@@ -80,14 +87,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: grouped })
   } catch (error) {
     console.error('Error in GET /api/reactions:', error)
-    // Return mock reactions on error
-    const { searchParams } = new URL(request.url)
-    const contentId = searchParams.get('contentId')
-    const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
-      acc[type] = reactions.filter((r) => r.content_id === contentId)
-      return acc
-    }, {} as Record<string, typeof reactions>)
-    return NextResponse.json({ data: filteredReactions })
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    if (demoMode) {
+      // Return mock reactions on error
+      const { searchParams } = new URL(request.url)
+      const contentId = searchParams.get('contentId')
+      const filteredReactions = Object.entries(MOCK_REACTIONS).reduce((acc, [type, reactions]) => {
+        acc[type] = reactions.filter((r) => r.content_id === contentId)
+        return acc
+      }, {} as Record<string, typeof reactions>)
+      return NextResponse.json({ data: filteredReactions })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -210,7 +221,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('Error in DELETE /api/reactions:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
