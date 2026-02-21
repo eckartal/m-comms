@@ -103,6 +103,8 @@ export function IdeaEditorPanel({
     )
   }, [idea, title, notes, ideaState, assignedTo])
 
+  const linkedPostMissing = ideaState === 'CONVERTED' && !idea?.converted_post_id
+
   const handleSave = async () => {
     if (!idea) return false
     setIsSaving(true)
@@ -324,10 +326,16 @@ export function IdeaEditorPanel({
                   onClick={handleConvert}
                   disabled={isConverting}
                 >
-                  {isConverting ? 'Converting...' : 'Convert to Post'}
+                  {isConverting ? 'Converting...' : linkedPostMissing ? 'Recreate Linked Post' : 'Convert to Post'}
                 </Button>
               )}
             </div>
+
+            {linkedPostMissing ? (
+              <div className="rounded-sm border border-amber-950/50 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+                This idea is marked converted but the linked post is missing. Use “Recreate Linked Post”.
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="p-4 text-xs text-muted-foreground">No idea selected</div>
