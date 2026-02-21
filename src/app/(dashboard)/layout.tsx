@@ -1,35 +1,91 @@
 'use client'
 
-import { useState } from 'react'
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { Toaster } from '@/components/ui/toaster'
+import { DashboardShell } from '@/components/layout/DashboardShell'
 import { useTheme } from '@/components/theme/ThemeProvider'
+import { fetchContents, useAppStore, useContentStore, syncTeamsWithStore } from '@/stores'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = createClient()
+  const router = useRouter()
+  const params = useParams()
+  const teamSlug = params.teamSlug as string | undefined
   const { theme } = useTheme()
-  const [isDevMode] = useState(() => {
-    return !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
-  })
+  const currentTeam = useAppStore((state) => state.currentTeam)
+  const teams = useAppStore((state) => state.teams)
+  const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
+  const sidebarExpanded = useAppStore((state) => state.sidebarOpen)
+  const toggleSidebar = useAppStore((state) => state.toggleSidebar)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const ensureTeamFromRoute = async () => {
+      if (!teamSlug) return
+
+      if (teams.length === 0) {
+        await syncTeamsWithStore()
+        if (cancelled) return
+      }
+
+      const availableTeams = useAppStore.getState().teams
+      const matched = availableTeams.find((team) => team.slug === teamSlug)
+      if (matched && currentTeam?.id !== matched.id) {
+        setCurrentTeam(matched)
+      }
+      if (!matched && availableTeams.length > 0) {
+        setCurrentTeam(availableTeams[0])
+        router.replace(`/${availableTeams[0].slug}`)
+      }
+    }
+
+    ensureTeamFromRoute()
+
+    return () => {
+      cancelled = true
+    }
+  }, [teamSlug, teams.length, currentTeam?.id, setCurrentTeam, router])
+
+  useEffect(() => {
+    if (!currentTeam?.id) {
+      useContentStore.getState().setContents([])
+      useContentStore.getState().setLoadedTeamId(null)
+      return
+    }
+
+    void fetchContents(currentTeam.id)
+  }, [currentTeam?.id])
 
   return (
-    <div className="flex h-screen bg-background text-foreground transition-colors duration-200">
-      <Sidebar className="w-[240px] flex-shrink-0" />
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header />
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {children}
-        </div>
-      </main>
+    <DashboardShell
+      sidebar={
+        <Sidebar
+          collapsed={!sidebarExpanded}
+          onNavigate={() => setMobileSidebarOpen(false)}
+        />
+      }
+      mobileSidebar={<Sidebar onNavigate={() => setMobileSidebarOpen(false)} />}
+      header={
+        <Header
+          sidebarCollapsed={!sidebarExpanded}
+          onSidebarToggle={toggleSidebar}
+          onMobileMenuClick={() => setMobileSidebarOpen(true)}
+        />
+      }
+      sidebarCollapsed={!sidebarExpanded}
+      mobileSidebarOpen={mobileSidebarOpen}
+      onMobileSidebarOpenChange={setMobileSidebarOpen}
+    >
+      {children}
       <Toaster theme={theme} />
-    </div>
+    </DashboardShell>
   )
 }

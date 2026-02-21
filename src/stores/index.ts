@@ -61,6 +61,12 @@ interface ContentState {
   // Content list
   contents: Content[]
   setContents: (contents: Content[]) => void
+  contentLoading: boolean
+  setContentLoading: (contentLoading: boolean) => void
+  contentError: string | null
+  setContentError: (contentError: string | null) => void
+  loadedTeamId: string | null
+  setLoadedTeamId: (loadedTeamId: string | null) => void
   addContent: (content: Content) => void
   updateContent: (id: string, updates: Partial<Content>) => void
   removeContent: (id: string) => void
@@ -83,6 +89,12 @@ export const useContentStore = create<ContentState>()(
       // Content list
       contents: [],
       setContents: (contents) => set({ contents }),
+      contentLoading: false,
+      setContentLoading: (contentLoading) => set({ contentLoading }),
+      contentError: null,
+      setContentError: (contentError) => set({ contentError }),
+      loadedTeamId: null,
+      setLoadedTeamId: (loadedTeamId) => set({ loadedTeamId }),
       addContent: (content) =>
         set((state) => ({ contents: [content, ...state.contents] })),
       updateContent: (id, updates) =>
@@ -196,6 +208,14 @@ export async function deleteContent(id: string): Promise<boolean> {
 export async function fetchContents(teamId: string): Promise<Content[]> {
   const { createClient } = await import('@/lib/supabase/client')
   const supabase = createClient()
+  const state = useContentStore.getState()
+
+  if (state.loadedTeamId !== teamId) {
+    state.setContents([])
+    state.setLoadedTeamId(null)
+  }
+  state.setContentLoading(true)
+  state.setContentError(null)
 
   const { data, error } = await supabase
     .from('content')
@@ -205,10 +225,14 @@ export async function fetchContents(teamId: string): Promise<Content[]> {
 
   if (error) {
     console.error('Error fetching contents:', error)
+    useContentStore.getState().setContentError(error.message || 'Failed to load content')
+    useContentStore.getState().setContentLoading(false)
     return []
   }
 
   useContentStore.getState().setContents(data || [])
+  useContentStore.getState().setLoadedTeamId(teamId)
+  useContentStore.getState().setContentLoading(false)
   return data || []
 }
 

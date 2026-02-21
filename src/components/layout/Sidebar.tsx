@@ -7,12 +7,19 @@ import { useAppStore, useContentStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import { Home, BarChart3, Calendar, Settings, Hash, Plus } from 'lucide-react'
 
-export function Sidebar({ className }: { className?: string }) {
+type SidebarProps = {
+  className?: string
+  collapsed?: boolean
+  onNavigate?: () => void
+}
+
+export function Sidebar({ className, collapsed = false, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const params = useParams()
   const teamSlug = params.teamSlug as string
   const { currentUser } = useAppStore()
   const contents = useContentStore((state) => state.contents)
+  const contentLoading = useContentStore((state) => state.contentLoading)
 
   const primaryNavItems = [
     { icon: Home, href: `/${teamSlug}`, label: "Home" },
@@ -24,7 +31,7 @@ export function Sidebar({ className }: { className?: string }) {
   const drafts = useMemo(
     () =>
       contents
-        .filter((content) => content.status !== 'PUBLISHED')
+        .filter((content) => content.status === 'DRAFT')
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
         .slice(0, 3)
         .map((content) => ({
@@ -49,59 +56,63 @@ export function Sidebar({ className }: { className?: string }) {
   // activePrimaryItem not used currently, kept for future use
 
   return (
-    <aside className={cn("flex flex-col h-full bg-sidebar border-r border-sidebar-border w-[275px]", className)}>
-      {/* Profile Avatar (Top) */}
-      <div className="px-4 py-3 hover:bg-sidebar-accent transition-colors cursor-pointer">
-        <div className="flex items-center gap-3">
+    <aside className={cn('flex h-full w-full flex-col bg-sidebar', className)}>
+      <div className={cn('border-b border-sidebar-border p-3', collapsed && 'px-2.5')}>
+        <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
           <div className="relative">
-            <div className="h-10 w-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground">
               {currentUser?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="absolute bottom-0 right-0 h-3 w-3 bg-emerald-500 rounded-full border-2 border-sidebar-border"></div>
+            <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-sidebar-border bg-emerald-500" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">
-              {currentUser?.name || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              @{currentUser?.email?.split('@')[0] || 'user'}
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">{currentUser?.name || 'User'}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                Logged in as @{currentUser?.email?.split('@')[0] || 'user'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* New Post button */}
-      <div className="px-4 py-3 border-b border-sidebar-border">
+      <div className={cn('border-b border-sidebar-border p-3', collapsed && 'px-2.5')}>
         <Link
           href={`/${teamSlug}/content/new`}
-          className="flex items-center gap-2 w-full px-4 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-100"
+          onClick={onNavigate}
+          title={collapsed ? 'Post' : undefined}
+          className={cn(
+            'flex w-full items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-gray-100',
+            collapsed && 'justify-center px-2.5'
+          )}
         >
-          <Plus className="w-5 h-5" />
-          <span className="flex-1 text-center">Post</span>
+          <Plus className="h-5 w-5" />
+          {!collapsed && <span className="flex-1 text-center">Post</span>}
         </Link>
       </div>
 
-      {/* Primary Navigation */}
-      <nav className="flex-1 overflow-y-auto custom-scrollbar py-2">
-        <div className="px-2">
-          {/* Primary Nav Items */}
-          <div className="space-y-0.5">
+      <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+        <div className={cn('px-2', collapsed && 'px-1.5')}>
+          <div className="space-y-1">
             {primaryNavItems.map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavigate}
+                  title={collapsed ? item.label : undefined}
                   className={cn(
-                    "flex items-center gap-4 px-4 py-3 transition-colors rounded-full hover:bg-accent",
-                    isActive ? "font-semibold text-foreground" : "text-foreground hover:text-foreground"
+                    'flex items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
+                    collapsed && 'justify-center px-2',
+                    isActive ? 'font-semibold text-foreground' : 'text-foreground hover:text-foreground'
                   )}
                 >
-                  <item.icon className={cn("w-7 h-7 flex-shrink-0", isActive && "text-primary")} />
-                  <span className="text-[15px]">{item.label}</span>
-                  {isActive && (
+                  <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
+                  {!collapsed && <span className="text-sm">{item.label}</span>}
+                  {!collapsed && isActive && (
                     <div className="ml-auto text-primary">
-                      <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+                      <div className="h-1.5 w-1.5 rounded-full bg-current" />
                     </div>
                   )}
                 </Link>
@@ -109,65 +120,68 @@ export function Sidebar({ className }: { className?: string }) {
             })}
           </div>
 
-          {/* Drafts Section - Subtle Divider */}
-          <div className="my-3 px-4">
-            <div className="h-px bg-sidebar-border"></div>
-          </div>
-          <div className="px-4 py-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Drafts
-              </span>
-              <Link
-                href={`/${teamSlug}/content`}
-                className="text-xs text-primary hover:text-primary/80"
-              >
-                Show all
-              </Link>
+          {!collapsed && (
+            <div className="px-3 pb-2 pt-3">
+              <div className="h-px bg-sidebar-border" />
             </div>
-            <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
-              {drafts.length === 0 && (
-                <p className="px-3 py-2 text-xs text-muted-foreground">No drafts yet</p>
-              )}
-              {drafts.map((draft) => {
-                const isActive = pathname === `/${teamSlug}/content/${draft.id}`
-                return (
-                  <Link
-                    key={draft.id}
-                    href={`/${teamSlug}/content/${draft.id}`}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-full hover:bg-accent transition-colors",
-                      isActive && "bg-accent"
-                    )}
-                  >
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] font-semibold text-primary">P</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm truncate", isActive ? "text-foreground font-medium" : "text-foreground")}>
-                        {draft.title}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{getRelativeTime(draft.updatedAt)}</p>
-                    </div>
-                  </Link>
-                )
-              })}
+          )}
+
+          {!collapsed && (
+            <div className="px-3 py-1">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Drafts ({drafts.length})
+                </span>
+                <Link href={`/${teamSlug}/content`} onClick={onNavigate} className="text-xs text-primary hover:text-primary/80">
+                  Show all
+                </Link>
+              </div>
+              <div className="max-h-[200px] space-y-1 overflow-y-auto custom-scrollbar">
+                {contentLoading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading drafts...</p>}
+                {!contentLoading && drafts.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No drafts yet</p>}
+                {drafts.map((draft) => {
+                  const isActive = pathname === `/${teamSlug}/content/${draft.id}`
+                  return (
+                    <Link
+                      key={draft.id}
+                      href={`/${teamSlug}/content/${draft.id}`}
+                      onClick={onNavigate}
+                      className={cn(
+                        'flex items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
+                        isActive && 'bg-accent'
+                      )}
+                    >
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-[9px] font-semibold text-primary">P</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('truncate text-sm', isActive ? 'font-medium text-foreground' : 'text-foreground')}>
+                          {draft.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">{getRelativeTime(draft.updatedAt)}</p>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </nav>
 
-      {/* Sticky Settings Footer */}
-      <div className="border-t border-sidebar-border p-2">
+      <div className={cn('border-t border-sidebar-border p-2', collapsed && 'px-1.5')}>
         <Link
           href={`/${teamSlug}/settings`}
+          onClick={onNavigate}
+          title={collapsed ? 'Settings' : undefined}
           className={cn(
-            "flex items-center gap-4 px-4 py-3 w-full rounded-full hover:bg-accent transition-colors",
-            pathname === `/${teamSlug}/settings` ? "text-foreground" : "text-muted-foreground"
+            'flex w-full items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
+            collapsed && 'justify-center px-2',
+            pathname === `/${teamSlug}/settings` ? 'text-foreground' : 'text-muted-foreground'
           )}
         >
-          <Settings className="w-7 h-7 flex-shrink-0" />
-          <span className="text-[15px]">Settings</span>
+          <Settings className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span className="text-sm">Settings</span>}
         </Link>
       </div>
     </aside>

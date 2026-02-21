@@ -50,6 +50,9 @@ export function Header({
       setTeams([])
       setOnboarded(false)
       setContents([])
+      useContentStore.getState().setLoadedTeamId(null)
+      useContentStore.getState().setContentError(null)
+      useContentStore.getState().setContentLoading(false)
       router.push('/login')
       router.refresh()
     }

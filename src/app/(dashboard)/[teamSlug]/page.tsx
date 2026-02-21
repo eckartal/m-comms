@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, FileText, Calendar, Clock, Edit, Eye, CheckCircle, BarChart3, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { persistOnboardingComplete, syncOnboardingWithStore, useAppStore } from '@/stores'
+import { persistOnboardingComplete, syncOnboardingWithStore, useAppStore, useContentStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { ContentStatus } from '@/types'
@@ -49,11 +49,12 @@ function formatShortDate(value: string | null) {
 
 export default function DashboardPage() {
   const { currentTeam, onboarded } = useAppStore()
+  const contents = useContentStore((state) => state.contents)
+  const contentLoading = useContentStore((state) => state.contentLoading)
+  const contentError = useContentStore((state) => state.contentError)
+  const loadedTeamId = useContentStore((state) => state.loadedTeamId)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [contentItems, setContentItems] = useState<DashboardContent[]>([])
 
   useEffect(() => {
     void syncOnboardingWithStore()
@@ -70,40 +71,14 @@ export default function DashboardPage() {
     setShowWelcome(false)
   }
 
-  useEffect(() => {
-    async function fetchDashboardContent() {
-      if (!currentTeam?.id) {
-        setLoading(false)
-        setContentItems([])
-        return
-      }
-
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch('/api/content', { cache: 'no-store' })
-        const payload = await response.json()
-
-        if (!response.ok) {
-          setError(payload.error || 'Failed to load content')
-          setContentItems([])
-          return
-        }
-
-        const allContent = Array.isArray(payload.data) ? payload.data : []
-        const filtered = allContent.filter((item: DashboardContent) => item.team_id === currentTeam.id)
-        setContentItems(filtered)
-      } catch {
-        setError('Failed to load content')
-        setContentItems([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDashboardContent()
-  }, [currentTeam?.id])
+  const contentItems = useMemo(
+    () =>
+      currentTeam?.id
+        ? (contents.filter((item) => item.team_id === currentTeam.id) as DashboardContent[])
+        : [],
+    [contents, currentTeam?.id]
+  )
+  const loading = contentLoading || (!!currentTeam?.id && loadedTeamId !== currentTeam.id)
 
   const stats = useMemo(() => {
     const total = contentItems.length
@@ -191,7 +166,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {error && <p className="mb-4 text-xs text-red-400">{error}</p>}
+        {contentError && <p className="mb-4 text-xs text-red-400">{contentError}</p>}
 
         <div className="grid grid-cols-3 gap-4">
           <div className="col-span-2">
