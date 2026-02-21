@@ -13,13 +13,13 @@ interface ColumnProps {
 
 export function Column({ title, count, color, children, className }: ColumnProps) {
   return (
-    <div className={cn('flex flex-col h-full min-w-[280px] max-w-[280px] rounded-xl', className)}>
+    <div className={cn('flex h-full min-w-[300px] max-w-[300px] flex-col overflow-hidden rounded-xl shadow-sm', className)}>
       {/* Column Header */}
-      <div className={cn('flex items-center justify-between px-4 py-3 rounded-t-xl', color || 'bg-gray-900')}>
+      <div className={cn('flex items-center justify-between border-b border-border/70 px-4 py-3', color || 'bg-muted')}>
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-sm text-foreground">{title}</h3>
           {count !== undefined && (
-            <span className="flex items-center justify-center min-w-[18px] h-5 px-1.5 rounded-full bg-gray-800 text-[10px] font-medium text-muted-foreground">
+            <span className="flex h-5 min-w-[18px] items-center justify-center rounded-full bg-background px-1.5 text-[10px] font-medium text-muted-foreground">
               {count}
             </span>
           )}
@@ -27,7 +27,7 @@ export function Column({ title, count, color, children, className }: ColumnProps
       </div>
 
       {/* Column Body */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+      <div className="flex-1 space-y-3 overflow-y-auto bg-card/60 p-3 custom-scrollbar">
         {children}
       </div>
     </div>

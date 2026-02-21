@@ -25,7 +25,9 @@ import type { Content } from '@/types'
 
 interface ContentCardProps {
   content: Content
+  teamSlug?: string
   onClick?: () => void
+  onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onConvertIdea?: (contentId: string) => void
   onOpenLinkedIdea?: (ideaId: string) => void
   onOpenLinkedPost?: (postId: string) => void
@@ -49,7 +51,9 @@ const PLATFORM_ICONS: Record<string, string> = {
 
 export function ContentCard({
   content,
+  teamSlug,
   onClick,
+  onStatusChange,
   onConvertIdea,
   onOpenLinkedIdea,
   onOpenLinkedPost,
@@ -68,12 +72,19 @@ export function ContentCard({
   const createdAt = formatDistanceToNow(content.created_at)
   const latestUpdater = content.latest_activity?.user?.name || content.latest_activity?.user?.email || null
   const activityCount = content.activity_count || 0
+  const canChangeStatus = !isIdea && !!onStatusChange
+  const ideaStageLabel =
+    content.idea_state === 'ARCHIVED'
+      ? 'ARCHIVED'
+      : content.idea_state === 'CONVERTED'
+        ? 'CONVERTED'
+        : 'IDEA INBOX'
 
   return (
     <Card
       className={cn(
-        'bg-[#0a0a0a] border-[#262626] rounded-lg p-3 hover:border-[#3d3d3d] transition-colors cursor-pointer group relative overflow-hidden',
-        isIdea ? 'border-amber-900/50' : 'border-blue-900/50'
+        'group relative cursor-pointer overflow-hidden rounded-lg border bg-card p-3 transition-colors hover:border-ring/40',
+        isIdea ? 'border-amber-300/40 dark:border-amber-900/50' : 'border-blue-300/40 dark:border-blue-900/50'
       )}
       onMouseEnter={() => setShowHover(true)}
       onMouseLeave={() => setShowHover(false)}
@@ -93,33 +104,22 @@ export function ContentCard({
               <span
                 className={cn(
                   'text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide',
-                  isIdea ? 'bg-amber-950/50 text-amber-300' : 'bg-blue-950/50 text-blue-300'
+                  isIdea ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                 )}
               >
                 {isIdea ? 'Idea' : 'Post'}
               </span>
-              <h4 className="text-sm font-medium text-foreground truncate pr-2">{title}</h4>
-              {ownerName && (
-                <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[120px]">
-                  Owner {ownerName}
-                </span>
-              )}
-              {latestUpdater && (
-                <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[140px]">
-                  Updated by {latestUpdater}
-                </span>
-              )}
-              {isConvertedIdea && content.converted_post_id ? (
-                <span className="text-[10px] text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded-full">
-                  Linked Post
-                </span>
-              ) : null}
-              {hasSourceIdea ? (
-                <span className="text-[10px] text-blue-300 bg-blue-950/40 px-2 py-0.5 rounded-full">
-                  From Idea
-                </span>
-              ) : null}
             </div>
+            <h4 className="mt-1 text-sm font-medium text-foreground truncate pr-2">{title}</h4>
+            {(ownerName || latestUpdater || isConvertedIdea || hasSourceIdea) ? (
+              <p className="mt-1 text-[10px] text-muted-foreground truncate">
+                {ownerName ? `Owner ${ownerName}` : ''}
+                {ownerName && latestUpdater ? ' · ' : ''}
+                {latestUpdater ? `Updated by ${latestUpdater}` : ''}
+                {(ownerName || latestUpdater) && (isConvertedIdea || hasSourceIdea) ? ' · ' : ''}
+                {isConvertedIdea ? 'Linked post' : hasSourceIdea ? 'From idea' : ''}
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground">
@@ -141,7 +141,7 @@ export function ContentCard({
             {content.platforms.slice(0, 3).map((platform, i) => (
               <span
                 key={i}
-                className="flex items-center justify-center w-5 h-5 rounded bg-gray-900 text-[9px] font-medium text-muted-foreground"
+                className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[9px] font-medium text-muted-foreground"
               >
                 {PLATFORM_ICONS[platform.platform] || platform.platform}
               </span>
@@ -157,15 +157,37 @@ export function ContentCard({
           <div className="flex items-center gap-2">
             {/* Status Badge */}
             {isIdea ? (
-              <Badge variant="outline" className="border-0 text-[10px] bg-amber-950/40 text-amber-300">
+              <Badge variant="outline" className="border-0 bg-amber-100 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                 <Lightbulb className="h-2.5 w-2.5 mr-1" />
-                {content.idea_state || 'INBOX'}
+                {ideaStageLabel}
               </Badge>
             ) : (
-              <Badge variant="outline" className={cn(statusConfig.color, 'border-0 text-[10px]')}>
-                <statusConfig.icon className="h-2.5 w-2.5 mr-1" />
-                {statusConfig.label}
-              </Badge>
+              <>
+                <Badge variant="outline" className={cn(statusConfig.color, 'border-0 text-[10px]')}>
+                  <statusConfig.icon className="h-2.5 w-2.5 mr-1" />
+                  {statusConfig.label}
+                </Badge>
+                {canChangeStatus ? (
+                  <select
+                    className="h-5 rounded border border-border bg-card px-1 text-[10px] text-muted-foreground"
+                    value={content.status}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
+                    onChange={(event) =>
+                      onStatusChange?.(content.id, event.target.value as Content['status'])
+                    }
+                  >
+                    <option value="DRAFT">Draft</option>
+                    <option value="IN_REVIEW">In Review</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                    <option value="PUBLISHED">Shared</option>
+                    <option value="ARCHIVED">Archived</option>
+                  </select>
+                ) : null}
+              </>
             )}
 
             {/* Date */}
@@ -192,13 +214,13 @@ export function ContentCard({
         </div>
 
         {/* Hover Actions */}
-        <div className={cn('flex items-center gap-1 pt-1 border-t border-gray-900', showHover ? 'opacity-100' : 'opacity-0 transition-opacity')}>
+        <div className={cn('flex items-center gap-1 border-t border-border pt-1', showHover ? 'opacity-100' : 'opacity-0 transition-opacity')}>
           <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
             <MessageSquare className="h-3.5 w-3.5 mr-1" />
             {content.comments_count || 0}
           </Button>
           {activityCount > 0 && (
-            <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
               {activityCount} updates
             </span>
           )}
@@ -210,7 +232,7 @@ export function ContentCard({
           {isIdea && !isConvertedIdea && onConvertIdea ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-amber-300 hover:text-amber-200"
+              className="h-7 px-2 text-xs text-amber-700 hover:text-amber-600 dark:text-amber-300 dark:hover:text-amber-200"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -223,7 +245,7 @@ export function ContentCard({
           {isConvertedIdea && content.converted_post_id && onOpenLinkedPost ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-emerald-300 hover:text-emerald-200"
+              className="h-7 px-2 text-xs text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -236,7 +258,7 @@ export function ContentCard({
           {hasSourceIdea && content.source_idea_id && onOpenLinkedIdea ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-blue-300 hover:text-blue-200"
+              className="h-7 px-2 text-xs text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -251,7 +273,7 @@ export function ContentCard({
             Share
           </Button>
           {!isIdea ? (
-            <Link href={`/${content.team_id}/content/${content.id}`}>
+            <Link href={`/${teamSlug || content.team_id}/content/${content.id}`}>
               <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
                 <Edit className="h-3.5 w-3.5 mr-1" />
                 Edit

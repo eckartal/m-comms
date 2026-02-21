@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react'
 import type { Content } from '@/types'
 import { ContentCard } from './ContentCard'
 import { Column } from './Column'
-import { Button } from '@/components/ui/button'
 import { getContentTitle } from '@/lib/contentText'
-import { LayoutGrid, List, Calendar } from 'lucide-react'
+import { List, Calendar } from 'lucide-react'
 
 interface KanbanBoardProps {
   content: Content[]
@@ -15,6 +14,7 @@ interface KanbanBoardProps {
   onOpenLinkedIdea?: (ideaId: string) => void
   onOpenLinkedPost?: (postId: string) => void
   onCardClick?: (content: Content) => void
+  teamSlug?: string
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
   teamMembers?: Array<{
@@ -44,9 +44,6 @@ type ContentWithActivity = Content & {
 function groupByStatus(content: Content[]): Record<string, Content[]> {
   const grouped: Record<string, Content[]> = {
     IDEA_INBOX: [],
-    IDEA_SHAPING: [],
-    IDEA_READY: [],
-    IDEA_CONVERTED: [],
     DRAFT: [],
     IN_REVIEW: [],
     APPROVED: [],
@@ -58,11 +55,12 @@ function groupByStatus(content: Content[]): Record<string, Content[]> {
   content.forEach((item) => {
     const itemType = item.item_type || 'POST'
     if (itemType === 'IDEA') {
-      const ideaState = item.idea_state || 'INBOX'
-      const key = `IDEA_${ideaState}`
-      if (grouped[key]) {
-        grouped[key].push(item)
-      }
+      // Keep collaboration pipeline simple:
+      // - Active ideas stay in Idea Inbox
+      // - Archived ideas appear with archived content
+      const isArchivedIdea = item.idea_state === 'ARCHIVED'
+      const key = isArchivedIdea ? 'ARCHIVED' : 'IDEA_INBOX'
+      grouped[key].push(item)
       return
     }
 
@@ -75,19 +73,16 @@ function groupByStatus(content: Content[]): Record<string, Content[]> {
 }
 
 const STATUS_COLUMNS: { id: Content['status']; label: string; color: string }[] = [
-  { id: 'DRAFT', label: 'Drafts', color: 'bg-gray-900' },
-  { id: 'IN_REVIEW', label: 'In Review', color: 'bg-amber-950/30' },
-  { id: 'APPROVED', label: 'Approved', color: 'bg-emerald-950/30' },
-  { id: 'SCHEDULED', label: 'Scheduled', color: 'bg-indigo-950/30' },
-  { id: 'PUBLISHED', label: 'Shared', color: 'bg-blue-950/30' },
-  { id: 'ARCHIVED', label: 'Archived', color: 'bg-gray-900' },
+  { id: 'DRAFT', label: 'Drafts', color: 'bg-muted' },
+  { id: 'IN_REVIEW', label: 'In Review', color: 'bg-amber-100 dark:bg-amber-950/30' },
+  { id: 'APPROVED', label: 'Approved', color: 'bg-emerald-100 dark:bg-emerald-950/30' },
+  { id: 'SCHEDULED', label: 'Scheduled', color: 'bg-indigo-100 dark:bg-indigo-950/30' },
+  { id: 'PUBLISHED', label: 'Shared', color: 'bg-blue-100 dark:bg-blue-950/30' },
+  { id: 'ARCHIVED', label: 'Archived', color: 'bg-muted' },
 ]
 
 const IDEA_COLUMNS = [
-  { id: 'IDEA_INBOX', label: 'Ideas Inbox', color: 'bg-amber-950/20' },
-  { id: 'IDEA_SHAPING', label: 'Shaping', color: 'bg-amber-950/20' },
-  { id: 'IDEA_READY', label: 'Ready', color: 'bg-amber-950/20' },
-  { id: 'IDEA_CONVERTED', label: 'Converted', color: 'bg-amber-950/10' },
+  { id: 'IDEA_INBOX', label: 'Ideas Inbox', color: 'bg-amber-100 dark:bg-amber-950/20' },
 ] as const
 
 const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
@@ -99,21 +94,29 @@ const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
   ARCHIVED: 'No archived posts',
 }
 
+const POST_STATUS_OPTIONS: Content['status'][] = [
+  'DRAFT',
+  'IN_REVIEW',
+  'APPROVED',
+  'SCHEDULED',
+  'PUBLISHED',
+  'ARCHIVED',
+]
+
 export function KanbanBoard({
   content,
+  onStatusChange,
   onCardClick,
   onConvertIdea,
   onOpenLinkedIdea,
   onOpenLinkedPost,
+  teamSlug,
   view,
-  onViewChange,
   teamMembers,
   onAssign,
 }: KanbanBoardProps) {
   const [groupedContent, setGroupedContent] = useState<Record<string, Content[]>>({})
-  const [internalView, setInternalView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
-  const activeView = view ?? internalView
-  const setView = onViewChange ?? setInternalView
+  const activeView = view ?? 'kanban'
 
   useEffect(() => {
     setGroupedContent(groupByStatus(content))
@@ -131,46 +134,32 @@ export function KanbanBoard({
     }
   }
 
-  const hasIdeas = content.some((item) => (item.item_type || 'POST') === 'IDEA')
-  const kanbanColumns = hasIdeas ? [...IDEA_COLUMNS, ...STATUS_COLUMNS] : STATUS_COLUMNS
+  const kanbanColumns = [...IDEA_COLUMNS, ...STATUS_COLUMNS]
 
   if (activeView === 'list') {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-900">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium text-foreground">All Content</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setView('kanban')} className="h-8 px-2">
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Kanban
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setView('list')} className="h-8 px-2 text-primary">
-              <List className="h-4 w-4 mr-2" />
-              List
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setView('calendar')} className="h-8 px-2">
-              <Calendar className="h-4 w-4 mr-2" />
-              Calendar
-            </Button>
-          </div>
+          <List className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
           {content.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 mb-4">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <List className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm">No content yet</p>
             </div>
           ) : (
-            <div className="border border-[#262626] rounded-lg overflow-hidden">
-              <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground bg-[#0f0f0f]">
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 bg-muted/40 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <span>Title</span>
                 <span>Status</span>
                 <span>Owner</span>
                 <span>Last updated</span>
               </div>
-              <div className="divide-y divide-[#1f1f1f]">
+              <div className="divide-y divide-border">
                     {content.map((item) => {
                       const itemWithActivity = item as ContentWithActivity
                       const ownerName =
@@ -196,12 +185,14 @@ export function KanbanBoard({
                         : '—'
                       const statusLabel =
                         (item.item_type || 'POST') === 'IDEA'
-                          ? `IDEA ${(item.idea_state || 'INBOX').replace('_', ' ')}`
+                          ? item.idea_state === 'ARCHIVED'
+                            ? 'ARCHIVED'
+                            : 'IDEA INBOX'
                           : item.status.replace('_', ' ')
                   return (
                     <button
                       key={item.id}
-                      className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
+                      className="grid w-full grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
                       onClick={() => handleCardClick(item)}
                     >
                       <div className="min-w-0">
@@ -214,10 +205,27 @@ export function KanbanBoard({
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{statusLabel}</span>
+                      {(item.item_type || 'POST') === 'IDEA' || !onStatusChange ? (
+                        <span className="text-xs text-muted-foreground">{statusLabel}</span>
+                      ) : (
+                        <select
+                          className="rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
+                          value={item.status}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) =>
+                            onStatusChange(item.id, event.target.value as Content['status'])
+                          }
+                        >
+                          {POST_STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {status.replace('_', ' ')}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {teamMembers && onAssign ? (
                         <select
-                          className="text-xs text-muted-foreground bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1"
+                          className="rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
                           value={ownerId || ''}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => handleAssign(item.id, event.target.value || null)}
@@ -273,27 +281,14 @@ export function KanbanBoard({
 
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-900">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium text-foreground">Content Calendar</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setView('kanban')} className="h-8 px-2">
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Kanban
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setView('list')} className="h-8 px-2">
-              <List className="h-4 w-4 mr-2" />
-              List
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setView('calendar')} className="h-8 px-2 text-primary">
-              <Calendar className="h-4 w-4 mr-2" />
-              Calendar
-            </Button>
-          </div>
+          <Calendar className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           {dateKeys.length === 0 ? (
             <div className="text-center text-muted-foreground py-12">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-900 mb-4">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <Calendar className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm">No scheduled or shared content</p>
@@ -302,11 +297,11 @@ export function KanbanBoard({
             dateKeys.map((dateKey) => {
               const date = new Date(dateKey)
               return (
-                <div key={dateKey} className="border border-[#262626] rounded-lg overflow-hidden">
-                  <div className="px-4 py-2 bg-[#0f0f0f] text-xs text-muted-foreground">
+                <div key={dateKey} className="overflow-hidden rounded-lg border border-border">
+                  <div className="bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
                     {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </div>
-                  <div className="divide-y divide-[#1f1f1f]">
+                  <div className="divide-y divide-border">
                     {groupedByDate[dateKey].map((item) => {
                       const dateStr = item.published_at || item.scheduled_at
                       const time = dateStr
@@ -322,7 +317,7 @@ export function KanbanBoard({
                       return (
                         <button
                           key={item.id}
-                          className="w-full text-left px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
+                          className="w-full px-4 py-3 text-left transition-colors hover:bg-accent/40"
                           onClick={() => handleCardClick(item)}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -335,7 +330,9 @@ export function KanbanBoard({
                             </div>
                             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               {(item.item_type || 'POST') === 'IDEA'
-                                ? item.idea_state || 'INBOX'
+                                ? item.idea_state === 'ARCHIVED'
+                                  ? 'ARCHIVED'
+                                  : 'IDEA INBOX'
                                 : item.status === 'PUBLISHED'
                                   ? 'Shared'
                                   : 'Scheduled'}
@@ -355,29 +352,31 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden">
+    <div className="flex h-full flex-1 overflow-x-auto overflow-y-hidden">
       {/* Kanban View */}
-      <div className="flex flex-1 gap-4 p-4 custom-scrollbar">
+      <div className="flex flex-1 gap-5 p-4 custom-scrollbar">
         {kanbanColumns.map((column) => (
           <Column
             key={column.id}
             title={column.label}
             count={groupedContent[String(column.id)]?.length || 0}
             color={column.color}
-            className="bg-[#050505] border border-[#262626] rounded-xl"
+            className="rounded-xl border border-border/80 bg-card"
           >
             {groupedContent[String(column.id)]?.map((item) => (
               <ContentCard
                 key={item.id}
                 content={item}
+                teamSlug={teamSlug}
                 onClick={() => handleCardClick(item)}
+                onStatusChange={onStatusChange}
                 onConvertIdea={onConvertIdea}
                 onOpenLinkedIdea={onOpenLinkedIdea}
                 onOpenLinkedPost={onOpenLinkedPost}
               />
             ))}
             {groupedContent[String(column.id)]?.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border-2 border-dashed border-gray-800 rounded-lg">
+              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border/80 py-8 text-muted-foreground">
                 <p className="text-xs">
                   {'id' in column && String(column.id).startsWith('IDEA_')
                     ? 'No ideas'

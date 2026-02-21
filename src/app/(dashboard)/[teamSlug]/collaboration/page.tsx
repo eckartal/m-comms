@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
-import { Plus, LayoutGrid, List, Calendar, Search } from 'lucide-react'
+import {
+  LayoutGrid,
+  List,
+  Calendar,
+  Search,
+  SlidersHorizontal,
+  Check,
+} from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
@@ -13,10 +20,16 @@ import { getContentTitle } from '@/lib/contentText'
 import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
-import { PipelineSummary } from '@/components/collaboration/PipelineSummary'
-import { CollabRightRail } from '@/components/collaboration/CollabRightRail'
 import { IdeaEditorPanel } from '@/components/collaboration/IdeaEditorPanel'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type TeamMemberItem = {
   id: string
@@ -89,8 +102,6 @@ export default function CollaborationPage() {
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>('all')
-  const [changeReason, setChangeReason] = useState('')
-  const [showReasonPrompt, setShowReasonPrompt] = useState(false)
   const [isCreatingIdea, setIsCreatingIdea] = useState(false)
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [isIdeaPanelOpen, setIsIdeaPanelOpen] = useState(false)
@@ -192,7 +203,7 @@ export default function CollaborationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: newStatus,
-          change_reason: changeReason.trim() || null,
+          change_reason: null,
         }),
       })
 
@@ -207,8 +218,6 @@ export default function CollaborationPage() {
         )
       }
 
-      setChangeReason('')
-      setShowReasonPrompt(false)
     } catch (err) {
       console.error(err)
       setActionError(err instanceof Error ? err.message : 'Failed to update status')
@@ -288,6 +297,8 @@ export default function CollaborationPage() {
     assigneeFilter !== 'all' ||
     quickFilter !== 'all' ||
     itemTypeFilter !== 'all'
+  const activeAdvancedFilterCount =
+    (assigneeFilter !== 'all' ? 1 : 0) + (itemTypeFilter !== 'all' ? 1 : 0)
 
   const filteredContent = useMemo(
     () =>
@@ -346,6 +357,13 @@ export default function CollaborationPage() {
     ],
     [content, currentUser?.id]
   )
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setAssigneeFilter('all')
+    setQuickFilter('all')
+    setItemTypeFilter('all')
+  }
 
   const viewState: ViewState = useMemo(() => {
     if (isLoading) return 'loading'
@@ -519,16 +537,6 @@ export default function CollaborationPage() {
             <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
             <p className="text-xs text-muted-foreground">Manage content workflow</p>
           </div>
-          <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
-            <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300">
-              <span className="h-2 w-2 rounded-full bg-amber-400" />
-              IDEA
-            </span>
-            <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 dark:text-blue-300">
-              <span className="h-2 w-2 rounded-full bg-blue-400" />
-              POST
-            </span>
-          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -543,30 +551,65 @@ export default function CollaborationPage() {
             />
           </div>
 
-          <select
-            value={itemTypeFilter}
-            onChange={(e) => setItemTypeFilter(e.target.value as ItemTypeFilter)}
-            className="h-8 rounded border border-border bg-card px-2 text-xs text-foreground"
-          >
-            <option value="all">All types</option>
-            <option value="IDEA">Ideas</option>
-            <option value="POST">Posts</option>
-          </select>
-
-          <select
-            value={assigneeFilter}
-            onChange={(e) => setAssigneeFilter(e.target.value)}
-            className="h-8 rounded border border-border bg-card px-2 text-xs text-foreground"
-          >
-            <option value="all">All owners</option>
-            {teamMembers
-              .filter((member) => member.user?.id)
-              .map((member) => (
-                <option key={member.id} value={member.user?.id}>
-                  {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
-                </option>
-              ))}
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-8 gap-2 text-xs">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {activeAdvancedFilterCount > 0 ? (
+                  <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-foreground">
+                    {activeAdvancedFilterCount}
+                  </span>
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Item Type</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setItemTypeFilter('all')}>
+                <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center">
+                  {itemTypeFilter === 'all' ? <Check className="h-3 w-3" /> : null}
+                </span>
+                All types
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setItemTypeFilter('IDEA')}>
+                <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center">
+                  {itemTypeFilter === 'IDEA' ? <Check className="h-3 w-3" /> : null}
+                </span>
+                Ideas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setItemTypeFilter('POST')}>
+                <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center">
+                  {itemTypeFilter === 'POST' ? <Check className="h-3 w-3" /> : null}
+                </span>
+                Posts
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Owner</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setAssigneeFilter('all')}>
+                <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center">
+                  {assigneeFilter === 'all' ? <Check className="h-3 w-3" /> : null}
+                </span>
+                All owners
+              </DropdownMenuItem>
+              {teamMembers
+                .filter((member) => member.user?.id)
+                .map((member) => {
+                  const ownerId = member.user?.id || ''
+                  const ownerLabel =
+                    member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'
+                  return (
+                    <DropdownMenuItem key={member.id} onClick={() => setAssigneeFilter(ownerId)}>
+                      <span className="mr-2 inline-flex h-3.5 w-3.5 items-center justify-center">
+                        {assigneeFilter === ownerId ? <Check className="h-3 w-3" /> : null}
+                      </span>
+                      <span className="truncate">{ownerLabel}</span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={clearFilters}>Reset filters</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="h-6 w-px bg-border" />
 
@@ -616,38 +659,22 @@ export default function CollaborationPage() {
           </div>
 
           <Button
-            className="h-8 bg-[#0a66c2] text-white hover:bg-[#08539d] text-xs"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={goToNewPost}
+          >
+            New Post
+          </Button>
+          <Button
+            className="h-8 bg-foreground text-background hover:bg-foreground/90 text-xs"
             onClick={createIdea}
             disabled={isCreatingIdea}
           >
-            <Plus className="h-3.5 w-3.5 mr-2" />
-            {isCreatingIdea ? 'Creating...' : 'New Idea'}
-          </Button>
-          <Button className="h-8 bg-foreground text-background hover:bg-foreground/90 text-xs" onClick={goToNewPost}>
-            <Plus className="h-3.5 w-3.5 mr-2" />
-            New Post
+            {isCreatingIdea ? 'Creating Idea...' : 'New Idea'}
           </Button>
         </div>
       </div>
 
-      <PipelineSummary
-        content={content}
-        activeFilter={
-          quickFilter === 'needs_review' ||
-          quickFilter === 'unassigned' ||
-          quickFilter === 'overdue' ||
-          quickFilter === 'approved'
-            ? quickFilter
-            : null
-        }
-        onSelectFilter={(filter) => {
-          setQuickFilter(filter)
-          trackCollabEvent('collab_pipeline_filter_selected', {
-            filter,
-            team_id: currentTeam.id,
-          })
-        }}
-      />
       <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-card/40 px-0 py-2">
         {quickFilterMeta.map((filter) => (
           <Button
@@ -672,37 +699,11 @@ export default function CollaborationPage() {
             size="sm"
             variant="ghost"
             className="h-7 text-xs text-muted-foreground hover:text-foreground ml-1"
-            onClick={() => {
-              setSearchQuery('')
-              setAssigneeFilter('all')
-              setQuickFilter('all')
-              setItemTypeFilter('all')
-            }}
+            onClick={clearFilters}
           >
             Clear filters
           </Button>
         ) : null}
-      </div>
-
-      <div className="border-b border-border px-0 py-2">
-        <button
-          type="button"
-          onClick={() => setShowReasonPrompt((prev) => !prev)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          {showReasonPrompt ? 'Hide reason' : 'Add reason for changes (optional)'}
-        </button>
-        {showReasonPrompt && (
-          <div className="mt-2 max-w-xl">
-            <Input
-              type="text"
-              placeholder="Why are you changing the status?"
-              value={changeReason}
-              onChange={(e) => setChangeReason(e.target.value)}
-              className="h-8 bg-card border-border text-xs"
-            />
-          </div>
-        )}
       </div>
 
       {actionError ? (
@@ -733,12 +734,7 @@ export default function CollaborationPage() {
           <CollabEmptyState
             variant="permission"
             onCreatePost={goToNewPost}
-            onClearFilters={() => {
-              setSearchQuery('')
-              setAssigneeFilter('all')
-              setQuickFilter('all')
-              setItemTypeFilter('all')
-            }}
+            onClearFilters={clearFilters}
             onGoToTeam={goToTeam}
           />
         ) : null}
@@ -747,12 +743,7 @@ export default function CollaborationPage() {
           <CollabEmptyState
             variant="first_use"
             onCreatePost={goToNewPost}
-            onClearFilters={() => {
-              setSearchQuery('')
-              setAssigneeFilter('all')
-              setQuickFilter('all')
-              setItemTypeFilter('all')
-            }}
+            onClearFilters={clearFilters}
             onGoToTeam={goToTeam}
           />
         ) : null}
@@ -761,33 +752,26 @@ export default function CollaborationPage() {
           <CollabEmptyState
             variant="filtered"
             onCreatePost={goToNewPost}
-            onClearFilters={() => {
-              setSearchQuery('')
-              setAssigneeFilter('all')
-              setQuickFilter('all')
-              setItemTypeFilter('all')
-            }}
+            onClearFilters={clearFilters}
             onGoToTeam={goToTeam}
           />
         ) : null}
 
         {viewState === 'ready' ? (
-          <div className="flex h-full">
-            <div className="min-w-0 flex-1">
-              <KanbanBoard
-                content={filteredContent}
-                onStatusChange={handleStatusChange}
-                onCardClick={handleCardClick}
-                view={view}
-                onViewChange={setView}
-                teamMembers={teamMembers}
-                onAssign={handleAssign}
-                onConvertIdea={handleConvertIdea}
-                onOpenLinkedIdea={openIdeaById}
-                onOpenLinkedPost={openPost}
-              />
-            </div>
-            <CollabRightRail teamId={currentTeam.id} content={content} onOpenContent={handleCardClick} />
+          <div className="flex h-full min-w-0">
+            <KanbanBoard
+              content={filteredContent}
+              onStatusChange={handleStatusChange}
+              onCardClick={handleCardClick}
+              teamSlug={currentTeam.slug}
+              view={view}
+              onViewChange={setView}
+              teamMembers={teamMembers}
+              onAssign={handleAssign}
+              onConvertIdea={handleConvertIdea}
+              onOpenLinkedIdea={openIdeaById}
+              onOpenLinkedPost={openPost}
+            />
           </div>
         ) : null}
       </div>
