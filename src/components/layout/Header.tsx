@@ -1,6 +1,7 @@
 'use client'
 
-import { Bell, Search, Sun, Moon } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Bell, Search, Sun, Moon, PanelLeft, PanelLeftClose, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,47 +15,101 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme/ThemeProvider'
-import { useAppStore } from '@/stores'
+import { createClient } from '@/lib/supabase/client'
+import { useAppStore, useContentStore } from '@/stores'
 
-export function Header({ className }: { className?: string }) {
+type HeaderProps = {
+  className?: string
+  sidebarCollapsed?: boolean
+  onSidebarToggle?: () => void
+  onMobileMenuClick?: () => void
+}
+
+export function Header({
+  className,
+  sidebarCollapsed = false,
+  onSidebarToggle,
+  onMobileMenuClick,
+}: HeaderProps) {
+  const router = useRouter()
   const { theme, toggleTheme } = useTheme()
   const currentUser = useAppStore((state) => state.currentUser)
+  const setCurrentUser = useAppStore((state) => state.setCurrentUser)
+  const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
+  const setTeams = useAppStore((state) => state.setTeams)
+  const setOnboarded = useAppStore((state) => state.setOnboarded)
+  const setContents = useContentStore((state) => state.setContents)
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } finally {
+      setCurrentUser(null)
+      setCurrentTeam(null)
+      setTeams([])
+      setOnboarded(false)
+      setContents([])
+      router.push('/login')
+      router.refresh()
+    }
+  }
 
   return (
     <header className={cn(
-      "flex items-center justify-between px-3 py-1.5 bg-background border-b border-border transition-colors duration-200",
+      "flex h-[var(--header-height)] items-center justify-between gap-3 border-b border-border bg-background px-3 transition-colors duration-200 md:px-4",
       className
     )}>
-      <div className="flex items-center gap-3 flex-1 max-w-xs">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+      <div className="flex min-w-0 flex-1 items-center gap-2 md:max-w-sm">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 md:hidden"
+          onClick={onMobileMenuClick}
+        >
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Open navigation</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden h-8 w-8 md:inline-flex"
+          onClick={onSidebarToggle}
+        >
+          {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
+
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search..."
-            className="pl-7 h-6 text-xs"
+            className="h-8 border-input bg-muted/40 pl-8 text-xs"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6"
+          className="h-8 w-8"
           onClick={toggleTheme}
         >
           {theme === 'dark' ? (
-            <Sun className="w-3.5 h-3.5 text-foreground hover:text-foreground" />
+            <Sun className="h-4 w-4 text-foreground hover:text-foreground" />
           ) : (
-            <Moon className="w-3.5 h-3.5 text-foreground hover:text-foreground" />
+            <Moon className="h-4 w-4 text-foreground hover:text-foreground" />
           )}
           <span className="sr-only">Toggle theme</span>
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-foreground">
-              <Bell className="w-3.5 h-3.5" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-foreground">
+              <Bell className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 bg-popover border-border">
@@ -73,8 +128,8 @@ export function Header({ className }: { className?: string }) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-none">
-              <Avatar className="h-5 w-5 border border-border">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none">
+              <Avatar className="h-6 w-6 border border-border">
                 <AvatarImage src={currentUser?.avatar_url || undefined} />
                 <AvatarFallback className="bg-accent text-[10px]">
                   {(currentUser?.name || 'U').slice(0, 2).toUpperCase()}
@@ -97,7 +152,10 @@ export function Header({ className }: { className?: string }) {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem className="text-xs text-foreground hover:text-foreground">
+            <DropdownMenuItem
+              className="text-xs text-foreground hover:text-foreground"
+              onClick={handleSignOut}
+            >
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
