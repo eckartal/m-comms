@@ -12,8 +12,8 @@
   --card-foreground: #e5e5e5;
   --popover: #0a0a0a;
   --popover-foreground: #e5e5e5;
-  --primary: #f97316;
-  --primary-foreground: #000000;
+  --primary: #0a66c2;
+  --primary-foreground: #ffffff;
   --secondary: #0a0a0a;
   --secondary-foreground: #e5e5e5;
   --muted: #171717;
@@ -23,19 +23,19 @@
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --input: #262626;
-  --ring: #f97316;
+  --ring: #0a66c2;
   --border: #262626;
   --radius: 2px;
 
   /* Sidebar */
   --sidebar: #000000;
   --sidebar-foreground: #e5e5e5;
-  --sidebar-primary: #f97316;
-  --sidebar-primary-foreground: #000000;
+  --sidebar-primary: #0a66c2;
+  --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #171717;
   --sidebar-accent-foreground: #e5e5e5;
   --sidebar-border: #262626;
-  --sidebar-ring: #f97316;
+  --sidebar-ring: #0a66c2;
 
   /* Chart colors - proper grayscale for dark backgrounds */
   --chart-1: #e5e5e5;
@@ -43,6 +43,15 @@
   --chart-3: #737373;
   --chart-4: #525252;
   --chart-5: #262626;
+
+  /* Dashboard layout contract */
+  --sidebar-width-expanded: 264px;
+  --sidebar-width-collapsed: 76px;
+  --header-height: 52px;
+  --content-max-width: 1200px;
+  --content-gutter-sm: 16px;
+  --content-gutter-md: 24px;
+  --content-gutter-lg: 32px;
 }
 
 /* Light Theme - Clean and minimal */
@@ -53,7 +62,7 @@
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #f97316;
+  --primary: #0a66c2;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #171717;
@@ -64,19 +73,19 @@
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --input: #e5e7eb;
-  --ring: #f97316;
+  --ring: #0a66c2;
   --border: #e5e7eb;
   --radius: 6px;
 
   /* Sidebar */
   --sidebar: #ffffff;
   --sidebar-foreground: #171717;
-  --sidebar-primary: #f97316;
+  --sidebar-primary: #0a66c2;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f3f4f6;
   --sidebar-accent-foreground: #171717;
   --sidebar-border: #e5e7eb;
-  --sidebar-ring: #f97316;
+  --sidebar-ring: #0a66c2;
 
   /* Chart colors - darker for light backgrounds */
   --chart-1: #171717;
@@ -167,19 +176,19 @@
 }
 
 .hover-accent:hover {
-  background-color: #f97316;
-  color: black;
+  background-color: #0a66c2;
+  color: white;
 }
 
 .active-accent {
-  background-color: #f97316;
-  color: black;
+  background-color: #0a66c2;
+  color: white;
 }
 
 /* Focus styles for terminal */
 .focus-terminal {
   outline: none;
-  box-shadow: inset 0 0 0 1px #f97316;
+  box-shadow: inset 0 0 0 1px #0a66c2;
 }
 
 /* Ghostty-style borders - very subtle */

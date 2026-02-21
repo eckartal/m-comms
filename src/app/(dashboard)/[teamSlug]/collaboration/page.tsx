@@ -513,18 +513,18 @@ export default function CollaborationPage() {
 
   return (
     <DashboardContainer className="flex h-full flex-1 flex-col py-4 md:py-5">
-      <div className="flex items-center justify-between border-b border-gray-900 px-0 py-4">
+      <div className="flex items-center justify-between border-b border-border px-0 py-4">
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
             <p className="text-xs text-muted-foreground">Manage content workflow</p>
           </div>
-          <div className="hidden md:flex items-center gap-2 rounded-full border border-[#262626] bg-[#0a0a0a] px-2 py-1">
-            <span className="inline-flex items-center gap-1 text-[10px] text-amber-300">
+          <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1">
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-300">
               <span className="h-2 w-2 rounded-full bg-amber-400" />
               IDEA
             </span>
-            <span className="inline-flex items-center gap-1 text-[10px] text-blue-300">
+            <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 dark:text-blue-300">
               <span className="h-2 w-2 rounded-full bg-blue-400" />
               POST
             </span>
@@ -539,14 +539,14 @@ export default function CollaborationPage() {
               placeholder="Search content..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 pl-9 bg-[#0a0a0a] border-gray-900 text-xs"
+              className="h-8 pl-9 bg-card border-border text-xs"
             />
           </div>
 
           <select
             value={itemTypeFilter}
             onChange={(e) => setItemTypeFilter(e.target.value as ItemTypeFilter)}
-            className="h-8 px-2 bg-[#0a0a0a] border border-gray-900 text-xs text-foreground rounded"
+            className="h-8 rounded border border-border bg-card px-2 text-xs text-foreground"
           >
             <option value="all">All types</option>
             <option value="IDEA">Ideas</option>
@@ -556,7 +556,7 @@ export default function CollaborationPage() {
           <select
             value={assigneeFilter}
             onChange={(e) => setAssigneeFilter(e.target.value)}
-            className="h-8 px-2 bg-[#0a0a0a] border border-gray-900 text-xs text-foreground rounded"
+            className="h-8 rounded border border-border bg-card px-2 text-xs text-foreground"
           >
             <option value="all">All owners</option>
             {teamMembers
@@ -568,9 +568,9 @@ export default function CollaborationPage() {
               ))}
           </select>
 
-          <div className="h-6 w-px bg-gray-900" />
+          <div className="h-6 w-px bg-border" />
 
-          <div className="flex bg-[#0a0a0a] rounded-lg p-0.5 border border-gray-900">
+          <div className="flex rounded-lg border border-border bg-card p-0.5">
             <Button
               variant="ghost"
               size="sm"
@@ -616,14 +616,14 @@ export default function CollaborationPage() {
           </div>
 
           <Button
-            className="h-8 bg-amber-300 text-black hover:bg-amber-200 text-xs"
+            className="h-8 bg-[#0a66c2] text-white hover:bg-[#08539d] text-xs"
             onClick={createIdea}
             disabled={isCreatingIdea}
           >
             <Plus className="h-3.5 w-3.5 mr-2" />
             {isCreatingIdea ? 'Creating...' : 'New Idea'}
           </Button>
-          <Button className="h-8 bg-white text-black hover:bg-gray-200 text-xs" onClick={goToNewPost}>
+          <Button className="h-8 bg-foreground text-background hover:bg-foreground/90 text-xs" onClick={goToNewPost}>
             <Plus className="h-3.5 w-3.5 mr-2" />
             New Post
           </Button>
@@ -648,7 +648,7 @@ export default function CollaborationPage() {
           })
         }}
       />
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-900 bg-[#050505] px-0 py-2">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-card/40 px-0 py-2">
         {quickFilterMeta.map((filter) => (
           <Button
             key={filter.id}
@@ -684,7 +684,7 @@ export default function CollaborationPage() {
         ) : null}
       </div>
 
-      <div className="border-b border-gray-900 px-0 py-2">
+      <div className="border-b border-border px-0 py-2">
         <button
           type="button"
           onClick={() => setShowReasonPrompt((prev) => !prev)}
@@ -699,14 +699,14 @@ export default function CollaborationPage() {
               placeholder="Why are you changing the status?"
               value={changeReason}
               onChange={(e) => setChangeReason(e.target.value)}
-              className="h-8 bg-[#0a0a0a] border-gray-900 text-xs"
+              className="h-8 bg-card border-border text-xs"
             />
           </div>
         )}
       </div>
 
       {actionError ? (
-        <div className="border-b border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">
+        <div className="border-b border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-200">
           {actionError}
         </div>
       ) : null}
