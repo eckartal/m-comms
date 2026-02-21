@@ -143,7 +143,7 @@ export async function POST(
       .eq('id', contentId)
 
     // Create schedule record
-    await supabase.from('content_schedules').insert({
+    await supabase.from('content_schedule').insert({
       content_id: contentId,
       platform_account_id: platformAccountId,
       scheduled_at: new Date().toISOString(),
