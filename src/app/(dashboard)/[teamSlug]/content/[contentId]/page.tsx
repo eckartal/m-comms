@@ -212,6 +212,17 @@ type ActivityItem = {
   } | null
 }
 
+type TeamMemberItem = {
+  id: string
+  role: string
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+    avatar_url?: string | null
+  } | null
+}
+
 export default function EditContentPage() {
   const router = useRouter()
   const params = useParams()
@@ -225,11 +236,13 @@ export default function EditContentPage() {
   const [platforms, setPlatforms] = useState<PlatformConfig[]>([])
   const [status, setStatus] = useState<ContentStatus>('DRAFT')
   const [scheduledAt, setScheduledAt] = useState('')
+  const [assignedTo, setAssignedTo] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [activityLoading, setActivityLoading] = useState(true)
+  const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
 
   useEffect(() => {
     if (contentId) {
@@ -238,18 +251,25 @@ export default function EditContentPage() {
     }
   }, [contentId])
 
+  useEffect(() => {
+    if (currentTeam?.id) {
+      fetchTeamMembers()
+    }
+  }, [currentTeam?.id])
+
   const fetchContent = async () => {
     try {
       const response = await fetch(`/api/content/${contentId}`)
       if (response.ok) {
         const data = await response.json()
-        const contentData = data.data
+        const contentData = data.data ?? data
         setContent(contentData)
         setTitle(contentData.title || '')
         setBlocks(contentData.blocks || [])
         setPlatforms(contentData.platforms || [])
         setStatus(contentData.status)
         setScheduledAt(contentData.scheduled_at || '')
+        setAssignedTo(contentData.assigned_to || null)
       }
     } catch (error) {
       console.error('Error fetching content:', error)
@@ -273,6 +293,18 @@ export default function EditContentPage() {
     }
   }
 
+  const fetchTeamMembers = async () => {
+    try {
+      const response = await fetch(`/api/teams/${currentTeam?.id}/members`)
+      if (response.ok) {
+        const data = await response.json()
+        setTeamMembers(Array.isArray(data.data) ? data.data : [])
+      }
+    } catch (error) {
+      console.error('Error fetching team members:', error)
+    }
+  }
+
   const handleSave = async (publishStatus?: ContentStatus) => {
     setIsSubmitting(true)
     try {
@@ -285,6 +317,7 @@ export default function EditContentPage() {
           platforms,
           status: publishStatus || status,
           scheduled_at: scheduledAt || null,
+          assigned_to: assignedTo || null,
         }),
       })
       if (publishStatus === 'PUBLISHED') {
@@ -428,6 +461,27 @@ export default function EditContentPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Ownership */}
+      <div className="mb-12">
+        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Owner</h2>
+        <div className="max-w-xs">
+          <select
+            value={assignedTo || ''}
+            onChange={(e) => setAssignedTo(e.target.value || null)}
+            className="w-full px-3 py-2 border border-[#e5e5e5] rounded-lg focus:outline-none focus:border-[#2383e2] text-[#37352f]"
+          >
+            <option value="">Unassigned</option>
+            {teamMembers
+              .filter((member) => member.user?.id)
+              .map((member) => (
+                <option key={member.id} value={member.user?.id}>
+                  {member.user?.full_name || member.user?.email || 'Unknown'}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       {/* Schedule */}

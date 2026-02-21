@@ -131,7 +131,7 @@ export async function GET(
     if (!user) {
       const content = MOCK_CONTENT.find((c) => c.id === contentId)
       if (content) {
-        return NextResponse.json(content)
+        return NextResponse.json({ data: content })
       }
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
     }
@@ -170,7 +170,7 @@ export async function GET(
       // Return mock content if database is not available
       const content = MOCK_CONTENT.find((c) => c.id === contentId)
       if (content) {
-        return NextResponse.json(content)
+        return NextResponse.json({ data: content })
       }
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
     }
@@ -179,13 +179,13 @@ export async function GET(
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ data })
   } catch (error) {
     console.error('Error in GET /api/content/[id]:', error)
     // Return mock content on error
     const content = MOCK_CONTENT.find((c) => c.id === contentId)
     if (content) {
-      return NextResponse.json(content)
+      return NextResponse.json({ data: content })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
