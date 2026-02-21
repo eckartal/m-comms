@@ -21,7 +21,7 @@ export default async function SharePage({ searchParams }: SharePageProps) {
     .from('content')
     .select(`
       *,
-      createdBy:user_id(id, name, avatar_url)
+      createdBy:created_by(id, name, avatar_url)
     `)
     .eq('share_token', token)
     .single()

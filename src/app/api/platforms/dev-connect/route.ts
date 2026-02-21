@@ -117,6 +117,7 @@ export async function GET(request: Request) {
 
     const { error: insertError } = await supabase.from('platform_accounts').insert({
       team_id: teamId,
+      user_id: user.id,
       platform,
       account_id: `dev_${platform}_${user.id.slice(0, 8)}`,
       account_name: `${platform} Local Sandbox`,

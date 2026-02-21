@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireTeamMembership } from '@/lib/api/authz'
 
 // GET /api/content/[id]/share - Get share status and public link
 export async function GET(
@@ -19,7 +20,7 @@ export async function GET(
       // Public access with share token
       const { data } = await supabase
         .from('content')
-        .select('*, createdBy:user_id(id, name, avatar_url)')
+        .select('*, createdBy:created_by(id, name, avatar_url)')
         .eq('id', contentId)
         .eq('share_token', token)
         .single()
@@ -31,9 +32,24 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
 
+      const { data: contentMeta } = await supabase
+        .from('content')
+        .select('team_id')
+        .eq('id', contentId)
+        .maybeSingle()
+
+      if (!contentMeta) {
+        return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+      }
+
+      const membership = await requireTeamMembership(supabase, user.id, contentMeta.team_id)
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
       const { data } = await supabase
         .from('content')
-        .select('*, createdBy:user_id(id, name, avatar_url)')
+        .select('*, createdBy:created_by(id, name, avatar_url)')
         .eq('id', contentId)
         .single()
       content = data

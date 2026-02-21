@@ -1,61 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { createClient } from '@/lib/supabase/client'
-import type { User, Team } from '@/types'
-
-export interface ContentBlock {
-  id: string
-  type: 'text' | 'image' | 'video' | 'link' | 'thread' | 'poll'
-  content: unknown
-}
-
-export interface Content {
-  id: string
-  item_type?: 'IDEA' | 'POST'
-  idea_state?: 'INBOX' | 'SHAPING' | 'READY' | 'CONVERTED' | 'ARCHIVED' | null
-  source_idea_id?: string | null
-  converted_post_id?: string | null
-  converted_at?: string | null
-  converted_by?: string | null
-  title: string
-  blocks: ContentBlock[]
-  status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'
-  scheduled_at?: string
-  published_at?: string
-  platforms: Array<{
-    type?: string
-    platform?: string
-    [key: string]: unknown
-  }>
-  created_by: string
-  assigned_to?: string
-  createdBy?: {
-    id: string
-    name: string | null
-    email: string
-    avatar_url: string | null
-    created_at?: string
-  }
-  assignedTo?: {
-    id: string
-    name: string | null
-    email: string
-    avatar_url: string | null
-    created_at?: string
-  }
-  comments_count?: number
-  views_count?: number
-  activity_count?: number
-  latest_activity?: {
-    user?: {
-      name?: string | null
-      email?: string | null
-    } | null
-  } | null
-  created_at: string
-  updated_at: string
-  team_id: string
-}
+import type { Content, ContentBlock, User, Team } from '@/types'
 
 interface ContentState {
   // Content list

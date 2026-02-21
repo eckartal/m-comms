@@ -64,6 +64,19 @@ export function ContentEditor({ content, onChange, readOnly = false }: ContentEd
     }
   }
 
+  const getBlockText = (block: ContentBlock) => {
+    if (typeof block.content === 'string') return block.content
+    if (
+      block.content &&
+      typeof block.content === 'object' &&
+      'text' in (block.content as Record<string, unknown>) &&
+      typeof (block.content as { text?: unknown }).text === 'string'
+    ) {
+      return (block.content as { text: string }).text
+    }
+    return ''
+  }
+
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -103,12 +116,12 @@ export function ContentEditor({ content, onChange, readOnly = false }: ContentEd
                     <div className="flex-1">
                       {readOnly ? (
                         <div className="p-3 bg-gray-50 rounded-md whitespace-pre-wrap">
-                          {block.content || <span className="text-gray-400 italic">Empty</span>}
+                          {getBlockText(block) || <span className="text-gray-400 italic">Empty</span>}
                         </div>
                       ) : block.type === 'heading' ? (
                         <Input
                           placeholder="Heading..."
-                          value={block.content}
+                          value={getBlockText(block)}
                           onChange={(e) => updateBlock(block.id, e.target.value)}
                           className="font-bold text-lg"
                         />
@@ -120,14 +133,14 @@ export function ContentEditor({ content, onChange, readOnly = false }: ContentEd
                       ) : block.type === 'quote' ? (
                         <Textarea
                           placeholder="Quote..."
-                          value={block.content}
+                          value={getBlockText(block)}
                           onChange={(e) => updateBlock(block.id, e.target.value)}
                           className="border-l-4 border-primary pl-4 font-serif italic"
                         />
                       ) : block.type === 'code' ? (
                         <Textarea
                           placeholder="Code..."
-                          value={block.content}
+                          value={getBlockText(block)}
                           onChange={(e) => updateBlock(block.id, e.target.value)}
                           className="font-mono text-sm bg-muted"
                         />
@@ -136,7 +149,7 @@ export function ContentEditor({ content, onChange, readOnly = false }: ContentEd
                       ) : (
                         <Textarea
                           placeholder="Start writing..."
-                          value={block.content}
+                          value={getBlockText(block)}
                           onChange={(e) => updateBlock(block.id, e.target.value)}
                           rows={block.type === 'bullet_list' || block.type === 'numbered_list' ? 1 : 3}
                         />

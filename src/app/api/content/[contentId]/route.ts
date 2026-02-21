@@ -1,5 +1,29 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireTeamMembership } from '@/lib/api/authz'
+
+type ApiErrorCode =
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'migration_required'
+  | 'content_fetch_failed'
+  | 'internal_server_error'
+
+function apiError(error: string, status: number, code: ApiErrorCode, retryable: boolean) {
+  return NextResponse.json({ error, code, retryable }, { status })
+}
+
+function isMissingContentCommentsRelationError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  return (
+    message.includes("relationship between 'content' and 'comments'") ||
+    message.includes("Could not find a relationship between 'content' and 'comments'")
+  )
+}
 
 // GET /api/content/[id] - Get single content
 export async function GET(
@@ -12,11 +36,20 @@ export async function GET(
 
     const { contentId } = await params
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
-    const { data, error } = await supabase
+    const { data: contentMeta, error: contentMetaError } = await supabase
+      .from('content')
+      .select('team_id')
+      .eq('id', contentId)
+      .maybeSingle()
+
+    if (contentMetaError || !contentMeta) return apiError('Content not found', 404, 'not_found', false)
+
+    const membership = await requireTeamMembership(supabase, user.id, contentMeta.team_id)
+    if (!membership) return apiError('Forbidden', 403, 'forbidden', false)
+
+    let { data, error } = await supabase
       .from('content')
       .select(`
         *,
@@ -45,19 +78,46 @@ export async function GET(
       .eq('id', contentId)
       .single()
 
-    if (error) {
-      console.error('Error fetching content:', error)
-      return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 })
+    if (error && isMissingContentCommentsRelationError(error)) {
+      // Compatibility fallback for older schemas missing content<->comments relation.
+      const fallback = await supabase
+        .from('content')
+        .select(`
+          *,
+          createdBy:created_by(id, name, email, avatar_url),
+          assignedTo:assigned_to(id, name, email, avatar_url),
+          versions:content_versions(
+            id,
+            blocks,
+            created_at,
+            createdBy:created_by(id, name, avatar_url)
+          )
+        `)
+        .eq('id', contentId)
+        .single()
+      data = fallback.data
+      error = fallback.error
     }
 
-    if (!data) {
-      return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+    if (error) {
+      console.error('Error fetching content:', error)
+      if (isMissingContentCommentsRelationError(error)) {
+        return apiError(
+          'Database migration required for comments relation.',
+          500,
+          'migration_required',
+          false
+        )
+      }
+      return apiError('Failed to fetch content', 500, 'content_fetch_failed', true)
     }
+
+    if (!data) return apiError('Content not found', 404, 'not_found', false)
 
     return NextResponse.json({ data })
   } catch (error) {
     console.error('Error in GET /api/content/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500, 'internal_server_error', true)
   }
 }
 
@@ -86,6 +146,16 @@ export async function PUT(
 
     if (currentError || !currentContent) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+    }
+
+    const membership = await requireTeamMembership(
+      supabase,
+      user.id,
+      currentContent.team_id,
+      ['OWNER', 'ADMIN', 'EDITOR']
+    )
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {
@@ -237,6 +307,26 @@ export async function DELETE(
     }
 
     const { contentId } = await params
+
+    const { data: contentMeta, error: contentMetaError } = await supabase
+      .from('content')
+      .select('team_id')
+      .eq('id', contentId)
+      .maybeSingle()
+
+    if (contentMetaError || !contentMeta) {
+      return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+    }
+
+    const membership = await requireTeamMembership(
+      supabase,
+      user.id,
+      contentMeta.team_id,
+      ['OWNER', 'ADMIN', 'EDITOR']
+    )
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { error } = await supabase
       .from('content')

@@ -49,8 +49,20 @@ export type IdeaState = 'INBOX' | 'SHAPING' | 'READY' | 'CONVERTED' | 'ARCHIVED'
 
 export interface ContentBlock {
   id: string
-  type: 'text' | 'heading' | 'bullet_list' | 'numbered_list' | 'image' | 'code' | 'quote' | 'divider'
-  content: string
+  type:
+    | 'text'
+    | 'heading'
+    | 'bullet_list'
+    | 'numbered_list'
+    | 'image'
+    | 'code'
+    | 'quote'
+    | 'divider'
+    | 'thread'
+    | 'link'
+    | 'video'
+    | 'poll'
+  content: unknown
   props?: Record<string, unknown>
 }
 

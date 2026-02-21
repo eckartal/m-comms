@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireTeamMembership } from '@/lib/api/authz'
 
 type MemberUser = {
   id: string
@@ -41,6 +42,11 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
+
+    const membership = await requireTeamMembership(supabase, user.id, teamId)
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden', code: 'forbidden' }, { status: 403 })
+    }
 
     // Get team members with user details
     const { data, error } = await supabase

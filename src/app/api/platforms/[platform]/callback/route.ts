@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 type OAuthStateRow = {
   team_id: string
   user_id: string
+  code_verifier: string | null
   expires_at: string
   team_slug: string | null
   return_to: string | null
@@ -69,7 +70,7 @@ export async function GET(
     if (state) {
       const { data } = await supabase
         .from('oauth_states')
-        .select('team_id, user_id, expires_at, team_slug, return_to, connect_mode')
+        .select('team_id, user_id, code_verifier, expires_at, team_slug, return_to, connect_mode')
         .eq('state_token', state)
         .single()
       storedState = (data as OAuthStateRow | null) || null
@@ -131,7 +132,7 @@ export async function GET(
     const userId = storedState.user_id
 
     // Exchange code for token
-    const tokenResponse = await exchangeCodeForToken(platform, code)
+    const tokenResponse = await exchangeCodeForToken(platform, code, storedState.code_verifier || undefined)
 
     if (!tokenResponse.access_token) {
       await supabase.from('oauth_states').delete().eq('state_token', state)
@@ -154,6 +155,7 @@ export async function GET(
       .from('platform_accounts')
       .insert({
         team_id: teamId,
+        user_id: userId,
         platform,
         account_id: tokenResponse.accountId || userId,
         account_name: tokenResponse.accountName || '',
@@ -205,7 +207,7 @@ export async function GET(
   }
 }
 
-async function exchangeCodeForToken(platform: string, code: string) {
+async function exchangeCodeForToken(platform: string, code: string, codeVerifier?: string) {
   const tokenUrl = getTokenUrl(platform)
   const clientId = process.env[`${platform.toUpperCase()}_CLIENT_ID`]
   const clientSecret = process.env[`${platform.toUpperCase()}_CLIENT_SECRET`]
@@ -217,6 +219,7 @@ async function exchangeCodeForToken(platform: string, code: string) {
     redirect_uri: redirectUri,
     client_id: clientId || '',
     ...(clientSecret && { client_secret: clientSecret }),
+    ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
   })
 
   const response = await fetch(tokenUrl, {

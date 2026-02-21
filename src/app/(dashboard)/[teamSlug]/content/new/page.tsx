@@ -281,7 +281,7 @@ export default function NewContentPage() {
         await updateContent(contentId, {
           title: title || 'Untitled',
           blocks,
-          platforms: publishTargets.map((platform) => ({ type: platform })),
+          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
         })
         setSaving(false)
       }
@@ -355,7 +355,7 @@ export default function NewContentPage() {
         if (newContent) {
           setContentId(newContent.id)
           await updateContent(newContent.id, {
-            platforms: publishTargets.map((platform) => ({ type: platform })),
+            platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
           })
         }
       } else if (contentId) {
@@ -363,7 +363,7 @@ export default function NewContentPage() {
           title: title || 'Untitled',
           blocks,
           status: 'PUBLISHED',
-          platforms: publishTargets.map((platform) => ({ type: platform })),
+          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
         })
       }
 
@@ -396,7 +396,7 @@ export default function NewContentPage() {
         if (newContent) {
           setContentId(newContent.id)
           await updateContent(newContent.id, {
-            platforms: publishTargets.map((platform) => ({ type: platform })),
+            platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
           })
         }
       } else if (contentId) {
@@ -404,7 +404,7 @@ export default function NewContentPage() {
           title: title || 'Untitled',
           blocks,
           status: 'SCHEDULED',
-          platforms: publishTargets.map((platform) => ({ type: platform })),
+          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
           scheduled_at: scheduledAt.toISOString()
         })
       }

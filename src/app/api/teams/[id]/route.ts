@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireTeamMembership } from '@/lib/api/authz'
 
 // GET /api/teams/[id] - Get single team
 export async function GET(
@@ -15,6 +16,11 @@ export async function GET(
     }
 
     const { id } = await params
+
+    const membership = await requireTeamMembership(supabase, user.id, id)
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { data, error } = await supabase
       .from('teams')
@@ -54,6 +60,16 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
     const { name, settings } = body
+
+    const membership = await requireTeamMembership(
+      supabase,
+      user.id,
+      id,
+      ['OWNER', 'ADMIN']
+    )
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -95,6 +111,16 @@ export async function DELETE(
     }
 
     const { id } = await params
+
+    const membership = await requireTeamMembership(
+      supabase,
+      user.id,
+      id,
+      ['OWNER', 'ADMIN']
+    )
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { error } = await supabase
       .from('teams')

@@ -96,7 +96,7 @@ export default function SettingsPage() {
               ? [{
                   id: `local:${integration.id}`,
                   account_name: localConnections[integration.id].account_name,
-                  source: 'local_sandbox',
+                  source: 'local_sandbox' as const,
                 }]
               : integration.accounts,
         }))
@@ -129,7 +129,7 @@ export default function SettingsPage() {
             ? [{
                 id: `local:${integration.id}`,
                 account_name: localConnections[integration.id].account_name,
-                source: 'local_sandbox',
+                source: 'local_sandbox' as const,
               }]
             : integration.accounts,
       })))
