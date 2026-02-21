@@ -81,6 +81,18 @@ function isMissingScheduledColumnError(error: unknown) {
   return message.includes('scheduled_at')
 }
 
+function isMissingContentCommentsRelationError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+
+  return (
+    message.includes("relationship between 'content' and 'comments'") ||
+    message.includes("Could not find a relationship between 'content' and 'comments'")
+  )
+}
+
 // GET /api/content - List content (optionally filtered by team_id)
 export async function GET(request: Request) {
   try {
@@ -96,13 +108,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('content')
-      .select(`
-        *,
-        createdBy:created_by(id, full_name, email, avatar_url),
-        assignedTo:assigned_to(id, full_name, email, avatar_url),
-        comments:comments(id),
-        comment_count:comments(count)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (teamId) {
@@ -127,7 +133,7 @@ export async function GET(request: Request) {
 
     let { data, error } = await query
 
-    if (error && isMissingScheduledColumnError(error)) {
+    if (error && (isMissingScheduledColumnError(error) || isMissingContentCommentsRelationError(error))) {
       // Compatibility fallback for older schemas missing scheduled_at/published_at.
       const fallbackQuery = supabase
         .from('content')
@@ -147,11 +153,7 @@ export async function GET(request: Request) {
           created_by,
           assigned_to,
           created_at,
-          updated_at,
-          createdBy:created_by(id, full_name, email, avatar_url),
-          assignedTo:assigned_to(id, full_name, email, avatar_url),
-          comments:comments(id),
-          comment_count:comments(count)
+          updated_at
         `)
         .order('created_at', { ascending: false })
 
@@ -163,9 +165,9 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching content:', error)
-      if (isMissingScheduledColumnError(error)) {
+      if (isMissingScheduledColumnError(error) || isMissingContentCommentsRelationError(error)) {
         return apiError(
-          'Database core schema migration required. Apply migration 20260221_core_schema_bootstrap.sql',
+          'Database core schema migration required. Apply migration 20260221_core_schema_bootstrap.sql and refresh schema cache.',
           500,
           'migration_required',
           false
@@ -286,10 +288,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from('content')
       .insert(insertData)
-      .select(`
-        *,
-        createdBy:created_by(id, full_name, email, avatar_url)
-      `)
+      .select('*')
       .single()
 
     if (error) {
