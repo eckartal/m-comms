@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Content } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,6 +62,8 @@ export function PostEditorPanel({
   const [assignedTo, setAssignedTo] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
 
   useEffect(() => {
@@ -71,6 +73,8 @@ export function PostEditorPanel({
     setStatus(post.status)
     setAssignedTo(post.assigned_to || '')
     setSaveError(null)
+    setLastSavedAt(null)
+    setIsAutoSaving(false)
     setTitleTouched(false)
   }, [post?.id, post])
 
@@ -93,43 +97,87 @@ export function PostEditorPanel({
     )
   }, [post, title, notes, status, assignedTo])
 
-  const handleSave = async () => {
+  const buildPayload = useCallback(() => {
+    const normalizedTitle = titleTouched
+      ? (title.trim() || 'Untitled post')
+      : inferTitleFromNotes(notes, 'POST', title)
+    const blocks = notes.trim()
+      ? [{ id: `post-note-${Date.now()}`, type: 'text', content: notes.trim() }]
+      : []
+
+    return {
+      title: normalizedTitle,
+      blocks,
+      status,
+      assigned_to: assignedTo || null,
+    }
+  }, [titleTouched, title, notes, status, assignedTo])
+
+  const handleSave = useCallback(async (mode: 'manual' | 'auto' = 'manual') => {
     if (!post) return
-    setIsSaving(true)
-    setSaveError(null)
+    if (mode === 'manual') {
+      setIsSaving(true)
+      setSaveError(null)
+    } else {
+      setIsAutoSaving(true)
+    }
+
     try {
-      const normalizedTitle = titleTouched
-        ? (title.trim() || 'Untitled post')
-        : inferTitleFromNotes(notes, 'POST', title)
-      const blocks = notes.trim()
-        ? [{ id: `post-note-${Date.now()}`, type: 'text', content: notes.trim() }]
-        : []
+      const payload = buildPayload()
 
       const response = await fetch(`/api/content/${post.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: normalizedTitle,
-          blocks,
-          status,
-          assigned_to: assignedTo || null,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const body = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(typeof body?.error === 'string' ? body.error : 'Failed to save post')
+        const baseMessage = typeof body?.error === 'string' ? body.error : 'Failed to save post'
+        const code = typeof body?.code === 'string' ? body.code : null
+        throw new Error(code ? `${baseMessage} (${code})` : baseMessage)
       }
 
       if (body?.data) {
         onPostUpdated(body.data as Content)
+        setLastSavedAt(new Date().toISOString())
+        setSaveError(null)
       }
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Failed to save post')
+      if (mode === 'manual') {
+        setSaveError(error instanceof Error ? error.message : 'Failed to save post')
+      } else {
+        setSaveError(error instanceof Error ? `Autosave failed: ${error.message}` : 'Autosave failed')
+      }
     } finally {
-      setIsSaving(false)
+      if (mode === 'manual') {
+        setIsSaving(false)
+      } else {
+        setIsAutoSaving(false)
+      }
     }
-  }
+  }, [post, buildPayload, onPostUpdated])
+
+  useEffect(() => {
+    if (!open || !post || !hasChanges || isSaving || isAutoSaving) return
+    const timer = setTimeout(() => {
+      handleSave('auto')
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [
+    open,
+    post?.id,
+    post,
+    title,
+    notes,
+    status,
+    assignedTo,
+    hasChanges,
+    isSaving,
+    isAutoSaving,
+    handleSave,
+  ])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -223,7 +271,7 @@ export function PostEditorPanel({
                 <Button
                   size="sm"
                   className="h-8"
-                  onClick={handleSave}
+                  onClick={() => handleSave('manual')}
                   disabled={isSaving || !hasChanges}
                 >
                   {isSaving ? 'Saving...' : 'Save Post'}
@@ -236,6 +284,13 @@ export function PostEditorPanel({
                 >
                   Open Full Editor
                 </Button>
+                <div className="ml-auto text-[10px] text-muted-foreground">
+                  {isAutoSaving
+                    ? 'Autosaving...'
+                    : lastSavedAt
+                      ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : 'Autosave on'}
+                </div>
               </div>
             </div>
           </div>
