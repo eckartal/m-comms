@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 type ApiErrorCode =
   | 'unauthorized'
+  | 'forbidden'
   | 'content_fetch_failed'
   | 'content_create_failed'
   | 'internal_server_error'
@@ -78,6 +79,22 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
 
     if (teamId) {
+      const { data: membership, error: membershipError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (membershipError) {
+        console.error('Error verifying team membership:', membershipError)
+        return apiError('Failed to verify team access', 500, 'internal_server_error', true)
+      }
+
+      if (!membership) {
+        return apiError('Forbidden', 403, 'forbidden', false)
+      }
+
       query = query.eq('team_id', teamId)
     }
 
