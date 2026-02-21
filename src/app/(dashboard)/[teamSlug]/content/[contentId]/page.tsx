@@ -15,9 +15,8 @@ import {
   Minus,
   X,
   MessageSquare,
-  Share2,
-  Send as PublishIcon,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
@@ -523,11 +522,12 @@ export default function EditContentPage() {
         }
 
         if (failed > 0) {
-          alert(`Published to ${successful} platform(s), but ${failed} failed. Check activity and publish history.`)
+          toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check activity and publish history.`)
         }
 
         router.push(`/${teamSlug}/content`)
       } else {
+        toast.success('Saved')
         await fetchContent()
         await fetchActivity()
         await fetchAnnotations()
@@ -536,7 +536,7 @@ export default function EditContentPage() {
       }
     } catch (error) {
       console.error('Error saving content:', error)
-      alert('Failed to save content')
+      toast.error(error instanceof Error ? error.message : 'Failed to save content')
     } finally {
       setIsSubmitting(false)
     }

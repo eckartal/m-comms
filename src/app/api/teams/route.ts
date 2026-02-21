@@ -122,11 +122,12 @@ export async function POST(request: Request) {
 
 This is your draft space where you can create and edit content before publishing.
 
-## Getting started:
-1. Click "New post" to create content
-2. Select your platform (Twitter, LinkedIn, Instagram, or Blog)
-3. Write your content or use a template
-4. Click "Publish" to share it with your audience
+	## Getting started:
+	1. Click "New post" to create content
+	2. Select your channels (X or LinkedIn are publish-ready today)
+	3. Write your content or use a template
+	4. Open Integrations and connect accounts for channels you want to use
+	5. Click "Publish" to share it with your audience
 
 Feel free to edit or delete this draft as you explore the platform!`,
             },

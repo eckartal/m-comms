@@ -41,6 +41,18 @@ type Integration = {
   support_status?: 'publish_ready' | 'connect_only' | 'internal'
 }
 
+const PLATFORM_ENV_REQUIREMENTS: Record<string, string[]> = {
+  twitter: ['TWITTER_CLIENT_ID', 'TWITTER_CLIENT_SECRET'],
+  linkedin: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
+  instagram: ['INSTAGRAM_CLIENT_ID', 'INSTAGRAM_CLIENT_SECRET'],
+  tiktok: ['TIKTOK_CLIENT_ID', 'TIKTOK_CLIENT_SECRET'],
+  youtube: ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET'],
+  threads: ['THREADS_CLIENT_ID', 'THREADS_CLIENT_SECRET'],
+  bluesky: ['BSKY_CLIENT_ID', 'BSKY_CLIENT_SECRET'],
+  mastodon: ['MASTODON_CLIENT_ID', 'MASTODON_CLIENT_SECRET'],
+  facebook: ['FACEBOOK_CLIENT_ID', 'FACEBOOK_CLIENT_SECRET'],
+}
+
 function mergeWithLocalConnections(
   integrations: Integration[],
   localConnections: Record<string, {
@@ -236,6 +248,9 @@ export default function IntegrationsPage() {
   const missingOauthPlatforms = socialIntegrations.filter(
     (integration) => integration.connectable !== false && integration.oauth_configured === false
   )
+  const selectedPlatformEnvRequirements = selectedPlatform
+    ? (PLATFORM_ENV_REQUIREMENTS[selectedPlatform.id] || [])
+    : []
 
   if (loading) {
     return (
@@ -368,6 +383,22 @@ export default function IntegrationsPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-foreground">Setup Checklist</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Fastest path to first successful real OAuth connection and publish.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>1. Set `NEXT_PUBLIC_APP_URL` to your deploy domain (for example, `https://app.yourdomain.com`).</p>
+          <p>2. Add provider credentials for channels you want to connect (start with X + LinkedIn).</p>
+          <p>3. Configure provider redirect URLs to `&lt;APP_URL&gt;/api/platforms/&lt;platform&gt;/callback`.</p>
+          <p>4. Run `npm run check:go-live` before deploy.</p>
+          <p>5. After deploy, connect accounts from this page and publish a test post.</p>
+        </CardContent>
+      </Card>
+
       <Dialog open={Boolean(settingsPlatformId)} onOpenChange={(open) => !open && setSettingsPlatformId(null)}>
         <DialogContent>
           <DialogHeader>
@@ -421,6 +452,11 @@ export default function IntegrationsPage() {
               ) : (
                 <div className="rounded-md border border-border bg-muted p-3">
                   <p className="text-sm text-muted-foreground">No accounts connected for this platform.</p>
+                  {defaultConnectionMode === 'real_oauth' && selectedPlatform.oauth_configured === false && (
+                    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                      Missing environment variables: {selectedPlatformEnvRequirements.join(', ') || 'Provider credentials not configured'}
+                    </div>
+                  )}
                   <Button
                     className="mt-3 h-8 text-xs"
                     disabled={defaultConnectionMode === 'real_oauth' && selectedPlatform.oauth_configured === false}
