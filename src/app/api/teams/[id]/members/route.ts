@@ -249,7 +249,7 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('Error in DELETE /api/teams/[id]/members:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
