@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Content } from '@/types'
 import { Button } from '@/components/ui/button'
 
@@ -20,8 +20,36 @@ type ContentWithMeta = Content & {
 }
 
 interface CollabRightRailProps {
+  teamId: string
   content: Content[]
   onOpenContent: (item: Content) => void
+}
+
+type OpenAnnotation = {
+  id: string
+  content_id: string
+  block_id: string
+  text_snapshot: string
+  created_at: string
+  status: string
+  content?:
+    | {
+        id: string
+        title: string
+        team_id: string
+      }
+    | Array<{
+        id: string
+        title: string
+        team_id: string
+      }>
+    | null
+  comments?:
+    | Array<{ count?: number | null }>
+    | {
+        count?: number | null
+      }
+    | null
 }
 
 function isOverdue(item: Content) {
@@ -55,8 +83,45 @@ function trackRailEvent(tab: RailTab) {
   )
 }
 
-export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps) {
+export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightRailProps) {
   const [tab, setTab] = useState<RailTab>('activity')
+  const [openAnnotations, setOpenAnnotations] = useState<OpenAnnotation[]>([])
+  const [annotationsError, setAnnotationsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const fetchOpenAnnotations = async () => {
+      setAnnotationsError(null)
+
+      try {
+        const response = await fetch(`/api/teams/${teamId}/open-annotations`, {
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => null)
+          throw new Error(body?.error || 'Failed to fetch open annotations')
+        }
+
+        const body = await response.json()
+        if (!isCancelled) {
+          setOpenAnnotations(Array.isArray(body?.data) ? body.data : [])
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setOpenAnnotations([])
+          setAnnotationsError(error instanceof Error ? error.message : 'Failed to fetch open annotations')
+        }
+      }
+    }
+
+    fetchOpenAnnotations()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [teamId])
 
   const recentActivity = useMemo(() => {
     const withMeta = content as ContentWithMeta[]
@@ -77,6 +142,8 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 8)
   }, [content])
+
+  const openAnnotationCount = openAnnotations.length
 
   return (
     <aside className="hidden xl:flex xl:w-80 xl:flex-col xl:border-l xl:border-gray-900 xl:bg-[#040404]">
@@ -106,7 +173,7 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
             trackRailEvent('attention')
           }}
         >
-          Needs Attention
+          Needs Attention ({attentionItems.length + openAnnotationCount})
         </Button>
       </div>
 
@@ -165,6 +232,34 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
               )
             })}
 
+        {tab === 'attention' && openAnnotations.length > 0 ? (
+          <div className="space-y-2 pt-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Open Threads</p>
+            {openAnnotations.slice(0, 6).map((annotation) => {
+              const contentValue = Array.isArray(annotation.content)
+                ? annotation.content[0]
+                : annotation.content
+              const commentCount = Array.isArray(annotation.comments)
+                ? annotation.comments[0]?.count || 0
+                : annotation.comments?.count || 0
+
+              return (
+                <div key={annotation.id} className="rounded-lg border border-[#222] bg-[#0a0a0a] p-3">
+                  <p className="truncate text-xs text-foreground">
+                    {contentValue?.title || 'Untitled content'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
+                    {annotation.text_snapshot}
+                  </p>
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    {commentCount} comments · {formatRelativeTime(annotation.created_at)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+
         {tab === 'activity' && recentActivity.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
             No recent activity yet.
@@ -174,6 +269,12 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
         {tab === 'attention' && attentionItems.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
             Nothing needs attention right now.
+          </div>
+        ) : null}
+
+        {tab === 'attention' && annotationsError ? (
+          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+            {annotationsError}
           </div>
         ) : null}
       </div>

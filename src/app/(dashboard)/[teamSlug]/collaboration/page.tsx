@@ -605,7 +605,7 @@ export default function CollaborationPage() {
                 onAssign={handleAssign}
               />
             </div>
-            <CollabRightRail content={content} onOpenContent={handleCardClick} />
+            <CollabRightRail teamId={currentTeam.id} content={content} onOpenContent={handleCardClick} />
           </div>
         ) : null}
       </div>
