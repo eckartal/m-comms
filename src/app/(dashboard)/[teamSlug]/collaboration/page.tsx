@@ -28,11 +28,15 @@ type TeamMemberItem = {
 
 class RequestError extends Error {
   status: number
+  code?: string
+  retryable: boolean
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string, retryable = true) {
     super(message)
     this.name = 'RequestError'
     this.status = status
+    this.code = code
+    this.retryable = retryable
   }
 }
 
@@ -62,6 +66,7 @@ export default function CollaborationPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  const [errorRetryable, setErrorRetryable] = useState(true)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [changeReason, setChangeReason] = useState('')
@@ -69,16 +74,24 @@ export default function CollaborationPage() {
 
   const parseRequestError = async (response: Response, fallbackMessage: string) => {
     let message = fallbackMessage
+    let code: string | undefined
+    let retryable = response.status >= 500
     try {
       const body = await response.json()
       if (typeof body?.error === 'string' && body.error.trim()) {
         message = body.error
       }
+      if (typeof body?.code === 'string') {
+        code = body.code
+      }
+      if (typeof body?.retryable === 'boolean') {
+        retryable = body.retryable
+      }
     } catch {
       // Ignore JSON parsing errors and use fallback message.
     }
 
-    throw new RequestError(message, response.status)
+    throw new RequestError(message, response.status, code, retryable)
   }
 
   const fetchContentData = useCallback(async (teamId: string) => {
@@ -107,6 +120,7 @@ export default function CollaborationPage() {
     setIsLoading(true)
     setError(null)
     setErrorStatus(null)
+    setErrorRetryable(true)
 
     const [contentResult, teamMembersResult] = await Promise.allSettled([
       fetchContentData(currentTeam.id),
@@ -121,6 +135,7 @@ export default function CollaborationPage() {
       setContent([])
       setError(isRequestError ? reason.message : 'Failed to load content')
       setErrorStatus(isRequestError ? reason.status : 500)
+      setErrorRetryable(isRequestError ? reason.retryable : true)
       console.error('Failed to load collaboration content:', reason)
     }
 
@@ -416,6 +431,7 @@ export default function CollaborationPage() {
         {viewState === 'error' ? (
           <CollabErrorState
             message={error || 'Failed to load collaboration data'}
+            showRetry={errorRetryable}
             onRetry={loadData}
             onGoToTeam={goToTeam}
           />

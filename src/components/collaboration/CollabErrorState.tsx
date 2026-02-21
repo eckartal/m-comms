@@ -3,11 +3,12 @@ import { Button } from '@/components/ui/button'
 
 interface CollabErrorStateProps {
   message: string
+  showRetry?: boolean
   onRetry: () => void
   onGoToTeam: () => void
 }
 
-export function CollabErrorState({ message, onRetry, onGoToTeam }: CollabErrorStateProps) {
+export function CollabErrorState({ message, showRetry = true, onRetry, onGoToTeam }: CollabErrorStateProps) {
   return (
     <div className="flex h-full items-center justify-center px-6">
       <div className="max-w-md w-full border border-[#262626] rounded-xl bg-[#050505] p-6 text-center">
@@ -17,9 +18,11 @@ export function CollabErrorState({ message, onRetry, onGoToTeam }: CollabErrorSt
         <h2 className="text-base font-semibold text-foreground">Couldn&apos;t load collaboration data</h2>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         <div className="mt-5 flex items-center justify-center gap-2">
-          <Button size="sm" className="h-8" onClick={onRetry}>
-            Retry
-          </Button>
+          {showRetry ? (
+            <Button size="sm" className="h-8" onClick={onRetry}>
+              Retry
+            </Button>
+          ) : null}
           <Button size="sm" variant="outline" className="h-8" onClick={onGoToTeam}>
             Go to Team
           </Button>
