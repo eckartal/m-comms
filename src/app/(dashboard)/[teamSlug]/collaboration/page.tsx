@@ -258,6 +258,36 @@ export default function CollaborationPage() {
     [content, searchQuery, assigneeFilter, quickFilter, currentUser?.id]
   )
 
+  const quickFilterMeta = useMemo(
+    () => [
+      { id: 'all' as const, label: 'All', count: content.length },
+      {
+        id: 'mine' as const,
+        label: 'Mine',
+        count: content.filter((item) => {
+          const ownerId = item.assigned_to || item.assignedTo?.id
+          return !!currentUser?.id && ownerId === currentUser.id
+        }).length,
+      },
+      {
+        id: 'unassigned' as const,
+        label: 'Unassigned',
+        count: content.filter((item) => !item.assigned_to && !item.assignedTo?.id).length,
+      },
+      {
+        id: 'needs_review' as const,
+        label: 'Needs Review',
+        count: content.filter((item) => item.status === 'IN_REVIEW').length,
+      },
+      {
+        id: 'overdue' as const,
+        label: 'Overdue',
+        count: content.filter(isOverdue).length,
+      },
+    ],
+    [content, currentUser?.id]
+  )
+
   const viewState: ViewState = useMemo(() => {
     if (isLoading) return 'loading'
     if (errorStatus === 401 || errorStatus === 403) return 'empty_permission'
@@ -371,13 +401,7 @@ export default function CollaborationPage() {
 
       <PipelineSummary content={content} />
       <div className="px-6 py-2 border-b border-gray-900 bg-[#050505] flex items-center gap-2 overflow-x-auto">
-        {[
-          { id: 'all' as const, label: 'All' },
-          { id: 'mine' as const, label: 'Mine' },
-          { id: 'unassigned' as const, label: 'Unassigned' },
-          { id: 'needs_review' as const, label: 'Needs Review' },
-          { id: 'overdue' as const, label: 'Overdue' },
-        ].map((filter) => (
+        {quickFilterMeta.map((filter) => (
           <Button
             key={filter.id}
             size="sm"
@@ -385,7 +409,7 @@ export default function CollaborationPage() {
             className="h-7 text-xs whitespace-nowrap"
             onClick={() => setQuickFilter(filter.id)}
           >
-            {filter.label}
+            {filter.label} ({filter.count})
           </Button>
         ))}
         {hasActiveFilters ? (
