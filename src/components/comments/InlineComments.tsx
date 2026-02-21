@@ -175,6 +175,9 @@ export function InlineComments({
     <div className="relative">
       {/* Text Editor Area */}
       <div className="relative">
+        <div className="text-[11px] text-muted-foreground mb-2">
+          Select text to add an inline comment
+        </div>
         <textarea
           ref={textAreaRef}
           value={content}

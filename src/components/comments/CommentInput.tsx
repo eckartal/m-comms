@@ -13,7 +13,7 @@ interface CommentInputProps {
 }
 
 export function CommentInput({
-  placeholder = 'Write a comment...',
+  placeholder = 'Write a comment... (use @ to mention)',
   onSubmit,
   onCancel,
   autoFocus = false,
