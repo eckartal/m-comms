@@ -35,6 +35,10 @@ type Integration = {
   connected: boolean
   accounts: Account[]
   connection_status?: 'connected' | 'degraded' | 'disconnected'
+  oauth_configured?: boolean
+  connectable?: boolean
+  publishable?: boolean
+  support_status?: 'publish_ready' | 'connect_only' | 'internal'
 }
 
 function mergeWithLocalConnections(
@@ -181,6 +185,13 @@ export default function IntegrationsPage() {
       return
     }
 
+    const integration = integrations.find((item) => item.id === platform)
+    const requiresConfiguration = defaultConnectionMode === 'real_oauth' && integration?.oauth_configured === false
+    if (requiresConfiguration) {
+      toast.error(`${integration?.name || platform} is not configured. Add client credentials on the server first.`)
+      return
+    }
+
     if (defaultConnectionMode === 'local_sandbox') {
       setSandboxConnectPlatform(platform)
       return
@@ -222,6 +233,9 @@ export default function IntegrationsPage() {
 
   const socialIntegrations = integrations.filter((integration) => integration.id !== 'blog')
   const selectedPlatform = integrations.find((integration) => integration.id === settingsPlatformId) || null
+  const missingOauthPlatforms = socialIntegrations.filter(
+    (integration) => integration.connectable !== false && integration.oauth_configured === false
+  )
 
   if (loading) {
     return (
@@ -249,12 +263,28 @@ export default function IntegrationsPage() {
         </div>
       )}
 
+      {defaultConnectionMode === 'real_oauth' && missingOauthPlatforms.length > 0 && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          OAuth credentials are missing for: {missingOauthPlatforms.map((item) => item.name).join(', ')}.
+          Add provider client ID/secret to enable real connections.
+        </div>
+      )}
+
       <div className="rounded-lg border border-border bg-card">
         {socialIntegrations.map((integration, index) => {
           const isConnecting = connecting === integration.id
           const isConnected = integration.connected
           const isDegraded = isConnected && integration.accounts.length === 0
-          const connectLabel = isConnecting ? 'Connecting...' : isDegraded ? 'Repair' : isConnected ? 'Connected' : 'Connect'
+          const requiresConfiguration = defaultConnectionMode === 'real_oauth' && integration.oauth_configured === false
+          const connectLabel = isConnecting
+            ? 'Connecting...'
+            : requiresConfiguration
+            ? 'Config Required'
+            : isDegraded
+            ? 'Repair'
+            : isConnected
+            ? 'Connected'
+            : 'Connect'
 
           return (
             <div
@@ -274,7 +304,7 @@ export default function IntegrationsPage() {
                   size="sm"
                   className="h-8 min-w-[92px]"
                   onClick={() => handleConnect(integration.id)}
-                  disabled={isConnecting || (isConnected && !isDegraded)}
+                  disabled={isConnecting || (isConnected && !isDegraded) || requiresConfiguration}
                 >
                   {isConnecting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
                   {!isConnecting && !isConnected ? <Plus className="mr-1 h-3.5 w-3.5" /> : null}
@@ -393,6 +423,7 @@ export default function IntegrationsPage() {
                   <p className="text-sm text-muted-foreground">No accounts connected for this platform.</p>
                   <Button
                     className="mt-3 h-8 text-xs"
+                    disabled={defaultConnectionMode === 'real_oauth' && selectedPlatform.oauth_configured === false}
                     onClick={() => {
                       handleConnect(selectedPlatform.id)
                       setSettingsPlatformId(null)

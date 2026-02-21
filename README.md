@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Content Platform
 
 ## Getting Started
 
@@ -14,11 +14,50 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3004](http://localhost:3004) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy `.env.example` to `.env` and fill required values.
+
+Minimum for app boot:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_URL`
+- `NEXT_PUBLIC_APP_URL`
+
+Minimum for real OAuth connection flow (X + LinkedIn):
+- `TWITTER_CLIENT_ID`
+- `TWITTER_CLIENT_SECRET`
+- `LINKEDIN_CLIENT_ID`
+- `LINKEDIN_CLIENT_SECRET`
+
+## OAuth Redirect URLs
+
+Configure provider app redirect URLs to:
+- `https://<your-domain>/api/platforms/twitter/callback`
+- `https://<your-domain>/api/platforms/linkedin/callback`
+
+For local development:
+- `http://localhost:3004/api/platforms/twitter/callback`
+- `http://localhost:3004/api/platforms/linkedin/callback`
+
+## Go-Live Checklist
+
+1. Set `NEXT_PUBLIC_APP_URL` to your production domain.
+2. Set OAuth client ID/secret env vars for platforms you want to connect.
+3. Deploy latest `main`.
+4. From Integrations page, verify channels show as configurable and connect successfully.
+5. Publish a test post to X and LinkedIn from:
+- Composer page (`/content/new`)
+- Content detail page (Share action)
+6. Confirm posts are created on provider side and `content_schedule` rows are recorded.
+
+## Notes
+
+- In local sandbox mode, connect uses mock accounts (no real provider posts).
+- Real mode requires OAuth credentials; Integrations page now blocks misconfigured providers.
 
 ## Learn More
 
