@@ -35,6 +35,7 @@ interface InlineCommentsProps {
   content: string
   comments: InlineComment[]
   currentUserId: string
+  onChangeContent?: (value: string) => void
   onAddComment: (text: string, startPos: number, endPos: number) => void
   onResolveComment: (commentId: string) => void
   onReplyComment: (commentId: string, text: string) => void
@@ -109,6 +110,7 @@ export function InlineComments({
   content,
   comments,
   currentUserId,
+  onChangeContent,
   onAddComment,
   onResolveComment,
   onReplyComment,
@@ -174,7 +176,7 @@ export function InlineComments({
         <textarea
           ref={textAreaRef}
           value={content}
-          onChange={() => {}}
+          onChange={(e) => onChangeContent?.(e.target.value)}
           onMouseUp={handleSelect}
           onSelect={handleSelect}
           className="w-full h-64 p-4 bg-[#0a0a0a] text-foreground rounded-md border border-gray-900 resize-none focus:ring-1 focus:ring-gray-900 focus:outline-none font-mono text-sm leading-relaxed"

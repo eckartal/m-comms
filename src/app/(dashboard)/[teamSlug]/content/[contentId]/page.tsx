@@ -56,7 +56,25 @@ function CharacterCircles({ current, max }: { current: number; max: number }) {
 }
 
 // Block-based content editor component
-function BlockEditor({ blocks, onChange, readOnly = false }: { blocks: ContentBlock[]; onChange: (blocks: ContentBlock[]) => void; readOnly?: boolean }) {
+function BlockEditor({
+  blocks,
+  onChange,
+  readOnly = false,
+  inlineComments,
+}: {
+  blocks: ContentBlock[]
+  onChange: (blocks: ContentBlock[]) => void
+  readOnly?: boolean
+  inlineComments?: {
+    currentUserId: string
+    getComments: (blockId: string) => any[]
+    onAdd: (blockId: string, text: string, startPos: number, endPos: number, blockText: string) => void
+    onResolve: (annotationId: string) => void
+    onReply: (annotationId: string, text: string) => void
+    onEdit: (commentId: string, text: string) => void
+    onDelete: (commentId: string) => void
+  }
+}) {
   const addBlock = (type: ContentBlock['type']) => {
     const newBlock: ContentBlock = {
       id: crypto.randomUUID(),
@@ -135,12 +153,30 @@ function BlockEditor({ blocks, onChange, readOnly = false }: { blocks: ContentBl
             ) : block.type === 'divider' ? (
               <Separator />
             ) : (
-              <Textarea
-                placeholder="Type '/' for commands..."
-                value={block.content}
-                onChange={(e) => updateBlock(block.id, e.target.value)}
-                className="resize-none px-0 py-2 min-h-[60px] text-[#37352f] placeholder:text-[#c4c4c4] focus:outline-none border-0"
-              />
+              <>
+                {inlineComments ? (
+                  <InlineComments
+                    content={block.content || ''}
+                    comments={inlineComments.getComments(block.id)}
+                    currentUserId={inlineComments.currentUserId}
+                    onChangeContent={(value) => updateBlock(block.id, value)}
+                    onAddComment={(text, startPos, endPos) =>
+                      inlineComments.onAdd(block.id, text, startPos, endPos, block.content || '')
+                    }
+                    onResolveComment={(id) => inlineComments.onResolve(id)}
+                    onReplyComment={(id, text) => inlineComments.onReply(id, text)}
+                    onEditComment={(id, text) => inlineComments.onEdit(id, text)}
+                    onDeleteComment={(id) => inlineComments.onDelete(id)}
+                  />
+                ) : (
+                  <Textarea
+                    placeholder="Type '/' for commands..."
+                    value={block.content}
+                    onChange={(e) => updateBlock(block.id, e.target.value)}
+                    className="resize-none px-0 py-2 min-h-[60px] text-[#37352f] placeholder:text-[#c4c4c4] focus:outline-none border-0"
+                  />
+                )}
+              </>
             )}
           </div>
 
@@ -572,38 +608,21 @@ export default function EditContentPage() {
 
       {/* Editor */}
       <div className="mb-12">
-        <BlockEditor blocks={blocks} onChange={setBlocks} />
-      </div>
-
-      {/* Inline Comments (Text Blocks) */}
-      <div className="mb-12">
-        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Inline Comments</h2>
-        {annotationsLoading ? (
-          <div className="text-sm text-[#9ca3af]">Loading annotations...</div>
-        ) : (
-          <div className="space-y-6">
-            {blocks
-              .filter((b) => b.type === 'text')
-              .map((block) => {
-                const textContent = typeof block.content === 'string' ? block.content : block.content?.text || ''
-                return (
-                  <div key={block.id} className="border border-[#e5e5e5] rounded-lg p-3">
-                    <InlineComments
-                      content={textContent}
-                      comments={buildInlineComments(block.id)}
-                      currentUserId={currentUser?.id || ''}
-                      onAddComment={(text, startPos, endPos) =>
-                        addAnnotation(block.id, text, startPos, endPos, textContent)
-                      }
-                      onResolveComment={(id) => resolveAnnotation(id)}
-                      onReplyComment={(id, text) => replyAnnotation(id, text)}
-                      onEditComment={(id, text) => editAnnotationComment(id, text)}
-                      onDeleteComment={(id) => deleteAnnotationComment(id)}
-                    />
-                  </div>
-                )
-              })}
-          </div>
+        <BlockEditor
+          blocks={blocks}
+          onChange={setBlocks}
+          inlineComments={{
+            currentUserId: currentUser?.id || '',
+            getComments: (blockId) => buildInlineComments(blockId),
+            onAdd: addAnnotation,
+            onResolve: resolveAnnotation,
+            onReply: replyAnnotation,
+            onEdit: editAnnotationComment,
+            onDelete: deleteAnnotationComment,
+          }}
+        />
+        {annotationsLoading && (
+          <div className="text-xs text-[#9ca3af] mt-2">Loading annotations...</div>
         )}
       </div>
 
