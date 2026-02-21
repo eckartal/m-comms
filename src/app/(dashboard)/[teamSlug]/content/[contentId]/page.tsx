@@ -474,6 +474,11 @@ export default function EditContentPage() {
     }
   }
 
+  const latestUpdate = activity
+    .filter((item) => item.action === 'CONTENT_UPDATED' || item.action === 'STATUS_CHANGED')
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+  const latestUpdater = latestUpdate?.user?.name || latestUpdate?.user?.email || null
+
   const diffBlocks = () => {
     const fromBlocks = (diffData?.from?.blocks || []) as ContentBlock[]
     const toBlocks = (diffData?.to?.blocks || []) as ContentBlock[]
@@ -648,6 +653,9 @@ export default function EditContentPage() {
           )}
           {content?.updated_at && (
             <>· Updated {new Date(content.updated_at).toLocaleString()}</>
+          )}
+          {latestUpdater && (
+            <>· by {latestUpdater}</>
           )}
         </p>
       </div>
@@ -849,15 +857,18 @@ export default function EditContentPage() {
                   ? pair.to?.content
                   : pair.to?.content?.text || ''
                 const changed = fromText !== toText
+                const fromType = pair.from?.type || 'text'
+                const toType = pair.to?.type || 'text'
+                const blockLabel = fromType === toType ? fromType : `${fromType} → ${toType}`
 
                 return (
                   <div key={index} className="grid grid-cols-2 gap-4">
                     <div className={`border rounded p-3 ${changed ? 'border-red-200 bg-red-50/30' : ''}`}>
-                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">Before</h4>
+                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">Before · {blockLabel}</h4>
                       <pre className="text-xs whitespace-pre-wrap">{fromText || '—'}</pre>
                     </div>
                     <div className={`border rounded p-3 ${changed ? 'border-green-200 bg-green-50/30' : ''}`}>
-                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">After</h4>
+                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">After · {blockLabel}</h4>
                       <pre className="text-xs whitespace-pre-wrap">{toText || '—'}</pre>
                     </div>
                   </div>
