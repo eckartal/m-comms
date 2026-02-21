@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Content } from '@/types'
+import type { Content, ContentBlock } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
 import { useContentStore } from '@/stores'
-import { ChevronLeft, ChevronRight, Link2 } from 'lucide-react'
+import { EditorToolbar } from '@/components/editor/EditorToolbar'
+import { ChevronLeft, ChevronRight, Link2, Plus, X } from 'lucide-react'
 
 type TeamMemberItem = {
   id: string
@@ -35,24 +35,71 @@ interface PostEditorPanelProps {
   onOpenFullEditor: (postId: string) => void
 }
 
-function extractPrimaryNotes(blocks: unknown): string {
-  if (!Array.isArray(blocks) || blocks.length === 0) return ''
-  const first = blocks[0] as { content?: unknown } | null
-  if (!first || typeof first !== 'object') return ''
-  if (typeof first.content === 'string') return first.content
-  if (
-    first.content &&
-    typeof first.content === 'object' &&
-    'text' in (first.content as Record<string, unknown>) &&
-    typeof (first.content as { text?: unknown }).text === 'string'
-  ) {
-    return (first.content as { text: string }).text
+type ThreadItem = {
+  id: string
+  content: string
+}
+
+function extractBlockText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (content && typeof content === 'object') {
+    const value = (content as { text?: unknown }).text
+    if (typeof value === 'string') return value
   }
   return ''
 }
 
+function parseThreadFromBlocks(blocks: unknown): ThreadItem[] {
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return [{ id: 'thread-1', content: '' }]
+  }
+
+  const items: ThreadItem[] = []
+  for (const rawBlock of blocks) {
+    const block = rawBlock as { id?: unknown; type?: unknown; content?: unknown } | null
+    if (!block || typeof block !== 'object') continue
+    const blockId = typeof block.id === 'string' ? block.id : `thread-${items.length + 1}`
+
+    if (block.type === 'thread' && block.content && typeof block.content === 'object') {
+      const tweets = (block.content as { tweets?: unknown }).tweets
+      if (Array.isArray(tweets)) {
+        for (const tweet of tweets) {
+          if (!tweet || typeof tweet !== 'object') continue
+          const tweetText = (tweet as { text?: unknown }).text
+          if (typeof tweetText === 'string') {
+            items.push({ id: `${blockId}-${items.length + 1}`, content: tweetText })
+          }
+        }
+      }
+      continue
+    }
+
+    const text = extractBlockText(block.content)
+    if (text.length > 0 || items.length === 0) {
+      items.push({ id: blockId, content: text })
+    }
+  }
+
+  if (items.length === 0) {
+    return [{ id: 'thread-1', content: '' }]
+  }
+
+  return items
+}
+
+function serializeThreadToBlocks(thread: ThreadItem[]): ContentBlock[] {
+  return thread
+    .map((item, index) => ({
+      id: item.id || `thread-${index + 1}`,
+      type: 'text' as const,
+      content: { text: item.content },
+    }))
+    .filter((block) => extractBlockText(block.content).trim().length > 0)
+}
+
 function extractIdeaNotes(blocks: unknown): string {
-  return extractPrimaryNotes(blocks)
+  const [first] = parseThreadFromBlocks(blocks)
+  return first?.content || ''
 }
 
 const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
@@ -84,7 +131,9 @@ export function PostEditorPanel({
 }: PostEditorPanelProps) {
   const allContents = useContentStore((state) => state.contents)
   const [title, setTitle] = useState('')
-  const [notes, setNotes] = useState('')
+  const [thread, setThread] = useState<ThreadItem[]>([{ id: 'thread-1', content: '' }])
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [isBookmarked, setIsBookmarked] = useState(false)
   const [status, setStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT')
   const [assignedTo, setAssignedTo] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -97,7 +146,9 @@ export function PostEditorPanel({
   useEffect(() => {
     if (!post) return
     setTitle(post.title || '')
-    setNotes(extractPrimaryNotes(post.blocks))
+    const nextThread = parseThreadFromBlocks(post.blocks)
+    setThread(nextThread)
+    setActiveIndex(0)
     setStatus(post.status)
     setAssignedTo(post.assigned_to || '')
     setSaveError(null)
@@ -126,37 +177,42 @@ export function PostEditorPanel({
   const hasChanges = useMemo(() => {
     if (!post) return false
     const initialTitle = post.title || ''
-    const initialNotes = extractPrimaryNotes(post.blocks)
+    const initialThreadText = parseThreadFromBlocks(post.blocks).map((item) => item.content)
+    const currentThreadText = thread.map((item) => item.content)
     const initialStatus = post.status
     const initialAssignee = post.assigned_to || ''
+
     return (
       title !== initialTitle ||
-      notes !== initialNotes ||
+      JSON.stringify(currentThreadText) !== JSON.stringify(initialThreadText) ||
       status !== initialStatus ||
       assignedTo !== initialAssignee
     )
-  }, [post, title, notes, status, assignedTo])
+  }, [post, title, thread, status, assignedTo])
+
+  const currentContent = thread[activeIndex]?.content || ''
+  const characterCount = currentContent.length
+  const maxChars = 3000
 
   const buildPayload = useCallback(() => {
+    const notes = thread.map((item) => item.content).join('\n\n').trim()
     const normalizedTitle = resolvePostTitle({
       currentTitle: title,
       notes,
       titleTouched,
     })
-    const blocks = notes.trim()
-      ? [{ id: `post-note-${Date.now()}`, type: 'text', content: notes.trim() }]
-      : []
 
     return {
       title: normalizedTitle,
-      blocks,
+      blocks: serializeThreadToBlocks(thread),
       status,
       assigned_to: assignedTo || null,
     }
-  }, [titleTouched, title, notes, status, assignedTo])
+  }, [titleTouched, title, thread, status, assignedTo])
 
   const handleSave = useCallback(async (mode: 'manual' | 'auto' = 'manual') => {
     if (!post) return
+
     if (mode === 'manual') {
       setIsSaving(true)
       setSaveError(null)
@@ -166,7 +222,6 @@ export function PostEditorPanel({
 
     try {
       const payload = buildPayload()
-
       const response = await fetch(`/api/content/${post.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -207,14 +262,35 @@ export function PostEditorPanel({
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [open, post, hasChanges, isSaving, isAutoSaving, title, notes, status, assignedTo, handleSave])
+  }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, handleSave])
+
+  const handleContentChange = (index: number, value: string) => {
+    setThread((prev) => prev.map((item, idx) => (idx === index ? { ...item, content: value } : item)))
+  }
+
+  const addThreadItem = () => {
+    const next = [...thread, { id: `thread-${Date.now()}`, content: '' }]
+    setThread(next)
+    setActiveIndex(next.length - 1)
+  }
+
+  const removeThreadItem = (index: number) => {
+    if (thread.length === 1) {
+      setThread([{ id: thread[0]?.id || 'thread-1', content: '' }])
+      setActiveIndex(0)
+      return
+    }
+    const next = thread.filter((_, idx) => idx !== index)
+    setThread(next)
+    setActiveIndex(Math.min(index, next.length - 1))
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
         showOverlay={false}
-        className="w-full gap-0 overflow-hidden border-l border-border bg-white p-0 text-foreground shadow-none dark:bg-[#050505] sm:max-w-xl"
+        className="w-full gap-0 overflow-hidden border-l border-border bg-white p-0 text-foreground shadow-none dark:bg-[#050505] sm:max-w-[1120px]"
       >
         <SheetHeader className="border-b border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
           <SheetTitle className="text-sm font-semibold text-foreground">Post</SheetTitle>
@@ -243,10 +319,10 @@ export function PostEditorPanel({
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-3 md:flex-row">
+              <div className="flex flex-col gap-3 lg:flex-row">
                 {hasLinkedIdeaContext && showIdeaContext ? (
-                  <aside className="w-full shrink-0 md:w-[210px]">
-                    <div className="sticky top-0 space-y-2 rounded-md border border-amber-200/70 bg-amber-50 p-3 shadow-sm dark:border-amber-900/70 dark:bg-amber-950/30">
+                  <aside className="w-full shrink-0 lg:w-[220px]">
+                    <div className="sticky top-0 space-y-2 rounded-[10px] border border-amber-200/80 bg-amber-50/95 p-3 shadow-sm dark:border-amber-900/70 dark:bg-amber-950/30">
                       <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
                         <Link2 className="h-3 w-3" />
                         Idea Context
@@ -266,7 +342,7 @@ export function PostEditorPanel({
                             </span>
                           </div>
                           <p className="text-xs font-medium text-foreground">{linkedIdea.title || 'Untitled idea'}</p>
-                          <div className="max-h-[180px] overflow-y-auto rounded-sm border border-amber-200/60 bg-white p-2 text-[11px] leading-5 text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
+                          <div className="max-h-[200px] overflow-y-auto rounded-[8px] border border-amber-200/60 bg-white p-2 text-[11px] leading-5 text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
                             {linkedIdeaNotes || 'No idea notes available.'}
                           </div>
                           {onOpenLinkedIdea ? (
@@ -287,31 +363,8 @@ export function PostEditorPanel({
                   </aside>
                 ) : null}
 
-                <div className="flex-1 space-y-3.5">
-                  <div className="space-y-2">
-                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</label>
-                    <Input
-                      value={title}
-                      onChange={(e) => {
-                        setTitleTouched(true)
-                        setTitle(e.target.value)
-                      }}
-                      placeholder="Draft title (optional)"
-                      className="h-10 rounded-[8px] border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Draft Notes</label>
-                    <Textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="What is happening?"
-                      className="min-h-[320px] rounded-[8px] border-border bg-card px-3 py-3 text-[15px] leading-7 text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="flex-1">
+                  <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</label>
                       <select
@@ -347,8 +400,115 @@ export function PostEditorPanel({
                     </div>
                   </div>
 
+                  <div className="rounded-[10px] border border-border bg-card/50">
+                    <div className="border-b border-border px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-foreground">Composer</span>
+                        <span className="text-[11px] text-muted-foreground">{thread.length} block{thread.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <Input
+                        value={title}
+                        onChange={(e) => {
+                          setTitleTouched(true)
+                          setTitle(e.target.value)
+                        }}
+                        placeholder="Draft title (optional)"
+                        className="mt-2 h-10 rounded-[8px] border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-0 px-3 py-3">
+                      {thread.map((item, index) => {
+                        const isActive = activeIndex === index
+                        const itemCharCount = item.content.length
+                        const itemOverLimit = itemCharCount > maxChars
+
+                        return (
+                          <div key={item.id}>
+                            {index > 0 ? (
+                              <div className="flex">
+                                <div className="w-8 flex items-center justify-center">
+                                  <div className="h-5 w-0.5 bg-border" />
+                                </div>
+                                <div className="flex-1" />
+                              </div>
+                            ) : null}
+
+                            <div
+                              className={`relative rounded-[8px] transition-all ${isActive ? 'bg-background' : 'bg-transparent'}`}
+                              onClick={() => setActiveIndex(index)}
+                            >
+                              <div className="absolute left-0 top-3 w-8 flex items-center justify-center">
+                                <span className={`text-[13px] font-medium ${isActive ? 'text-muted-foreground' : 'text-border'}`}>
+                                  {index + 1}
+                                </span>
+                              </div>
+
+                              <div className="pl-12 pr-3">
+                                <textarea
+                                  value={item.content}
+                                  onChange={(e) => handleContentChange(index, e.target.value)}
+                                  onFocus={() => setActiveIndex(index)}
+                                  placeholder={index === 0 ? 'What is happening?' : 'Add another block...'}
+                                  className={`w-full resize-none border-none bg-transparent text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground ${isActive ? 'mt-2 min-h-[100px]' : 'min-h-[72px]'}`}
+                                  style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
+                                />
+
+                                {isActive ? (
+                                  <div className="flex items-center justify-between pb-2">
+                                    <div className="flex items-center gap-2">
+                                      {thread.length > 1 ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            removeThreadItem(index)
+                                          }}
+                                          className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                                          title="Remove block"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      ) : null}
+                                    </div>
+
+                                    <span
+                                      className={`text-[12px] tabular-nums ${itemOverLimit ? 'text-red-500' : itemCharCount > maxChars * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}
+                                    >
+                                      {itemCharCount} / {maxChars}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="px-4 pb-3">
+                      <button
+                        type="button"
+                        onClick={addThreadItem}
+                        className="flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add block
+                      </button>
+                    </div>
+
+                    <div className="px-4 pb-3">
+                      <EditorToolbar
+                        characterCount={characterCount}
+                        maxCharacters={maxChars}
+                        isBookmarked={isBookmarked}
+                        onBookmark={() => setIsBookmarked((prev) => !prev)}
+                      />
+                    </div>
+                  </div>
+
                   {saveError ? (
-                    <div className="rounded-sm border border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">
+                    <div className="mt-3 rounded-sm border border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">
                       {saveError}
                     </div>
                   ) : null}
