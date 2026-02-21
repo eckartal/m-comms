@@ -42,6 +42,19 @@ function formatRelativeTime(iso?: string | null) {
   return `${days}d ago`
 }
 
+function trackRailEvent(tab: RailTab) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('collaboration:analytics', {
+      detail: {
+        name: 'collab_rail_tab_changed',
+        payload: { tab },
+        ts: Date.now(),
+      },
+    })
+  )
+}
+
 export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps) {
   const [tab, setTab] = useState<RailTab>('activity')
 
@@ -77,7 +90,10 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
           size="sm"
           variant={tab === 'activity' ? 'default' : 'outline'}
           className="h-7 text-xs"
-          onClick={() => setTab('activity')}
+          onClick={() => {
+            setTab('activity')
+            trackRailEvent('activity')
+          }}
         >
           Activity
         </Button>
@@ -85,7 +101,10 @@ export function CollabRightRail({ content, onOpenContent }: CollabRightRailProps
           size="sm"
           variant={tab === 'attention' ? 'default' : 'outline'}
           className="h-7 text-xs"
-          onClick={() => setTab('attention')}
+          onClick={() => {
+            setTab('attention')
+            trackRailEvent('attention')
+          }}
         >
           Needs Attention
         </Button>

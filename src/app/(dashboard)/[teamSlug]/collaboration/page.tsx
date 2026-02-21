@@ -407,7 +407,10 @@ export default function CollaborationPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setView('kanban')}
+              onClick={() => {
+                setView('kanban')
+                trackCollabEvent('collab_view_changed', { view: 'kanban', team_id: currentTeam.id })
+              }}
               className={cn(
                 'h-7 px-2',
                 view === 'kanban' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -418,7 +421,10 @@ export default function CollaborationPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setView('list')}
+              onClick={() => {
+                setView('list')
+                trackCollabEvent('collab_view_changed', { view: 'list', team_id: currentTeam.id })
+              }}
               className={cn(
                 'h-7 px-2',
                 view === 'list' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -429,7 +435,10 @@ export default function CollaborationPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setView('calendar')}
+              onClick={() => {
+                setView('calendar')
+                trackCollabEvent('collab_view_changed', { view: 'calendar', team_id: currentTeam.id })
+              }}
               className={cn(
                 'h-7 px-2',
                 view === 'calendar' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -454,7 +463,14 @@ export default function CollaborationPage() {
             size="sm"
             variant={quickFilter === filter.id ? 'default' : 'outline'}
             className="h-7 text-xs whitespace-nowrap"
-            onClick={() => setQuickFilter(filter.id)}
+            onClick={() => {
+              setQuickFilter(filter.id)
+              trackCollabEvent('collab_quick_filter_selected', {
+                filter: filter.id,
+                count: filter.count,
+                team_id: currentTeam.id,
+              })
+            }}
           >
             {filter.label} ({filter.count})
           </Button>
