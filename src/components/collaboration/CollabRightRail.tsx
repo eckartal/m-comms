@@ -87,12 +87,14 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
   const [tab, setTab] = useState<RailTab>('activity')
   const [openAnnotations, setOpenAnnotations] = useState<OpenAnnotation[]>([])
   const [annotationsError, setAnnotationsError] = useState<string | null>(null)
+  const [isLoadingAnnotations, setIsLoadingAnnotations] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
 
     const fetchOpenAnnotations = async () => {
       setAnnotationsError(null)
+      setIsLoadingAnnotations(true)
 
       try {
         const response = await fetch(`/api/teams/${teamId}/open-annotations`, {
@@ -112,6 +114,10 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
         if (!isCancelled) {
           setOpenAnnotations([])
           setAnnotationsError(error instanceof Error ? error.message : 'Failed to fetch open annotations')
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingAnnotations(false)
         }
       }
     }
@@ -242,9 +248,19 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
               const commentCount = Array.isArray(annotation.comments)
                 ? annotation.comments[0]?.count || 0
                 : annotation.comments?.count || 0
+              const linkedContent = content.find((item) => item.id === annotation.content_id)
 
               return (
-                <div key={annotation.id} className="rounded-lg border border-[#222] bg-[#0a0a0a] p-3">
+                <button
+                  key={annotation.id}
+                  type="button"
+                  className="w-full rounded-lg border border-[#222] bg-[#0a0a0a] p-3 text-left hover:border-[#333]"
+                  onClick={() => {
+                    if (linkedContent) {
+                      onOpenContent(linkedContent)
+                    }
+                  }}
+                >
                   <p className="truncate text-xs text-foreground">
                     {contentValue?.title || 'Untitled content'}
                   </p>
@@ -254,7 +270,7 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
                   <p className="mt-2 text-[10px] text-muted-foreground">
                     {commentCount} comments · {formatRelativeTime(annotation.created_at)}
                   </p>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -275,6 +291,12 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
         {tab === 'attention' && annotationsError ? (
           <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
             {annotationsError}
+          </div>
+        ) : null}
+
+        {tab === 'attention' && isLoadingAnnotations ? (
+          <div className="rounded-lg border border-dashed border-[#222] p-3 text-xs text-muted-foreground">
+            Loading open threads...
           </div>
         ) : null}
       </div>
