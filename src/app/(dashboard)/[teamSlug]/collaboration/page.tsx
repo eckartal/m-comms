@@ -50,7 +50,7 @@ type ViewState =
   | 'empty_filtered'
   | 'ready'
 
-type QuickFilter = 'all' | 'mine' | 'unassigned' | 'needs_review' | 'overdue'
+type QuickFilter = 'all' | 'mine' | 'unassigned' | 'needs_review' | 'overdue' | 'approved'
 
 function isOverdue(item: Content) {
   if (!item.scheduled_at) return false
@@ -267,6 +267,7 @@ export default function CollaborationPage() {
         if (quickFilter === 'unassigned' && (item.assigned_to || item.assignedTo?.id)) return false
         if (quickFilter === 'needs_review' && item.status !== 'IN_REVIEW') return false
         if (quickFilter === 'overdue' && !isOverdue(item)) return false
+        if (quickFilter === 'approved' && item.status !== 'APPROVED') return false
 
         if (assigneeFilter === 'all') return true
         const assignedId = item.assigned_to || item.assignedTo?.id
@@ -300,6 +301,11 @@ export default function CollaborationPage() {
         id: 'overdue' as const,
         label: 'Overdue',
         count: content.filter(isOverdue).length,
+      },
+      {
+        id: 'approved' as const,
+        label: 'Approved',
+        count: content.filter((item) => item.status === 'APPROVED').length,
       },
     ],
     [content, currentUser?.id]
@@ -455,7 +461,24 @@ export default function CollaborationPage() {
         </div>
       </div>
 
-      <PipelineSummary content={content} />
+      <PipelineSummary
+        content={content}
+        activeFilter={
+          quickFilter === 'needs_review' ||
+          quickFilter === 'unassigned' ||
+          quickFilter === 'overdue' ||
+          quickFilter === 'approved'
+            ? quickFilter
+            : null
+        }
+        onSelectFilter={(filter) => {
+          setQuickFilter(filter)
+          trackCollabEvent('collab_pipeline_filter_selected', {
+            filter,
+            team_id: currentTeam.id,
+          })
+        }}
+      />
       <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-900 bg-[#050505] px-0 py-2">
         {quickFilterMeta.map((filter) => (
           <Button
