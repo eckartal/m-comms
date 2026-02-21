@@ -5,12 +5,15 @@ import type { Content } from '@/types'
 import { ContentCard } from './ContentCard'
 import { Column } from './Column'
 import { Button } from '@/components/ui/button'
+import { getContentTitle } from '@/lib/contentText'
 import { LayoutGrid, List, Calendar } from 'lucide-react'
 
 interface KanbanBoardProps {
   content: Content[]
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onConvertIdea?: (contentId: string) => void
+  onOpenLinkedIdea?: (ideaId: string) => void
+  onOpenLinkedPost?: (postId: string) => void
   onCardClick?: (content: Content) => void
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
@@ -100,6 +103,8 @@ export function KanbanBoard({
   content,
   onCardClick,
   onConvertIdea,
+  onOpenLinkedIdea,
+  onOpenLinkedPost,
   view,
   onViewChange,
   teamMembers,
@@ -200,7 +205,7 @@ export function KanbanBoard({
                       onClick={() => handleCardClick(item)}
                     >
                       <div className="min-w-0">
-                        <span className="block text-sm text-foreground truncate">{item.title}</span>
+                        <span className="block text-sm text-foreground truncate">{getContentTitle(item.title)}</span>
                         {(latestUpdater || activityCount > 0) && (
                           <span className="block text-[10px] text-muted-foreground truncate">
                             {latestUpdater ? `Updated by ${latestUpdater}` : ''}
@@ -322,7 +327,7 @@ export function KanbanBoard({
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                              <p className="text-sm font-medium text-foreground truncate">{getContentTitle(item.title)}</p>
                               <p className="text-xs text-muted-foreground">{time}</p>
                               {ownerName && (
                                 <p className="text-[10px] text-muted-foreground truncate">Owner {ownerName}</p>
@@ -367,6 +372,8 @@ export function KanbanBoard({
                 content={item}
                 onClick={() => handleCardClick(item)}
                 onConvertIdea={onConvertIdea}
+                onOpenLinkedIdea={onOpenLinkedIdea}
+                onOpenLinkedPost={onOpenLinkedPost}
               />
             ))}
             {groupedContent[String(column.id)]?.length === 0 && (

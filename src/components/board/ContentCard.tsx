@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { getBlockPreview, getContentTitle } from '@/lib/contentText'
 import {
   MessageSquare,
   Eye,
@@ -26,6 +27,8 @@ interface ContentCardProps {
   content: Content
   onClick?: () => void
   onConvertIdea?: (contentId: string) => void
+  onOpenLinkedIdea?: (ideaId: string) => void
+  onOpenLinkedPost?: (postId: string) => void
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
@@ -44,12 +47,21 @@ const PLATFORM_ICONS: Record<string, string> = {
   blog: '📝',
 }
 
-export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProps) {
+export function ContentCard({
+  content,
+  onClick,
+  onConvertIdea,
+  onOpenLinkedIdea,
+  onOpenLinkedPost,
+}: ContentCardProps) {
   const [showHover, setShowHover] = useState(false)
 
   const itemType = content.item_type || 'POST'
   const isIdea = itemType === 'IDEA'
   const isConvertedIdea = isIdea && content.idea_state === 'CONVERTED'
+  const hasSourceIdea = !isIdea && !!content.source_idea_id
+  const title = getContentTitle(content.title)
+  const preview = getBlockPreview(content.blocks)
   const statusConfig = STATUS_CONFIG[content.status] || STATUS_CONFIG.DRAFT
   const assignedUser = content.assignedTo || content.createdBy
   const ownerName = assignedUser?.name || assignedUser?.email || null
@@ -59,11 +71,20 @@ export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProp
 
   return (
     <Card
-      className="bg-[#0a0a0a] border-[#262626] rounded-lg p-3 hover:border-[#3d3d3d] transition-colors cursor-pointer group"
+      className={cn(
+        'bg-[#0a0a0a] border-[#262626] rounded-lg p-3 hover:border-[#3d3d3d] transition-colors cursor-pointer group relative overflow-hidden',
+        isIdea ? 'border-amber-900/50' : 'border-blue-900/50'
+      )}
       onMouseEnter={() => setShowHover(true)}
       onMouseLeave={() => setShowHover(false)}
       onClick={onClick}
     >
+      <span
+        className={cn(
+          'absolute left-0 top-0 h-full w-[3px]',
+          isIdea ? 'bg-amber-500/70' : 'bg-blue-500/70'
+        )}
+      />
       <CardContent className="p-0 space-y-3">
         {/* Card Header */}
         <div className="flex items-start justify-between gap-2">
@@ -77,7 +98,7 @@ export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProp
               >
                 {isIdea ? 'Idea' : 'Post'}
               </span>
-              <h4 className="text-sm font-medium text-foreground truncate pr-2">{content.title}</h4>
+              <h4 className="text-sm font-medium text-foreground truncate pr-2">{title}</h4>
               {ownerName && (
                 <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[120px]">
                   Owner {ownerName}
@@ -88,6 +109,16 @@ export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProp
                   Updated by {latestUpdater}
                 </span>
               )}
+              {isConvertedIdea && content.converted_post_id ? (
+                <span className="text-[10px] text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                  Linked Post
+                </span>
+              ) : null}
+              {hasSourceIdea ? (
+                <span className="text-[10px] text-blue-300 bg-blue-950/40 px-2 py-0.5 rounded-full">
+                  From Idea
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -98,9 +129,9 @@ export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProp
         </div>
 
         {/* Content Preview */}
-        {content.blocks.length > 0 && (
+        {preview && (
           <div className="text-xs text-muted-foreground line-clamp-2">
-            {content.blocks[0].type === 'heading' ? content.blocks[0].content : content.blocks[0].content}
+            {preview}
           </div>
         )}
 
@@ -189,16 +220,49 @@ export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProp
               Convert
             </Button>
           ) : null}
+          {isConvertedIdea && content.converted_post_id && onOpenLinkedPost ? (
+            <Button
+              variant="ghost"
+              className="h-7 px-2 text-xs text-emerald-300 hover:text-emerald-200"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenLinkedPost(content.converted_post_id as string)
+              }}
+            >
+              Open Post
+            </Button>
+          ) : null}
+          {hasSourceIdea && content.source_idea_id && onOpenLinkedIdea ? (
+            <Button
+              variant="ghost"
+              className="h-7 px-2 text-xs text-blue-300 hover:text-blue-200"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenLinkedIdea(content.source_idea_id as string)
+              }}
+            >
+              Open Idea
+            </Button>
+          ) : null}
           <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
             <Share2 className="h-3.5 w-3.5 mr-1" />
             Share
           </Button>
-          <Link href={`/${content.team_id}/content/${content.id}`}>
+          {!isIdea ? (
+            <Link href={`/${content.team_id}/content/${content.id}`}>
+              <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
+                <Edit className="h-3.5 w-3.5 mr-1" />
+                Edit
+              </Button>
+            </Link>
+          ) : (
             <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
               <Edit className="h-3.5 w-3.5 mr-1" />
-              Edit
+              Idea
             </Button>
-          </Link>
+          )}
         </div>
       </CardContent>
     </Card>

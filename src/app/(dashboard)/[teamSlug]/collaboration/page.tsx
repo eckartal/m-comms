@@ -273,6 +273,16 @@ export default function CollaborationPage() {
     openPost(contentItem.id)
   }
 
+  const openIdeaById = (ideaId: string) => {
+    const exists = content.some((item) => item.id === ideaId && (item.item_type || 'POST') === 'IDEA')
+    if (!exists) {
+      setActionError('Linked idea is not available in this view.')
+      return
+    }
+    setSelectedIdeaId(ideaId)
+    setIsIdeaPanelOpen(true)
+  }
+
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||
     assigneeFilter !== 'all' ||
@@ -496,6 +506,16 @@ export default function CollaborationPage() {
           <div>
             <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
             <p className="text-xs text-muted-foreground">Manage content workflow</p>
+          </div>
+          <div className="hidden md:flex items-center gap-2 rounded-full border border-[#262626] bg-[#0a0a0a] px-2 py-1">
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-300">
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              IDEA
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-blue-300">
+              <span className="h-2 w-2 rounded-full bg-blue-400" />
+              POST
+            </span>
           </div>
         </div>
 
@@ -751,6 +771,8 @@ export default function CollaborationPage() {
                 teamMembers={teamMembers}
                 onAssign={handleAssign}
                 onConvertIdea={handleConvertIdea}
+                onOpenLinkedIdea={openIdeaById}
+                onOpenLinkedPost={openPost}
               />
             </div>
             <CollabRightRail teamId={currentTeam.id} content={content} onOpenContent={handleCardClick} />
