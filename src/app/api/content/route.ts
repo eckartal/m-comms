@@ -23,6 +23,7 @@ type ContentRow = {
   id: string
   createdBy?: RawUser | RawUser[] | null
   assignedTo?: RawUser | RawUser[] | null
+  writer?: RawUser | RawUser[] | null
   [key: string]: unknown
 }
 
@@ -68,7 +69,8 @@ function isMissingIdeaColumnsError(error: unknown) {
     message.includes('source_idea_id') ||
     message.includes('converted_post_id') ||
     message.includes('converted_at') ||
-    message.includes('converted_by')
+    message.includes('converted_by') ||
+    message.includes('writer_id')
   )
 }
 
@@ -79,6 +81,15 @@ function isMissingScheduledColumnError(error: unknown) {
       : ''
 
   return message.includes('scheduled_at')
+}
+
+function isMissingWriterColumnError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+
+  return message.includes('writer_id')
 }
 
 function isMissingContentCommentsRelationError(error: unknown) {
@@ -108,7 +119,12 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('content')
-      .select('*')
+      .select(`
+        *,
+        createdBy:created_by(id, full_name, name, email, avatar_url),
+        assignedTo:assigned_to(id, full_name, name, email, avatar_url),
+        writer:writer_id(id, full_name, name, email, avatar_url)
+      `)
       .order('created_at', { ascending: false })
 
     if (teamId) {
@@ -133,7 +149,12 @@ export async function GET(request: Request) {
 
     let { data, error } = await query
 
-    if (error && (isMissingScheduledColumnError(error) || isMissingContentCommentsRelationError(error))) {
+    if (
+      error &&
+      (isMissingScheduledColumnError(error) ||
+        isMissingContentCommentsRelationError(error) ||
+        isMissingWriterColumnError(error))
+    ) {
       // Compatibility fallback for older schemas missing scheduled_at/published_at.
       const fallbackQuery = supabase
         .from('content')
@@ -152,6 +173,8 @@ export async function GET(request: Request) {
           platforms,
           created_by,
           assigned_to,
+          createdBy:created_by(id, full_name, name, email, avatar_url),
+          assignedTo:assigned_to(id, full_name, name, email, avatar_url),
           created_at,
           updated_at
         `)
@@ -202,10 +225,14 @@ export async function GET(request: Request) {
 
     const enriched = (data as ContentRow[]).map((item) => {
       const latest = latestActivity[item.id]
+      const createdBy = normalizeUser(item.createdBy)
+      const assignedTo = normalizeUser(item.assignedTo)
+      const writer = normalizeUser(item.writer as RawUser | RawUser[] | null | undefined)
       return {
         ...item,
-        createdBy: normalizeUser(item.createdBy),
-        assignedTo: normalizeUser(item.assignedTo),
+        createdBy,
+        assignedTo,
+        writer: writer || assignedTo || createdBy,
         latest_activity: latest
           ? {
               ...latest,
@@ -234,7 +261,19 @@ export async function POST(request: Request) {
     if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
     const body = await request.json()
-    const { title, blocks, platforms, status, scheduled_at, team_id, item_type, idea_state, assigned_to } = body
+    const {
+      title,
+      blocks,
+      platforms,
+      status,
+      scheduled_at,
+      team_id,
+      item_type,
+      idea_state,
+      assigned_to,
+      writer_id,
+      source_idea_id,
+    } = body
 
     if (!title || !team_id) {
       return apiError('Title and team_id are required', 400, 'validation_error', false)
@@ -284,12 +323,29 @@ export async function POST(request: Request) {
     // Keep backward compatibility with older schemas where these columns may not exist yet.
     if (scheduled_at !== undefined) insertData.scheduled_at = scheduled_at
     if (assigned_to !== undefined) insertData.assigned_to = assigned_to
+    if (source_idea_id !== undefined) insertData.source_idea_id = source_idea_id
+    if (writer_id !== undefined) {
+      insertData.writer_id = writer_id
+    } else {
+      insertData.writer_id = assigned_to || user.id
+    }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('content')
       .insert(insertData)
       .select('*')
       .single()
+
+    if (error && isMissingWriterColumnError(error)) {
+      delete insertData.writer_id
+      const retry = await supabase
+        .from('content')
+        .insert(insertData)
+        .select('*')
+        .single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error('Error creating content:', error)
@@ -309,6 +365,11 @@ export async function POST(request: Request) {
         data: {
           ...data,
           createdBy: normalizeUser((data as ContentRow).createdBy),
+          assignedTo: normalizeUser((data as ContentRow).assignedTo),
+          writer:
+            normalizeUser((data as ContentRow).writer as RawUser | RawUser[] | null | undefined) ||
+            normalizeUser((data as ContentRow).assignedTo) ||
+            normalizeUser((data as ContentRow).createdBy),
         },
       },
       { status: 201 }

@@ -139,6 +139,11 @@ export function PostEditorPanel({
   }, [linkedIdea?.id, allContents])
   const linkedIdeaNotes = useMemo(() => extractIdeaNotes(linkedIdea?.blocks), [linkedIdea?.blocks])
   const hasLinkedIdeaContext = !!post?.source_idea_id
+  const handleInsertIdeaContext = () => {
+    if (!linkedIdeaNotes.trim()) return
+    const prefixed = `Idea context:\n${linkedIdeaNotes.trim()}`
+    setNotes((prev) => (prev.trim().length === 0 ? prefixed : `${prev.trim()}\n\n${prefixed}`))
+  }
 
   const hasChanges = useMemo(() => {
     if (!post) return false
@@ -274,8 +279,9 @@ export function PostEditorPanel({
 
               <div className="flex flex-col gap-3 md:flex-row">
                 {hasLinkedIdeaContext && showIdeaContext ? (
-                  <aside className="w-full shrink-0 space-y-2 rounded-sm border border-border bg-card p-3 md:w-[230px]">
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <aside className="w-full shrink-0 md:w-[220px]">
+                    <div className="sticky top-0 space-y-2 rounded-md border border-amber-200/70 bg-amber-50 p-3 shadow-sm dark:border-amber-900/70 dark:bg-amber-950/30">
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
                       <Link2 className="h-3 w-3" />
                       Idea Context
                     </div>
@@ -294,23 +300,34 @@ export function PostEditorPanel({
                           </span>
                         </div>
                         <p className="text-xs font-medium text-foreground">{linkedIdea.title || 'Untitled idea'}</p>
-                        <div className="max-h-[220px] overflow-y-auto rounded-sm border border-border bg-background p-2 text-[11px] text-muted-foreground">
+                        <div className="max-h-[220px] overflow-y-auto rounded-sm border border-amber-200/60 bg-white p-2 text-[11px] text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
                           {linkedIdeaNotes || 'No idea notes available.'}
                         </div>
-                        {onOpenLinkedIdea ? (
+                        <div className="flex items-center gap-1">
+                          {onOpenLinkedIdea ? (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              className="h-6 px-2 text-[10px]"
+                              onClick={() => onOpenLinkedIdea(linkedIdea.id)}
+                            >
+                              Open Idea
+                            </Button>
+                          ) : null}
                           <Button
                             size="xs"
                             variant="outline"
                             className="h-6 px-2 text-[10px]"
-                            onClick={() => onOpenLinkedIdea(linkedIdea.id)}
+                            onClick={handleInsertIdeaContext}
                           >
-                            Open Idea
+                            Use Context
                           </Button>
-                        ) : null}
+                        </div>
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground">No linked idea found.</p>
                     )}
+                    </div>
                   </aside>
                 ) : null}
 

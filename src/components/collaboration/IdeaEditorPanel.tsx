@@ -37,6 +37,15 @@ interface IdeaEditorPanelProps {
       include_notes?: boolean
     }
   ) => Promise<void>
+  onCreatePostDraft: (
+    ideaId: string,
+    options?: {
+      post_title?: string
+      post_status?: string
+      assigned_to?: string | null
+      include_notes?: boolean
+    }
+  ) => Promise<void>
   onOpenLinkedPost: (postId: string) => void
 }
 
@@ -85,6 +94,7 @@ export function IdeaEditorPanel({
   onOpenChange,
   onIdeaUpdated,
   onConvertIdea,
+  onCreatePostDraft,
   onOpenLinkedPost,
 }: IdeaEditorPanelProps) {
   const allContents = useContentStore((state) => state.contents)
@@ -257,6 +267,31 @@ export function IdeaEditorPanel({
       })
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to convert idea')
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
+  const handleCreateDraftPost = async () => {
+    if (!idea) return
+    setIsConverting(true)
+    setSaveError(null)
+    try {
+      if (hasChanges) {
+        const saved = await handleSave('manual')
+        if (!saved) {
+          return
+        }
+      }
+
+      await onCreatePostDraft(idea.id, {
+        post_title: convertTitle.trim() || inferTitleFromNotes(notes, 'POST', title),
+        post_status: convertStatus,
+        assigned_to: convertAssignee || null,
+        include_notes: includeNotes,
+      })
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Failed to create post draft')
     } finally {
       setIsConverting(false)
     }
@@ -454,6 +489,15 @@ export function IdeaEditorPanel({
                   />
                   Copy idea notes into post draft
                 </label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-full"
+                  onClick={handleCreateDraftPost}
+                  disabled={isConverting}
+                >
+                  {isConverting ? 'Creating Draft...' : 'Create Draft in Editor'}
+                </Button>
                   </div>
                 ) : null}
               </div>

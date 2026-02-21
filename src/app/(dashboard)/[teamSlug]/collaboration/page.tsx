@@ -650,6 +650,59 @@ export default function CollaborationPage() {
     }
   }
 
+  const handleCreatePostDraftFromIdea = async (
+    ideaId: string,
+    options?: {
+      post_title?: string
+      post_status?: string
+      assigned_to?: string | null
+      include_notes?: boolean
+    }
+  ) => {
+    if (!currentTeam?.id) return
+    const idea = content.find(
+      (item) => item.id === ideaId && (item.item_type || 'POST') === 'IDEA'
+    )
+    if (!idea) {
+      throw new Error('Idea not found in collaboration view')
+    }
+
+    const notesBlocks = options?.include_notes === false ? [] : idea.blocks || []
+
+    const response = await fetch('/api/content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        team_id: currentTeam.id,
+        title: options?.post_title?.trim() || 'Untitled post',
+        blocks: notesBlocks,
+        platforms: idea.platforms || [],
+        item_type: 'POST',
+        status: options?.post_status || 'DRAFT',
+        assigned_to: options?.assigned_to ?? idea.assigned_to ?? null,
+        source_idea_id: idea.id,
+      }),
+    })
+    if (!response.ok) {
+      await parseRequestError(response, 'Failed to create post draft')
+    }
+
+    const body = await response.json()
+    const post = body?.data as Content | undefined
+    if (!post) {
+      throw new Error('Post draft was not returned by server')
+    }
+
+    setContent((prev) => {
+      const next = prev.some((item) => item.id === post.id) ? prev : [post, ...prev]
+      setContents(next)
+      return next
+    })
+    setIsIdeaPanelOpen(false)
+    setSelectedPostId(post.id)
+    setIsPostPanelOpen(true)
+  }
+
   const selectedIdea = content.find(
     (item) => item.id === selectedIdeaId && (item.item_type || 'POST') === 'IDEA'
   ) || null
@@ -1006,6 +1059,7 @@ export default function CollaborationPage() {
           setContents(next)
         }}
         onConvertIdea={handleConvertIdea}
+        onCreatePostDraft={handleCreatePostDraftFromIdea}
         onOpenLinkedPost={(postId) => openLinkedPostById(postId, 'idea_panel')}
       />
 
