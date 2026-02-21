@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Loader2 } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,6 +34,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    void trackEvent('login_started', { payload: { method: 'password' } })
 
     try {
       const supabase = createClient()
@@ -46,6 +48,7 @@ export default function LoginPage() {
       await syncUserWithStore()
       await syncTeamsWithStore()
       await syncOnboardingWithStore()
+      void trackEvent('login_succeeded', { payload: { method: 'password' } })
       const next = getSafeNext()
       if (next) {
         router.push(next)
@@ -58,6 +61,12 @@ export default function LoginPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign in'
       setError(message)
+      void trackEvent('login_failed', {
+        payload: {
+          method: 'password',
+          error: message,
+        },
+      })
     } finally {
       setLoading(false)
     }
@@ -65,6 +74,7 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true)
+    void trackEvent('login_started', { payload: { method: 'google_oauth' } })
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithOAuth({
@@ -77,6 +87,12 @@ export default function LoginPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign in with Google'
       setError(message)
+      void trackEvent('login_failed', {
+        payload: {
+          method: 'google_oauth',
+          error: message,
+        },
+      })
       setLoading(false)
     }
   }

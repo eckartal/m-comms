@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { persistOnboardingComplete, syncTeamsWithStore, useAppStore } from '@/stores'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 export default function OnboardingTeamPage() {
   const router = useRouter()
@@ -45,6 +46,7 @@ export default function OnboardingTeamPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    void trackEvent('onboarding_team_create_started')
 
     try {
       const slug = teamName
@@ -71,10 +73,14 @@ export default function OnboardingTeamPage() {
       await syncTeamsWithStore()
       await persistOnboardingComplete()
       const routeSlug = body?.data?.slug || slug
+      void trackEvent('team_created', { payload: { slug: routeSlug } })
+      void trackEvent('onboarding_completed', { payload: { source: 'onboarding_team' } })
       router.push(`/${routeSlug}`)
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create team')
+      const message = err instanceof Error ? err.message : 'Failed to create team'
+      setError(message)
+      void trackEvent('onboarding_team_create_failed', { payload: { error: message } })
     } finally {
       setLoading(false)
     }

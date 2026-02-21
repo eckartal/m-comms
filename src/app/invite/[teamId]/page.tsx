@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 export default function InvitePage() {
   const params = useParams()
@@ -19,12 +20,14 @@ export default function InvitePage() {
 
     setLoading(true)
     setError(null)
+    void trackEvent('invite_join_started')
 
     try {
       const response = await fetch(`/api/invite/${teamId}/accept`, { method: 'POST' })
       const body = await response.json().catch(() => ({}))
 
       if (response.status === 401) {
+        void trackEvent('invite_join_requires_login')
         router.push(`/login?next=/invite/${teamId}`)
         return
       }
@@ -34,10 +37,13 @@ export default function InvitePage() {
       }
 
       const slug = body?.data?.slug
+      void trackEvent('invite_join_succeeded', { payload: { slug: slug || null } })
       router.push(slug ? `/${slug}` : '/onboarding/team')
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join team')
+      const message = err instanceof Error ? err.message : 'Failed to join team'
+      setError(message)
+      void trackEvent('invite_join_failed', { payload: { error: message } })
     } finally {
       setLoading(false)
     }

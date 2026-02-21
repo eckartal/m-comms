@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from '@/components/ui/separator'
 import { Loader2 } from 'lucide-react'
 import { persistOnboardingComplete, syncUserWithStore, syncTeamsWithStore } from '@/stores'
+import { trackEvent } from '@/lib/analytics/trackEvent'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -55,6 +56,8 @@ export default function RegisterPage() {
     await syncTeamsWithStore()
     await persistOnboardingComplete()
     const createdSlug = teamPayload?.data?.slug || teamSlug
+    void trackEvent('team_created', { payload: { slug: createdSlug } })
+    void trackEvent('onboarding_completed', { payload: { source: 'register' } })
     router.push(`/${createdSlug}`)
     router.refresh()
   }
@@ -63,6 +66,7 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    void trackEvent('signup_started', { payload: { method: 'password' } })
 
     try {
       const supabase = createClient()
@@ -80,6 +84,7 @@ export default function RegisterPage() {
 
       if (data.session) {
         await syncUserWithStore()
+        void trackEvent('signup_succeeded', { payload: { method: 'password' } })
         setStep('team')
       } else {
         router.push('/check-email')
@@ -87,6 +92,7 @@ export default function RegisterPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create account'
       setError(message)
+      void trackEvent('signup_failed', { payload: { method: 'password', error: message } })
     } finally {
       setLoading(false)
     }
@@ -109,6 +115,7 @@ export default function RegisterPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true)
+    void trackEvent('signup_started', { payload: { method: 'google_oauth' } })
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithOAuth({
@@ -121,6 +128,7 @@ export default function RegisterPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign up with Google'
       setError(message)
+      void trackEvent('signup_failed', { payload: { method: 'google_oauth', error: message } })
       setLoading(false)
     }
   }
