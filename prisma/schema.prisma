@@ -91,6 +91,8 @@ model Content {
   schedules   ContentSchedule[]
   comments    Comment[]
   activities  ContentActivity[]
+  annotations ContentAnnotation[]
+  changeNotes ContentChangeNote[]
 
   @@index([team_id])
   @@index([status])
@@ -148,6 +150,8 @@ model ContentActivity {
   to_scheduled_at   DateTime?
   from_assigned_to String?
   to_assigned_to   String?
+  from_version_id  String?
+  to_version_id    String?
   metadata         Json     @default("{}")
   created_at       DateTime @default(now())
 
@@ -159,6 +163,65 @@ model ContentActivity {
   @@index([team_id])
   @@index([created_at])
   @@map("content_activity")
+}
+
+model ContentAnnotation {
+  id           String   @id @default(cuid())
+  content_id   String
+  block_id     String
+  start_offset Int
+  end_offset   Int
+  text_snapshot String
+  status       String   @default("OPEN")
+  created_by   String
+  created_at   DateTime @default(now())
+  resolved_by  String?
+  resolved_at  DateTime?
+
+  content Content @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  creator User   @relation(fields: [created_by], references: [id])
+
+  comments AnnotationComment[]
+
+  @@index([content_id])
+  @@index([block_id])
+  @@index([status])
+  @@map("content_annotations")
+}
+
+model AnnotationComment {
+  id            String   @id @default(cuid())
+  annotation_id String
+  content_id    String
+  user_id       String
+  text          String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  annotation ContentAnnotation @relation(fields: [annotation_id], references: [id], onDelete: Cascade)
+  content    Content           @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [user_id], references: [id])
+
+  @@index([annotation_id])
+  @@index([content_id])
+  @@map("annotation_comments")
+}
+
+model ContentChangeNote {
+  id          String   @id @default(cuid())
+  content_id  String
+  activity_id String
+  user_id     String
+  reason      String
+  created_at  DateTime @default(now())
+
+  content  Content        @relation(fields: [content_id], references: [id], onDelete: Cascade)
+  activity ContentActivity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [user_id], references: [id])
+
+  @@index([content_id])
+  @@index([activity_id])
+  @@map("content_change_notes")
 }
 
 enum ScheduleStatus {

@@ -216,7 +216,7 @@ export async function PUT(
 
     const { contentId } = await params
     const body = await request.json()
-    const { title, blocks, platforms, status, scheduled_at, assigned_to } = body
+    const { title, blocks, platforms, status, scheduled_at, assigned_to, change_reason } = body
 
     const { data: currentContent, error: currentError } = await supabase
       .from('content')
@@ -290,11 +290,25 @@ export async function PUT(
     }
 
     if (activityEntries.length > 0) {
-      const { error: activityError } = await supabase
+      const { data: inserted, error: activityError } = await supabase
         .from('content_activity')
         .insert(activityEntries)
+        .select('id, action')
       if (activityError) {
         console.error('Error logging content activity:', activityError)
+      } else if (change_reason && inserted?.length) {
+        const noteEntries = inserted.map((entry: { id: string }) => ({
+          content_id: contentId,
+          activity_id: entry.id,
+          user_id: user.id,
+          reason: change_reason,
+        }))
+        const { error: noteError } = await supabase
+          .from('content_change_notes')
+          .insert(noteEntries)
+        if (noteError) {
+          console.error('Error logging change notes:', noteError)
+        }
       }
     }
 

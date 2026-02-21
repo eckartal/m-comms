@@ -27,6 +27,7 @@ export async function GET(
         to_scheduled_at,
         from_assigned_to,
         to_assigned_to,
+        changeNote:content_change_notes(reason),
         metadata,
         created_at,
         user:user_id(id, name, email, avatar_url)

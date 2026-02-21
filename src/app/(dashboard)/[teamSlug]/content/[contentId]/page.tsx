@@ -202,6 +202,7 @@ type ActivityItem = {
   to_scheduled_at?: string | null
   from_assigned_to?: string | null
   to_assigned_to?: string | null
+  changeNote?: Array<{ reason: string }> | null
   metadata?: Record<string, unknown> | null
   created_at: string
   user?: {
@@ -242,6 +243,8 @@ export default function EditContentPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [activityLoading, setActivityLoading] = useState(true)
+  const [changeReason, setChangeReason] = useState('')
+  const [showReasonPrompt, setShowReasonPrompt] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
 
   useEffect(() => {
@@ -318,6 +321,7 @@ export default function EditContentPage() {
           status: publishStatus || status,
           scheduled_at: scheduledAt || null,
           assigned_to: assignedTo || null,
+          change_reason: changeReason.trim() || null,
         }),
       })
       if (publishStatus === 'PUBLISHED') {
@@ -325,6 +329,8 @@ export default function EditContentPage() {
       } else {
         await fetchContent()
         await fetchActivity()
+        setChangeReason('')
+        setShowReasonPrompt(false)
       }
     } catch (error) {
       console.error('Error saving content:', error)
@@ -356,6 +362,8 @@ export default function EditContentPage() {
     }
     return item.action.replace(/_/g, ' ').toLowerCase()
   }
+
+  const latestReason = (item: ActivityItem) => item.changeNote?.[0]?.reason || null
 
   if (isLoading) {
     return <div className="max-w-4xl mx-auto py-8 text-[#9ca3af]">Loading...</div>
@@ -454,6 +462,9 @@ export default function EditContentPage() {
                 <div className="absolute left-1 top-2 h-2 w-2 rounded-full bg-[#37352f]" />
                 <div className="border-l border-[#e5e5e5] pl-4 py-2">
                   <p className="text-sm text-[#37352f]">{renderActivityLabel(item)}</p>
+                  {latestReason(item) && (
+                    <p className="text-xs text-[#6b7280] mt-1">Why: {latestReason(item)}</p>
+                  )}
                   <p className="text-xs text-[#9ca3af]">
                     {item.user?.name || item.user?.email || 'Unknown user'} · {new Date(item.created_at).toLocaleString()}
                   </p>
@@ -488,6 +499,26 @@ export default function EditContentPage() {
       {/* Schedule */}
       <div className="mb-12">
         <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Schedule</h2>
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => setShowReasonPrompt((prev) => !prev)}
+            className="text-xs text-[#6b7280] hover:text-[#37352f]"
+          >
+            {showReasonPrompt ? 'Hide reason' : 'Add a reason (optional)'}
+          </button>
+          {showReasonPrompt && (
+            <div className="mt-2">
+              <input
+                type="text"
+                value={changeReason}
+                onChange={(e) => setChangeReason(e.target.value)}
+                placeholder="Why are you making this change?"
+                className="w-full px-3 py-2 border border-[#e5e5e5] rounded-lg focus:outline-none focus:border-[#2383e2] text-[#37352f]"
+              />
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-xs">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
