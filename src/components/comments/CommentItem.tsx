@@ -81,6 +81,20 @@ export function CommentItem({ comment, currentUserId, onUpdate, depth = 0 }: Com
     }
   }
 
+  const renderWithMentions = (text: string) => {
+    const parts = text.split(/(@[\w-]+)/g)
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        return (
+          <span key={index} className="text-blue-600">
+            {part}
+          </span>
+        )
+      }
+      return <span key={index}>{part}</span>
+    })
+  }
+
   return (
     <div className={`${depth > 0 ? 'ml-8 border-l-2 border-gray-100 pl-4' : ''}`}>
       <div className={`flex gap-3 py-3 ${isResolved ? 'opacity-50' : ''}`}>
@@ -120,7 +134,9 @@ export function CommentItem({ comment, currentUserId, onUpdate, depth = 0 }: Com
               </div>
             </div>
           ) : (
-            <p className="text-sm mt-1 text-gray-700 whitespace-pre-wrap">{comment.text}</p>
+            <p className="text-sm mt-1 text-gray-700 whitespace-pre-wrap">
+              {renderWithMentions(comment.text)}
+            </p>
           )}
 
           <div className="flex items-center gap-4 mt-2">

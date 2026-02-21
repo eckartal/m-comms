@@ -123,6 +123,8 @@ export function InlineComments({
   const [commentText, setCommentText] = useState('')
   const [hoveredComment, setHoveredComment] = useState<string | null>(null)
   const [commentBoxPos, setCommentBoxPos] = useState({ top: 0, left: 0 })
+  const openCount = comments.filter((c) => !c.resolved).length
+  const resolvedCount = comments.filter((c) => c.resolved).length
 
   // Handle text selection
   const handleSelect = () => {
@@ -253,7 +255,7 @@ export function InlineComments({
       {/* Comments List */}
       <div className="mt-4 space-y-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Comments ({comments.length})
+          Comments ({comments.length} · {openCount} open · {resolvedCount} resolved)
         </h3>
         {comments.map((comment) => (
           <InlineCommentItem
