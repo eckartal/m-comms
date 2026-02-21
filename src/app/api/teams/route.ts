@@ -33,7 +33,7 @@ export async function GET() {
 
     type TeamMemberData = { team: unknown }
     const teams = (data as TeamMemberData[])?.map((tm) => tm.team) || []
-    return NextResponse.json(teams)
+    return NextResponse.json({ data: teams })
   } catch (error) {
     console.error('Error in GET /api/teams:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -139,10 +139,15 @@ Feel free to edit or delete this draft as you explore the platform!`,
       }
     }
 
-    return NextResponse.json({
-      ...team,
-      welcome_content_id: welcomeContentId,
-    }, { status: 201 })
+    return NextResponse.json(
+      {
+        data: {
+          ...team,
+          welcome_content_id: welcomeContentId,
+        },
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error in POST /api/teams:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

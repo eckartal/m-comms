@@ -81,7 +81,7 @@ export default function RegisterPage() {
             router.refresh()
           } else {
             const errorData = await teamResponse.json()
-            setError(errorData.error || 'Failed to create team')
+            setError(errorData.error || errorData?.data?.error || 'Failed to create team')
             setLoading(false)
           }
         }
