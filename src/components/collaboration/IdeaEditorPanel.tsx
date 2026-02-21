@@ -288,7 +288,7 @@ export function IdeaEditorPanel({
         post_title: convertTitle.trim() || inferTitleFromNotes(notes, 'POST', title),
         post_status: convertStatus,
         assigned_to: convertAssignee || null,
-        include_notes: includeNotes,
+        include_notes: false,
       })
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to create post draft')
@@ -496,7 +496,7 @@ export function IdeaEditorPanel({
                   onClick={handleCreateDraftPost}
                   disabled={isConverting}
                 >
-                  {isConverting ? 'Creating Draft...' : 'Create Draft in Editor'}
+                  {isConverting ? 'Creating Draft...' : 'Create Draft in Editor (Empty)'}
                 </Button>
                   </div>
                 ) : null}

@@ -39,7 +39,6 @@ function extractPrimaryNotes(blocks: unknown): string {
   if (!Array.isArray(blocks) || blocks.length === 0) return ''
   const first = blocks[0] as { content?: unknown } | null
   if (!first || typeof first !== 'object') return ''
-
   if (typeof first.content === 'string') return first.content
   if (
     first.content &&
@@ -53,19 +52,7 @@ function extractPrimaryNotes(blocks: unknown): string {
 }
 
 function extractIdeaNotes(blocks: unknown): string {
-  if (!Array.isArray(blocks) || blocks.length === 0) return ''
-  const first = blocks[0] as { content?: unknown } | null
-  if (!first || typeof first !== 'object') return ''
-  if (typeof first.content === 'string') return first.content
-  if (
-    first.content &&
-    typeof first.content === 'object' &&
-    'text' in (first.content as Record<string, unknown>) &&
-    typeof (first.content as { text?: unknown }).text === 'string'
-  ) {
-    return (first.content as { text: string }).text
-  }
-  return ''
+  return extractPrimaryNotes(blocks)
 }
 
 const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
@@ -78,14 +65,8 @@ function resolvePostTitle(params: {
   const rawTitle = params.currentTitle.trim()
   const hasMeaningfulTitle = rawTitle.length > 0 && !UNTITLED_TITLE_RE.test(rawTitle)
 
-  if (params.titleTouched) {
-    return rawTitle || 'Untitled post'
-  }
-
-  if (hasMeaningfulTitle) {
-    return rawTitle
-  }
-
+  if (params.titleTouched) return rawTitle || 'Untitled post'
+  if (hasMeaningfulTitle) return rawTitle
   return inferTitleFromNotes(params.notes, 'POST', params.currentTitle)
 }
 
@@ -133,17 +114,14 @@ export function PostEditorPanel({
     if (!post) return null
     return getTicketKey(post.id, allContents)
   }, [post, allContents])
+
   const linkedIdeaTicket = useMemo(() => {
     if (!linkedIdea?.id) return null
     return getTicketKey(linkedIdea.id, allContents)
   }, [linkedIdea?.id, allContents])
+
   const linkedIdeaNotes = useMemo(() => extractIdeaNotes(linkedIdea?.blocks), [linkedIdea?.blocks])
   const hasLinkedIdeaContext = !!post?.source_idea_id
-  const handleInsertIdeaContext = () => {
-    if (!linkedIdeaNotes.trim()) return
-    const prefixed = `Idea context:\n${linkedIdeaNotes.trim()}`
-    setNotes((prev) => (prev.trim().length === 0 ? prefixed : `${prev.trim()}\n\n${prefixed}`))
-  }
 
   const hasChanges = useMemo(() => {
     if (!post) return false
@@ -229,19 +207,7 @@ export function PostEditorPanel({
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [
-    open,
-    post?.id,
-    post,
-    title,
-    notes,
-    status,
-    assignedTo,
-    hasChanges,
-    isSaving,
-    isAutoSaving,
-    handleSave,
-  ])
+  }, [open, post, hasChanges, isSaving, isAutoSaving, title, notes, status, assignedTo, handleSave])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -279,31 +245,30 @@ export function PostEditorPanel({
 
               <div className="flex flex-col gap-3 md:flex-row">
                 {hasLinkedIdeaContext && showIdeaContext ? (
-                  <aside className="w-full shrink-0 md:w-[220px]">
+                  <aside className="w-full shrink-0 md:w-[210px]">
                     <div className="sticky top-0 space-y-2 rounded-md border border-amber-200/70 bg-amber-50 p-3 shadow-sm dark:border-amber-900/70 dark:bg-amber-950/30">
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                      <Link2 className="h-3 w-3" />
-                      Idea Context
-                    </div>
-                    {linkedIdeaLoading ? (
-                      <p className="text-xs text-muted-foreground">Loading linked idea...</p>
-                    ) : linkedIdeaError ? (
-                      <p className="text-xs text-red-400">{linkedIdeaError}</p>
-                    ) : linkedIdea ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                            {linkedIdeaTicket || 'IDEA'}
-                          </span>
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                            IDEA
-                          </span>
-                        </div>
-                        <p className="text-xs font-medium text-foreground">{linkedIdea.title || 'Untitled idea'}</p>
-                        <div className="max-h-[220px] overflow-y-auto rounded-sm border border-amber-200/60 bg-white p-2 text-[11px] text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
-                          {linkedIdeaNotes || 'No idea notes available.'}
-                        </div>
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                        <Link2 className="h-3 w-3" />
+                        Idea Context
+                      </div>
+                      {linkedIdeaLoading ? (
+                        <p className="text-xs text-muted-foreground">Loading linked idea...</p>
+                      ) : linkedIdeaError ? (
+                        <p className="text-xs text-red-400">{linkedIdeaError}</p>
+                      ) : linkedIdea ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                              {linkedIdeaTicket || 'IDEA'}
+                            </span>
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                              IDEA
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-foreground">{linkedIdea.title || 'Untitled idea'}</p>
+                          <div className="max-h-[180px] overflow-y-auto rounded-sm border border-amber-200/60 bg-white p-2 text-[11px] leading-5 text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
+                            {linkedIdeaNotes || 'No idea notes available.'}
+                          </div>
                           {onOpenLinkedIdea ? (
                             <Button
                               size="xs"
@@ -314,19 +279,10 @@ export function PostEditorPanel({
                               Open Idea
                             </Button>
                           ) : null}
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            className="h-6 px-2 text-[10px]"
-                            onClick={handleInsertIdeaContext}
-                          >
-                            Use Context
-                          </Button>
                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No linked idea found.</p>
-                    )}
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No linked idea found.</p>
+                      )}
                     </div>
                   </aside>
                 ) : null}
@@ -340,8 +296,8 @@ export function PostEditorPanel({
                         setTitleTouched(true)
                         setTitle(e.target.value)
                       }}
-                      placeholder="Untitled post"
-                      className="h-8 border-border bg-card text-xs text-foreground placeholder:text-muted-foreground"
+                      placeholder="Draft title (optional)"
+                      className="h-10 rounded-[8px] border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
 
@@ -350,8 +306,8 @@ export function PostEditorPanel({
                     <Textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Write the post content..."
-                      className="min-h-[220px] border-border bg-card text-xs text-foreground placeholder:text-muted-foreground"
+                      placeholder="What is happening?"
+                      className="min-h-[320px] rounded-[8px] border-border bg-card px-3 py-3 text-[15px] leading-7 text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
 
@@ -361,7 +317,7 @@ export function PostEditorPanel({
                       <select
                         value={status}
                         onChange={(e) => setStatus(e.target.value as typeof status)}
-                        className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                        className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
                       >
                         <option value="DRAFT">Draft</option>
                         <option value="IN_REVIEW">In Review</option>
@@ -377,7 +333,7 @@ export function PostEditorPanel({
                       <select
                         value={assignedTo}
                         onChange={(e) => setAssignedTo(e.target.value)}
-                        className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                        className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
                       >
                         <option value="">Unassigned</option>
                         {teamMembers

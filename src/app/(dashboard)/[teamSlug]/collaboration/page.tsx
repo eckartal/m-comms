@@ -667,15 +667,13 @@ export default function CollaborationPage() {
       throw new Error('Idea not found in collaboration view')
     }
 
-    const notesBlocks = options?.include_notes === false ? [] : idea.blocks || []
-
     const response = await fetch('/api/content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         team_id: currentTeam.id,
         title: options?.post_title?.trim() || 'Untitled post',
-        blocks: notesBlocks,
+        blocks: [],
         platforms: idea.platforms || [],
         item_type: 'POST',
         status: options?.post_status || 'DRAFT',
@@ -920,7 +918,7 @@ export default function CollaborationPage() {
             onClick={goToIdeaMoodboard}
           >
             <Lightbulb className="mr-1 h-3.5 w-3.5" />
-            Idea Moodboard
+            Inspirations
           </Button>
           <Button
             variant="outline"
