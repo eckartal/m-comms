@@ -32,7 +32,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
   const recentItems = useMemo(
     () =>
       contents
-        .filter((content) => content.status !== 'ARCHIVED')
+        .filter((content) => content.status !== 'ARCHIVED' && (content.item_type || 'POST') === 'POST')
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
         .slice(0, 3)
         .map((content) => ({
@@ -59,7 +59,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
   // activePrimaryItem not used currently, kept for future use
 
   return (
-    <aside className={cn('flex h-full w-full flex-col bg-sidebar', className)}>
+    <aside className={cn('flex h-full min-h-0 w-full flex-col bg-sidebar', className)}>
       <div className={cn('border-b border-sidebar-border p-3', collapsed && 'px-2.5')}>
         <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
           <div className="relative">
@@ -85,7 +85,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
           onClick={onNavigate}
           title={collapsed ? 'Post' : undefined}
           className={cn(
-            'flex w-full items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-gray-100',
+            'flex w-full items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-foreground/90',
             collapsed && 'justify-center px-2.5'
           )}
         >
@@ -94,7 +94,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+      <nav className="min-h-0 flex-1 overflow-y-auto py-2 custom-scrollbar">
         <div className={cn('px-2', collapsed && 'px-1.5')}>
           <div className="space-y-1">
             {primaryNavItems.map((item) => {
@@ -141,7 +141,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
               </div>
               <div className="max-h-[200px] space-y-1 overflow-y-auto custom-scrollbar">
                 {contentLoading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading recent items...</p>}
-                {!contentLoading && recentItems.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No recent items yet</p>}
+                {!contentLoading && recentItems.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No recent posts yet</p>}
                 {recentItems.map((item) => {
                   const isActive = pathname === `/${teamSlug}/content/${item.id}`
                   return (
@@ -174,7 +174,7 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
         </div>
       </nav>
 
-      <div className={cn('border-t border-sidebar-border p-2', collapsed && 'px-1.5')}>
+      <div className={cn('shrink-0 border-t border-sidebar-border bg-sidebar p-2', collapsed && 'px-1.5')}>
         <Link
           href={`/${teamSlug}/settings`}
           onClick={onNavigate}
