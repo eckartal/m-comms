@@ -657,6 +657,14 @@ export default function EditContentPage() {
           {latestUpdater && (
             <>· by {latestUpdater}</>
           )}
+          {currentUser?.name && (
+            <>
+              · <span className="inline-flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Active now: {currentUser.name}
+              </span>
+            </>
+          )}
         </p>
       </div>
 

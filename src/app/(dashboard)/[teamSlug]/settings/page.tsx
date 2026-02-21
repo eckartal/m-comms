@@ -45,6 +45,9 @@ export default function SettingsPage() {
     push: false,
     scheduled: true,
     published: true,
+    mentions: true,
+    commentReplies: true,
+    statusChanges: true,
   })
   const [saved, setSaved] = useState(false)
 
@@ -187,6 +190,24 @@ export default function SettingsPage() {
                 description="Get notified when posts are published"
                 checked={notifications.published}
                 onChange={(v) => setNotifications({ ...notifications, published: v })}
+              />
+              <ToggleOption
+                label="Mentions"
+                description="Get notified when someone @mentions you"
+                checked={notifications.mentions}
+                onChange={(v) => setNotifications({ ...notifications, mentions: v })}
+              />
+              <ToggleOption
+                label="Comment replies"
+                description="Get notified when someone replies to your comments"
+                checked={notifications.commentReplies}
+                onChange={(v) => setNotifications({ ...notifications, commentReplies: v })}
+              />
+              <ToggleOption
+                label="Status changes"
+                description="Get notified when content status changes"
+                checked={notifications.statusChanges}
+                onChange={(v) => setNotifications({ ...notifications, statusChanges: v })}
               />
             </div>
           </div>
