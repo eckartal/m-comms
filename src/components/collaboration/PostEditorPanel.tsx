@@ -1,14 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Content, ContentBlock } from '@/types'
+import { useParams, usePathname } from 'next/navigation'
+import type { Content, ContentBlock, PlatformType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
-import { useContentStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
-import { ChevronLeft, ChevronRight, Link2, Plus, X } from 'lucide-react'
+import { PlatformIcon } from '@/components/oauth/PlatformIcon'
+import { connectPlatform } from '@/lib/oauth/connectPlatform'
+import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
+import { useConnectionMode } from '@/hooks/useConnectionMode'
+import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { ChevronLeft, ChevronRight, Link2, Plus, X, Settings2, ChevronDown, Check, Loader2 } from 'lucide-react'
 
 type TeamMemberItem = {
   id: string
@@ -38,6 +47,41 @@ interface PostEditorPanelProps {
 type ThreadItem = {
   id: string
   content: string
+}
+
+type PlatformAccountItem = {
+  id: string
+  account_name: string
+  account_handle?: string | null
+  source?: 'real_oauth' | 'local_sandbox' | 'unknown'
+}
+
+type PlatformCatalogItem = {
+  id: string
+  name: string
+  connected: boolean
+  accounts: PlatformAccountItem[]
+  publishable?: boolean
+  support_status?: 'publish_ready' | 'connect_only' | 'internal'
+  oauth_configured?: boolean
+}
+
+const PLATFORMS: Record<PlatformType, { name: string; limit: number }> = {
+  twitter: { name: 'X (Twitter)', limit: 280 },
+  linkedin: { name: 'LinkedIn', limit: 3000 },
+  instagram: { name: 'Instagram', limit: 2200 },
+  tiktok: { name: 'TikTok', limit: 2200 },
+  youtube: { name: 'YouTube', limit: 5000 },
+  threads: { name: 'Threads', limit: 500 },
+  bluesky: { name: 'Bluesky', limit: 300 },
+  mastodon: { name: 'Mastodon', limit: 500 },
+  facebook: { name: 'Facebook', limit: 63000 },
+}
+
+const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
+
+function isSupportedPlatform(id: string): id is PlatformType {
+  return SUPPORTED_PLATFORM_KEYS.has(id)
 }
 
 function extractBlockText(content: unknown): string {
@@ -80,10 +124,7 @@ function parseThreadFromBlocks(blocks: unknown): ThreadItem[] {
     }
   }
 
-  if (items.length === 0) {
-    return [{ id: 'thread-1', content: '' }]
-  }
-
+  if (items.length === 0) return [{ id: 'thread-1', content: '' }]
   return items
 }
 
@@ -100,6 +141,14 @@ function serializeThreadToBlocks(thread: ThreadItem[]): ContentBlock[] {
 function extractIdeaNotes(blocks: unknown): string {
   const [first] = parseThreadFromBlocks(blocks)
   return first?.content || ''
+}
+
+function getEnabledTargets(platforms: Content['platforms'] | undefined): PlatformType[] {
+  if (!Array.isArray(platforms)) return ['twitter']
+  const enabled = platforms
+    .map((item) => item?.platform)
+    .filter((platform): platform is PlatformType => typeof platform === 'string' && isSupportedPlatform(platform))
+  return enabled.length > 0 ? Array.from(new Set(enabled)) : ['twitter']
 }
 
 const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
@@ -130,27 +179,48 @@ export function PostEditorPanel({
   onOpenFullEditor,
 }: PostEditorPanelProps) {
   const allContents = useContentStore((state) => state.contents)
+  const { currentTeam } = useAppStore()
+  const params = useParams<{ teamSlug?: string }>()
+  const pathname = usePathname()
+  const teamSlug = typeof params?.teamSlug === 'string' ? params.teamSlug : undefined
+  const { mode: connectionMode } = useConnectionMode(teamSlug)
+
   const [title, setTitle] = useState('')
   const [thread, setThread] = useState<ThreadItem[]>([{ id: 'thread-1', content: '' }])
   const [activeIndex, setActiveIndex] = useState(0)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [status, setStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT')
   const [assignedTo, setAssignedTo] = useState('')
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
+  const [targetPlatforms, setTargetPlatforms] = useState<PlatformType[]>(['twitter'])
+  const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
+  const [platformCatalog, setPlatformCatalog] = useState<PlatformCatalogItem[]>([])
+  const [publishablePlatforms, setPublishablePlatforms] = useState<Set<PlatformType>>(new Set(['twitter', 'linkedin']))
+  const [connectionsLoading, setConnectionsLoading] = useState(true)
+  const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
+  const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
+  const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<PlatformType | null>(null)
+  const [showIdeaContext, setShowIdeaContext] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
-  const [showIdeaContext, setShowIdeaContext] = useState(true)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isScheduling, setIsScheduling] = useState(false)
 
   useEffect(() => {
     if (!post) return
     setTitle(post.title || '')
-    const nextThread = parseThreadFromBlocks(post.blocks)
-    setThread(nextThread)
+    setThread(parseThreadFromBlocks(post.blocks))
     setActiveIndex(0)
     setStatus(post.status)
     setAssignedTo(post.assigned_to || '')
+
+    const initialTargets = getEnabledTargets(post.platforms)
+    setTargetPlatforms(initialTargets)
+    setSelectedPlatform(initialTargets[0] || 'twitter')
+
     setSaveError(null)
     setLastSavedAt(null)
     setIsAutoSaving(false)
@@ -160,6 +230,111 @@ export function PostEditorPanel({
   useEffect(() => {
     setShowIdeaContext(true)
   }, [post?.id])
+
+  const fetchConnectedPlatforms = useCallback(async () => {
+    if (!teamSlug) return
+
+    try {
+      setConnectionsLoading(true)
+      const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
+      const data = await res.json()
+      const localConnected = getLocalConnectedPlatforms(teamSlug, currentTeam?.id)
+      const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
+
+      if (!res.ok) {
+        setConnectedPlatforms(localConnected.filter((id) => isSupportedPlatform(id)) as PlatformType[])
+        setPlatformCatalog([])
+        setPublishablePlatforms(new Set(['twitter', 'linkedin']))
+        return
+      }
+
+      const catalog = ((data.data || []) as PlatformCatalogItem[])
+        .filter((platform) => isSupportedPlatform(platform.id))
+        .map((platform) => {
+          const localAccount = localConnections[platform.id]
+          if (!localAccount || platform.accounts.length > 0) return platform
+          return {
+            ...platform,
+            connected: true,
+            accounts: [
+              {
+                id: `local:${platform.id}`,
+                account_name: localAccount.account_name,
+                account_handle: localAccount.account_handle,
+                source: localAccount.source,
+              },
+            ],
+          }
+        })
+
+      setPlatformCatalog(catalog)
+
+      const publishableFromApi = ((data?.meta?.publishable_platforms || []) as string[])
+        .filter((id) => isSupportedPlatform(id))
+      setPublishablePlatforms(
+        publishableFromApi.length > 0
+          ? new Set(publishableFromApi as PlatformType[])
+          : new Set(['twitter', 'linkedin'])
+      )
+
+      const connected = catalog
+        .filter((platform) => platform.connected)
+        .map((platform) => platform.id as PlatformType)
+      const merged = Array.from(new Set([...connected, ...localConnected]))
+        .filter((id) => isSupportedPlatform(id)) as PlatformType[]
+      setConnectedPlatforms(merged)
+    } catch {
+      setConnectedPlatforms(getLocalConnectedPlatforms(teamSlug, currentTeam?.id).filter((id) => isSupportedPlatform(id)) as PlatformType[])
+      setPlatformCatalog([])
+      setPublishablePlatforms(new Set(['twitter', 'linkedin']))
+    } finally {
+      setConnectionsLoading(false)
+    }
+  }, [teamSlug, currentTeam?.id])
+
+  useEffect(() => {
+    if (!open) return
+    fetchConnectedPlatforms()
+  }, [open, fetchConnectedPlatforms])
+
+  const runConnectPlatform = async (platform: PlatformType, skipSandboxConfirmation = false) => {
+    setConnectingPlatform(platform)
+    try {
+      await connectPlatform({
+        platform,
+        teamId: currentTeam?.id,
+        teamSlug,
+        returnTo: pathname || `/${teamSlug}/collaboration`,
+        mode: 'popup',
+        source: 'composer',
+        skipSandboxConfirmation,
+        onSuccess: async () => {
+          await fetchConnectedPlatforms()
+          toast.success(`${PLATFORMS[platform].name} connected.`)
+        },
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to connect')
+    } finally {
+      setConnectingPlatform(null)
+    }
+  }
+
+  const handleConnectPlatform = async (platform: PlatformType) => {
+    const selected = platformCatalog.find((item) => item.id === platform)
+    const requiresConfiguration = connectionMode === 'real_oauth' && selected?.oauth_configured === false
+    if (requiresConfiguration) {
+      toast.error(`${selected?.name || platform} is not configured. Add client credentials first.`)
+      return
+    }
+
+    if (connectionMode === 'local_sandbox') {
+      setSandboxConnectPlatform(platform)
+      return
+    }
+
+    await runConnectPlatform(platform)
+  }
 
   const ticketKey = useMemo(() => {
     if (!post) return null
@@ -174,6 +349,13 @@ export function PostEditorPanel({
   const linkedIdeaNotes = useMemo(() => extractIdeaNotes(linkedIdea?.blocks), [linkedIdea?.blocks])
   const hasLinkedIdeaContext = !!post?.source_idea_id
 
+  const initialTargetsKey = useMemo(() => {
+    if (!post) return ''
+    return getEnabledTargets(post.platforms).slice().sort().join(',')
+  }, [post])
+
+  const currentTargetsKey = useMemo(() => targetPlatforms.slice().sort().join(','), [targetPlatforms])
+
   const hasChanges = useMemo(() => {
     if (!post) return false
     const initialTitle = post.title || ''
@@ -186,15 +368,41 @@ export function PostEditorPanel({
       title !== initialTitle ||
       JSON.stringify(currentThreadText) !== JSON.stringify(initialThreadText) ||
       status !== initialStatus ||
-      assignedTo !== initialAssignee
+      assignedTo !== initialAssignee ||
+      currentTargetsKey !== initialTargetsKey
     )
-  }, [post, title, thread, status, assignedTo])
+  }, [post, title, thread, status, assignedTo, currentTargetsKey, initialTargetsKey])
+
+  const publishTargets = useMemo(() => {
+    const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
+    return Array.from(new Set(targets))
+  }, [targetPlatforms, selectedPlatform])
+
+  const targetSummary = useMemo(
+    () => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '),
+    [publishTargets]
+  )
+
+  const platformRows = useMemo(
+    () =>
+      (platformCatalog.length > 0
+        ? platformCatalog.filter((platform) => isSupportedPlatform(platform.id))
+        : (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
+            id: platform,
+            name: PLATFORMS[platform].name,
+            connected: connectedPlatforms.includes(platform),
+            accounts: [],
+          }))) as PlatformCatalogItem[],
+    [platformCatalog, connectedPlatforms]
+  )
 
   const currentContent = thread[activeIndex]?.content || ''
   const characterCount = currentContent.length
-  const maxChars = 3000
+  const maxChars = PLATFORMS[selectedPlatform].limit
+  const hasContent = thread.some((item) => item.content.trim().length > 0)
+  const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
 
-  const buildPayload = useCallback(() => {
+  const buildPayload = useCallback((override?: Partial<{ status: Content['status']; scheduled_at: string | null }>) => {
     const notes = thread.map((item) => item.content).join('\n\n').trim()
     const normalizedTitle = resolvePostTitle({
       currentTitle: title,
@@ -205,13 +413,15 @@ export function PostEditorPanel({
     return {
       title: normalizedTitle,
       blocks: serializeThreadToBlocks(thread),
-      status,
+      status: override?.status || status,
+      scheduled_at: override?.scheduled_at,
       assigned_to: assignedTo || null,
+      platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
     }
-  }, [titleTouched, title, thread, status, assignedTo])
+  }, [titleTouched, title, thread, status, assignedTo, publishTargets])
 
-  const handleSave = useCallback(async (mode: 'manual' | 'auto' = 'manual') => {
-    if (!post) return
+  const persistPost = useCallback(async (mode: 'manual' | 'auto' = 'manual', override?: Partial<{ status: Content['status']; scheduled_at: string | null }>) => {
+    if (!post) return false
 
     if (mode === 'manual') {
       setIsSaving(true)
@@ -221,7 +431,7 @@ export function PostEditorPanel({
     }
 
     try {
-      const payload = buildPayload()
+      const payload = buildPayload(override)
       const response = await fetch(`/api/content/${post.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -240,12 +450,14 @@ export function PostEditorPanel({
         setLastSavedAt(new Date().toISOString())
         setSaveError(null)
       }
+      return true
     } catch (error) {
       if (mode === 'manual') {
         setSaveError(error instanceof Error ? error.message : 'Failed to save post')
       } else {
         setSaveError(error instanceof Error ? `Autosave failed: ${error.message}` : 'Autosave failed')
       }
+      return false
     } finally {
       if (mode === 'manual') {
         setIsSaving(false)
@@ -255,14 +467,18 @@ export function PostEditorPanel({
     }
   }, [post, buildPayload, onPostUpdated])
 
+  const handleSave = useCallback(async () => {
+    await persistPost('manual')
+  }, [persistPost])
+
   useEffect(() => {
     if (!open || !post || !hasChanges || isSaving || isAutoSaving) return
     const timer = setTimeout(() => {
-      handleSave('auto')
+      void persistPost('auto')
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, handleSave])
+  }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, targetPlatforms, persistPost])
 
   const handleContentChange = (index: number, value: string) => {
     setThread((prev) => prev.map((item, idx) => (idx === index ? { ...item, content: value } : item)))
@@ -285,6 +501,102 @@ export function PostEditorPanel({
     setActiveIndex(Math.min(index, next.length - 1))
   }
 
+  const toggleTargetPlatform = (platform: PlatformType) => {
+    if (!connectedPlatforms.includes(platform)) return
+
+    setTargetPlatforms((prev) => {
+      if (prev.includes(platform)) return prev.filter((item) => item !== platform)
+      return [...prev, platform]
+    })
+  }
+
+  const handlePublish = useCallback(async () => {
+    if (!post) return
+    if (!hasContent) {
+      toast.error('Add some content before publishing.')
+      return
+    }
+
+    const eligibleTargets = publishTargets.filter(
+      (platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)
+    )
+
+    if (eligibleTargets.length === 0) {
+      toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
+      return
+    }
+
+    setIsPublishing(true)
+    try {
+      const saved = await persistPost('manual')
+      if (!saved) throw new Error('Failed to save latest changes before publishing')
+
+      const publishResponse = await fetch(`/api/content/${post.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platforms: eligibleTargets }),
+      })
+
+      const publishData = await publishResponse.json().catch(() => null)
+      if (!publishResponse.ok) {
+        throw new Error((publishData as { error?: string } | null)?.error || 'Publish request failed')
+      }
+
+      const successful = Number((publishData as { data?: { summary?: { successful?: number } } } | null)?.data?.summary?.successful || 0)
+      const failed = Number((publishData as { data?: { summary?: { failed?: number } } } | null)?.data?.summary?.failed || 0)
+
+      if (successful === 0) throw new Error('No platforms were published successfully')
+
+      if (failed > 0) {
+        toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check publish history for details.`)
+      } else {
+        toast.success(`Published to ${successful} platform${successful === 1 ? '' : 's'}.`)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to publish')
+    } finally {
+      setIsPublishing(false)
+    }
+  }, [post, hasContent, publishTargets, connectedPlatforms, publishablePlatforms, persistPost])
+
+  const handleSchedule = useCallback(async () => {
+    if (!post) return
+    if (!hasContent) {
+      toast.error('Add some content before scheduling.')
+      return
+    }
+
+    setIsScheduling(true)
+    try {
+      const scheduledAt = new Date(Date.now() + 60 * 60 * 1000)
+      const saved = await persistPost('manual', {
+        status: 'SCHEDULED',
+        scheduled_at: scheduledAt.toISOString(),
+      })
+
+      if (!saved) throw new Error('Failed to schedule post')
+      setStatus('SCHEDULED')
+      toast.success(`Scheduled for ${scheduledAt.toLocaleString()}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to schedule')
+    } finally {
+      setIsScheduling(false)
+    }
+  }, [post, hasContent, persistPost])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault()
+        void handlePublish()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, handlePublish])
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -303,9 +615,7 @@ export function PostEditorPanel({
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto bg-white p-4 custom-scrollbar dark:bg-[#050505]">
               <div className="mb-3 flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {ticketKey || 'POST'}
-                </div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{ticketKey || 'POST'}</div>
                 {hasLinkedIdeaContext ? (
                   <Button
                     size="xs"
@@ -400,11 +710,82 @@ export function PostEditorPanel({
                     </div>
                   </div>
 
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPlatformPickerOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+                    >
+                      <Settings2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Platform Scope</span>
+                      <span className="text-muted-foreground">{targetSummary}</span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">Active: {PLATFORMS[selectedPlatform].name}</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-5 rounded-[10px] border border-border bg-card/60 px-3 py-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Share to</p>
+                      <span className="text-xs text-muted-foreground">
+                        {publishTargets.length} target{publishTargets.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {publishTargets.map((platform) => (
+                        <button
+                          key={platform}
+                          type="button"
+                          onClick={() => toggleTargetPlatform(platform)}
+                          className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
+                        >
+                          <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
+                          <span>{PLATFORMS[platform].name}</span>
+                          <X className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      ))}
+                      {publishTargets.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">No targets selected. Choose channels in Platform Scope.</span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {!connectionsLoading && (!selectedPlatformConnected || !publishablePlatforms.has(selectedPlatform)) ? (
+                    <div className="mb-5 flex items-center justify-between rounded-[8px] border border-border bg-card px-3 py-2">
+                      <p className="text-[13px] text-muted-foreground">
+                        {publishablePlatforms.has(selectedPlatform)
+                          ? `Connect ${PLATFORMS[selectedPlatform].name} to publish without leaving the editor.`
+                          : `${PLATFORMS[selectedPlatform].name} is connect-only right now. Direct publishing is currently available for X and LinkedIn.`}
+                      </p>
+                      {!selectedPlatformConnected ? (
+                        <button
+                          onClick={() => handleConnectPlatform(selectedPlatform)}
+                          disabled={connectingPlatform === selectedPlatform}
+                          className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
+                        >
+                          {connectingPlatform === selectedPlatform ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Connecting
+                            </>
+                          ) : (
+                            'Connect'
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <div className="rounded-[10px] border border-border bg-card/50">
                     <div className="border-b border-border px-4 py-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-foreground">Composer</span>
-                        <span className="text-[11px] text-muted-foreground">{thread.length} block{thread.length === 1 ? '' : 's'}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {thread.length} block{thread.length === 1 ? '' : 's'}
+                        </span>
                       </div>
                       <Input
                         value={title}
@@ -449,7 +830,7 @@ export function PostEditorPanel({
                                   value={item.content}
                                   onChange={(e) => handleContentChange(index, e.target.value)}
                                   onFocus={() => setActiveIndex(index)}
-                                  placeholder={index === 0 ? 'What is happening?' : 'Add another block...'}
+                                  placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add another block...'}
                                   className={`w-full resize-none border-none bg-transparent text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground ${isActive ? 'mt-2 min-h-[100px]' : 'min-h-[72px]'}`}
                                   style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
                                 />
@@ -517,21 +898,17 @@ export function PostEditorPanel({
             </div>
 
             <div className="sticky bottom-0 border-t border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  className="h-8"
-                  onClick={() => handleSave('manual')}
-                  disabled={isSaving || !hasChanges}
-                >
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving || !hasChanges}>
                   {isSaving ? 'Saving...' : 'Save Post'}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  onClick={() => onOpenFullEditor(post.id)}
-                >
+                <Button size="sm" variant="outline" className="h-8" onClick={() => void handleSchedule()} disabled={isScheduling || isPublishing || !hasContent}>
+                  {isScheduling ? 'Scheduling...' : 'Schedule'}
+                </Button>
+                <Button size="sm" className="h-8" onClick={() => void handlePublish()} disabled={isPublishing || isScheduling || !hasContent}>
+                  {isPublishing ? 'Publishing...' : 'Publish'}
+                </Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => onOpenFullEditor(post.id)}>
                   Open Page Editor
                 </Button>
                 <div className="ml-auto text-[10px] text-muted-foreground">
@@ -542,11 +919,125 @@ export function PostEditorPanel({
                       : 'Autosave on'}
                 </div>
               </div>
+              <div className="mt-1 text-right text-[10px] text-muted-foreground">Press Ctrl/Cmd + Enter to publish</div>
             </div>
           </div>
         ) : (
           <div className="p-4 text-xs text-muted-foreground">No post selected</div>
         )}
+
+        <Dialog open={platformPickerOpen} onOpenChange={setPlatformPickerOpen}>
+          <DialogContent className="max-w-2xl border-border bg-card">
+            <DialogHeader>
+              <DialogTitle>Platform Scope</DialogTitle>
+              <DialogDescription>
+                Choose your active compose channel and manage connection state.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto custom-scrollbar pr-1">
+              {platformRows.map((platform) => {
+                const platformId = platform.id as PlatformType
+                const isActive = selectedPlatform === platformId
+                const isConnected = connectedPlatforms.includes(platformId)
+                const isTarget = publishTargets.includes(platformId)
+                const isPublishable = publishablePlatforms.has(platformId)
+                const primaryAccount = platform.accounts[0]
+
+                return (
+                  <div
+                    key={platform.id}
+                    className={cn(
+                      'flex items-center justify-between rounded-[10px] border px-3 py-2',
+                      isActive ? 'border-ring bg-accent/50' : 'border-border bg-background/60'
+                    )}
+                  >
+                    <div className="min-w-0 flex items-center gap-3">
+                      <PlatformIcon platform={platform.id} className="h-4 w-4" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{platform.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {isConnected
+                            ? (primaryAccount
+                              ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
+                              : 'Connected')
+                            : 'Not connected'}
+                          {isConnected && !isPublishable ? ' • Connect-only' : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleTargetPlatform(platformId)}
+                        disabled={!isConnected || !isPublishable}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
+                          isConnected && isPublishable
+                            ? (isTarget ? 'bg-emerald-500/15 text-emerald-300' : 'border border-border text-foreground hover:bg-accent')
+                            : 'cursor-not-allowed border border-border text-muted-foreground opacity-70'
+                        )}
+                      >
+                        {isTarget ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Target
+                          </>
+                        ) : isConnected ? 'Add target' : 'Connect first'}
+                      </button>
+
+                      {!isConnected ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleConnectPlatform(platformId)}
+                          disabled={connectingPlatform === platformId}
+                          className="inline-flex items-center rounded-[6px] border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-70"
+                        >
+                          {connectingPlatform === platformId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Connect'}
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlatform(platformId)}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
+                          isActive
+                            ? 'bg-foreground text-background'
+                            : 'border border-border text-foreground hover:bg-accent'
+                        )}
+                      >
+                        {isActive ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Active
+                          </>
+                        ) : (
+                          'Use'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <SandboxConfirmDialog
+          open={sandboxConnectPlatform !== null}
+          platformName={sandboxConnectPlatform ? PLATFORMS[sandboxConnectPlatform].name : 'platform'}
+          onCancel={() => {
+            setSandboxConnectPlatform(null)
+          }}
+          onConfirm={() => {
+            if (!sandboxConnectPlatform) return
+            const selected = sandboxConnectPlatform
+            setSandboxConnectPlatform(null)
+            void runConnectPlatform(selected, true)
+          }}
+        />
       </SheetContent>
     </Sheet>
   )
