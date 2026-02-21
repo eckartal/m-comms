@@ -29,6 +29,7 @@ interface PlatformInfo {
   name: string
   accounts: Array<{ account_name?: string }>
   connected: boolean
+  publishable?: boolean
 }
 
 interface PublishResult {
@@ -69,7 +70,7 @@ export function PublishModal({ contentId }: PublishModalProps) {
         if (platformsRes.ok) {
           const { data: platformData } = await platformsRes.json()
           const connectedPlatforms = (platformData as PlatformInfo[])
-            .filter((p) => p.connected)
+            .filter((p) => p.connected && p.publishable !== false)
             .map((p) => ({
               platform: p.id,
               account_name: p.accounts[0]?.account_name || p.name,
@@ -196,7 +197,7 @@ export function PublishModal({ contentId }: PublishModalProps) {
                 <p>No platforms connected.</p>
                 <p className="text-sm mb-3">Connect one now and continue publishing.</p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {['twitter', 'linkedin', 'instagram'].map((platform) => (
+                  {['twitter', 'linkedin'].map((platform) => (
                     <Button
                       key={platform}
                       variant="outline"

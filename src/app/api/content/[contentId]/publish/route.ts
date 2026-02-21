@@ -1,5 +1,92 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { postToTwitter, postThreadToTwitter } from '@/lib/platforms/twitter'
+import { postToLinkedIn } from '@/lib/platforms/linkedin'
+
+type ContentBlock = {
+  type?: string
+  content?: unknown
+}
+
+type PublishResult = {
+  platform: string
+  accountId?: string
+  accountName?: string | null
+  success: boolean
+  postId?: string
+  error?: string
+}
+
+const PUBLISHABLE_PLATFORMS = new Set(['twitter', 'linkedin'])
+
+function normalizeRequestedPlatforms(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+    )
+  )
+}
+
+function extractTweetTexts(blocks: ContentBlock[]): string[] {
+  const tweets: string[] = []
+
+  for (const block of blocks) {
+    if (!block || typeof block !== 'object') continue
+
+    if (block.type === 'thread' && block.content && typeof block.content === 'object') {
+      const threadContent = block.content as { tweets?: unknown }
+      if (Array.isArray(threadContent.tweets)) {
+        for (const entry of threadContent.tweets) {
+          if (typeof entry === 'string' && entry.trim()) tweets.push(entry.trim())
+          if (entry && typeof entry === 'object' && 'text' in entry) {
+            const text = (entry as { text?: unknown }).text
+            if (typeof text === 'string' && text.trim()) tweets.push(text.trim())
+          }
+        }
+      }
+    }
+
+    if (block.type === 'text' && block.content && typeof block.content === 'object') {
+      const text = (block.content as { text?: unknown }).text
+      if (typeof text === 'string' && text.trim()) tweets.push(text.trim())
+    }
+  }
+
+  return tweets
+}
+
+function extractLinkedInText(blocks: ContentBlock[]): string {
+  const parts: string[] = []
+
+  for (const block of blocks) {
+    if (!block || typeof block !== 'object') continue
+    if (!block.content || typeof block.content !== 'object') continue
+
+    if (block.type === 'text') {
+      const text = (block.content as { text?: unknown }).text
+      if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+      continue
+    }
+
+    if (block.type === 'thread') {
+      const thread = block.content as { tweets?: unknown }
+      if (!Array.isArray(thread.tweets)) continue
+      for (const entry of thread.tweets) {
+        if (typeof entry === 'string' && entry.trim()) parts.push(entry.trim())
+        if (entry && typeof entry === 'object' && 'text' in entry) {
+          const text = (entry as { text?: unknown }).text
+          if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+        }
+      }
+    }
+  }
+
+  return parts.join('\n\n').trim()
+}
 
 // POST /api/content/[id]/publish - Publish content to platforms
 export async function POST(
@@ -16,9 +103,9 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { platforms } = body // Array of platform names: ['twitter', 'linkedin']
+    const requestedPlatforms = normalizeRequestedPlatforms(body?.platforms)
 
-    if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
+    if (requestedPlatforms.length === 0) {
       return NextResponse.json({ error: 'At least one platform is required' }, { status: 400 })
     }
 
@@ -50,88 +137,172 @@ export async function POST(
       .from('platform_accounts')
       .select('*')
       .eq('team_id', content.team_id)
-      .in('platform', platforms)
+      .in('platform', requestedPlatforms)
 
-    if (!accounts || accounts.length === 0) {
-      return NextResponse.json(
-        { error: 'No connected accounts for the specified platforms' },
-        { status: 400 }
-      )
+    const accountsByPlatform = new Map<string, Array<Record<string, unknown>>>()
+    for (const account of accounts || []) {
+      const platform = String(account.platform || '')
+      if (!accountsByPlatform.has(platform)) accountsByPlatform.set(platform, [])
+      accountsByPlatform.get(platform)?.push(account as Record<string, unknown>)
     }
 
-    const results: Array<{
-      platform: string
-      success: boolean
-      postId?: string
-      error?: string
-    }> = []
+    const blocks = Array.isArray(content.blocks)
+      ? (content.blocks as ContentBlock[])
+      : []
 
-    // Generate text content from blocks
-    const textContent = content.blocks
-      .map((block: { content: string }) => block.content)
-      .filter(Boolean)
-      .join('\n\n')
+    const results: PublishResult[] = []
 
     // Publish to each platform
-    for (const account of accounts) {
-      try {
-        let postId: string | undefined
-
-        if (account.platform === 'twitter') {
-          postId = await publishToTwitter(account, textContent)
-        } else if (account.platform === 'linkedin') {
-          postId = await publishToLinkedIn(account, textContent)
-        }
-
-        // Record the publication
-        await supabase.from('content_schedule').insert({
-          content_id: contentId,
-          platform_account_id: account.id,
-          platform_post_id: postId,
-          scheduled_at: new Date().toISOString(),
-          status: 'SENT',
-        })
-
+    for (const platform of requestedPlatforms) {
+      if (!PUBLISHABLE_PLATFORMS.has(platform)) {
         results.push({
-          platform: account.platform,
-          success: true,
-          postId,
-        })
-      } catch (error) {
-        console.error(`Error publishing to ${account.platform}:`, error)
-        results.push({
-          platform: account.platform,
+          platform,
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: 'Publishing is not implemented for this platform yet',
         })
+        continue
+      }
+
+      const platformAccounts = accountsByPlatform.get(platform) || []
+      if (platformAccounts.length === 0) {
+        results.push({
+          platform,
+          success: false,
+          error: 'No connected account for this platform',
+        })
+        continue
+      }
+
+      for (const account of platformAccounts) {
+        const platformAccountId = String(account.id || '')
+        const accountName = typeof account.account_name === 'string' ? account.account_name : null
+
+        try {
+          let postId: string | undefined
+
+          if (platform === 'twitter') {
+            const tweets = extractTweetTexts(blocks)
+            if (!tweets.length) {
+              results.push({
+                platform,
+                accountId: platformAccountId,
+                accountName,
+                success: false,
+                error: 'No tweet content found to publish',
+              })
+              continue
+            }
+
+            const publishResult = tweets.length > 1
+              ? await postThreadToTwitter(content.team_id, platformAccountId, tweets)
+              : await postToTwitter(content.team_id, platformAccountId, { text: tweets[0] })
+
+            if (!publishResult.success) {
+              throw new Error(publishResult.error || 'Failed to post to X')
+            }
+
+            postId = publishResult.data?.id
+          } else if (platform === 'linkedin') {
+            const textContent = extractLinkedInText(blocks)
+            if (!textContent) {
+              results.push({
+                platform,
+                accountId: platformAccountId,
+                accountName,
+                success: false,
+                error: 'No text content found to publish',
+              })
+              continue
+            }
+
+            const publishResult = await postToLinkedIn(content.team_id, platformAccountId, {
+              text: textContent.slice(0, 3000),
+              shareMediaCategory: 'NONE',
+            })
+
+            if (!publishResult.success) {
+              throw new Error(publishResult.error || 'Failed to post to LinkedIn')
+            }
+
+            postId = publishResult.data?.id
+          } else {
+            results.push({
+              platform,
+              accountId: platformAccountId,
+              accountName,
+              success: false,
+              error: 'Publishing is not implemented for this platform yet',
+            })
+            continue
+          }
+
+          await supabase.from('content_schedule').insert({
+            content_id: contentId,
+            platform_account_id: platformAccountId,
+            platform_post_id: postId,
+            scheduled_at: new Date().toISOString(),
+            status: 'SENT',
+          })
+
+          results.push({
+            platform,
+            accountId: platformAccountId,
+            accountName,
+            success: true,
+            postId,
+          })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error(`Error publishing to ${platform}:`, error)
+
+          if (platformAccountId) {
+            await supabase.from('content_schedule').insert({
+              content_id: contentId,
+              platform_account_id: platformAccountId,
+              scheduled_at: new Date().toISOString(),
+              status: 'FAILED',
+              error_message: errorMessage,
+            })
+          }
+
+          results.push({
+            platform,
+            accountId: platformAccountId || undefined,
+            accountName,
+            success: false,
+            error: errorMessage,
+          })
+        }
       }
     }
 
-    // Update content status
-    await supabase
-      .from('content')
-      .update({
-        status: 'PUBLISHED',
-        published_at: new Date().toISOString(),
-      })
-      .eq('id', contentId)
-
-    await supabase.from('content_activity').insert({
-      content_id: contentId,
-      team_id: content.team_id,
-      user_id: user.id,
-      action: 'STATUS_CHANGED',
-      from_status: content.status,
-      to_status: 'PUBLISHED',
-      metadata: { source: 'publish' },
-    })
-
     const successCount = results.filter(r => r.success).length
+
+    if (successCount > 0) {
+      await supabase
+        .from('content')
+        .update({
+          status: 'PUBLISHED',
+          published_at: new Date().toISOString(),
+        })
+        .eq('id', contentId)
+
+      await supabase.from('content_activity').insert({
+        content_id: contentId,
+        team_id: content.team_id,
+        user_id: user.id,
+        action: 'STATUS_CHANGED',
+        from_status: content.status,
+        to_status: 'PUBLISHED',
+        metadata: { source: 'publish' },
+      })
+    }
 
     return NextResponse.json({
       data: {
         results,
         summary: {
+          requested: requestedPlatforms.length,
           total: results.length,
           successful: successCount,
           failed: results.length - successCount,
@@ -142,72 +313,6 @@ export async function POST(
     console.error('Error in POST /api/content/[id]/publish:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
-
-// Twitter/X posting helper
-async function publishToTwitter(
-  account: { account_id: string; access_token: string },
-  text: string
-): Promise<string> {
-  // Truncate to Twitter's character limit
-  const tweetText = text.slice(0, 280)
-
-  const response = await fetch('https://api.twitter.com/2/tweets', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${account.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      text: tweetText,
-    }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || 'Failed to post to Twitter')
-  }
-
-  const data = await response.json()
-  return data.data.id
-}
-
-// LinkedIn posting helper
-async function publishToLinkedIn(
-  account: { account_id: string; access_token: string },
-  text: string
-): Promise<string> {
-  const response = await fetch(`https://api.linkedin.com/v2/ugcPosts`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${account.access_token}`,
-      'Content-Type': 'application/json',
-      'X-Restli-Protocol-Version': '2.0.0',
-    },
-    body: JSON.stringify({
-      author: `urn:li:person:${account.account_id}`,
-      lifecycleState: 'PUBLISHED',
-      specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: {
-            text: text.slice(0, 3000), // LinkedIn's limit
-          },
-          shareMediaCategory: 'NONE',
-        },
-      },
-      visibility: {
-        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-      },
-    }),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.message || 'Failed to post to LinkedIn')
-  }
-
-  const data = await response.json()
-  return data.id
 }
 
 // GET /api/content/[id]/publish - Get publish status

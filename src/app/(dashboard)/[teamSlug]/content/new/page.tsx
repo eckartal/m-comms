@@ -63,6 +63,8 @@ type PlatformCatalogItem = {
   name: string
   connected: boolean
   accounts: PlatformAccountItem[]
+  publishable?: boolean
+  support_status?: 'publish_ready' | 'connect_only' | 'internal'
 }
 
 const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
@@ -90,6 +92,7 @@ export default function NewContentPage() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
   const [platformCatalog, setPlatformCatalog] = useState<PlatformCatalogItem[]>([])
+  const [publishablePlatforms, setPublishablePlatforms] = useState<Set<PlatformType>>(new Set(['twitter', 'linkedin']))
   const [connectionsLoading, setConnectionsLoading] = useState(true)
   const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
   const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
@@ -134,6 +137,7 @@ export default function NewContentPage() {
       if (!res.ok) {
         setConnectedPlatforms(localConnected as PlatformType[])
         setPlatformCatalog([])
+        setPublishablePlatforms(new Set(['twitter', 'linkedin']))
         return
       }
 
@@ -156,6 +160,13 @@ export default function NewContentPage() {
           }
         })
       setPlatformCatalog(catalog)
+      const publishableFromApi = ((data?.meta?.publishable_platforms || []) as string[])
+        .filter((id) => isSupportedPlatform(id))
+      setPublishablePlatforms(
+        publishableFromApi.length > 0
+          ? new Set(publishableFromApi as PlatformType[])
+          : new Set(['twitter', 'linkedin'])
+      )
 
       const connected = catalog
         .filter((platform) => platform.connected)
@@ -166,6 +177,7 @@ export default function NewContentPage() {
       console.error('Failed to fetch connected platforms for composer:', error)
       setConnectedPlatforms(getLocalConnectedPlatforms(teamSlug, currentTeam?.id) as PlatformType[])
       setPlatformCatalog([])
+      setPublishablePlatforms(new Set(['twitter', 'linkedin']))
     } finally {
       setConnectionsLoading(false)
     }
@@ -335,42 +347,80 @@ export default function NewContentPage() {
 
   const handlePublish = async () => {
     const hasContent = thread.some(t => t.content.trim().length > 0)
-    if (!hasContent) return
+    if (!hasContent || !currentTeam) return
+
+    const eligibleTargets = publishTargets.filter(
+      (platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)
+    )
+
+    if (eligibleTargets.length === 0) {
+      toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
+      return
+    }
+
     setIsPublishing(true)
 
     try {
       const blocks = thread.map((item) => ({
-        id: item.id,
-        type: 'thread' as const,
-        content: { tweets: thread.map(t => ({ text: t.content })) }
+        id: item.id || Date.now().toString(),
+        type: 'text' as const,
+        content: { text: item.content }
       }))
 
-      // Create content in Supabase if not exists
-      if (!contentId && currentTeam) {
+      let resolvedContentId = contentId
+
+      // Create content in Supabase if not exists.
+      if (!resolvedContentId) {
         const newContent = await createContent(currentTeam.id, {
           title: title || 'Untitled',
           blocks,
-          status: 'PUBLISHED'
+          status: 'DRAFT',
         })
-        if (newContent) {
-          setContentId(newContent.id)
-          await updateContent(newContent.id, {
-            platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-          })
-        }
-      } else if (contentId) {
-        await updateContent(contentId, {
-          title: title || 'Untitled',
-          blocks,
-          status: 'PUBLISHED',
-          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-        })
+        if (!newContent) throw new Error('Failed to create content before publishing')
+        resolvedContentId = newContent.id
+        setContentId(newContent.id)
+      }
+
+      if (!resolvedContentId) throw new Error('Missing content id after create')
+      const finalContentId = resolvedContentId
+
+      const updateOk = await updateContent(finalContentId, {
+        title: title || 'Untitled',
+        blocks,
+        status: 'DRAFT',
+        platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
+      })
+      if (!updateOk) throw new Error('Failed to save latest changes before publishing')
+
+      const publishResponse = await fetch(`/api/content/${finalContentId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platforms: eligibleTargets }),
+      })
+
+      const publishData = await publishResponse.json()
+      if (!publishResponse.ok) {
+        throw new Error(publishData?.error || 'Publish request failed')
+      }
+
+      const successful = Number(publishData?.data?.summary?.successful || 0)
+      const failed = Number(publishData?.data?.summary?.failed || 0)
+
+      if (successful === 0) {
+        throw new Error('No platforms were published successfully')
+      }
+
+      if (failed > 0) {
+        toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check publish history for details.`)
+      } else {
+        toast.success(`Published to ${successful} platform${successful === 1 ? '' : 's'}.`)
       }
 
       localStorage.removeItem(`draft_${teamSlug}`)
       router.push(`/${teamSlug}/content`)
     } catch (error) {
       console.error('Error publishing:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to publish')
     } finally {
       setIsPublishing(false)
     }
@@ -540,25 +590,29 @@ export default function NewContentPage() {
             </div>
           </div>
 
-          {!connectionsLoading && !selectedPlatformConnected && (
+          {!connectionsLoading && (!selectedPlatformConnected || !publishablePlatforms.has(selectedPlatform)) && (
             <div className="mb-5 rounded-[8px] border border-border bg-card px-3 py-2 flex items-center justify-between">
               <p className="text-[13px] text-muted-foreground">
-                Connect {PLATFORMS[selectedPlatform].name} to publish without leaving the editor.
+                {publishablePlatforms.has(selectedPlatform)
+                  ? `Connect ${PLATFORMS[selectedPlatform].name} to publish without leaving the editor.`
+                  : `${PLATFORMS[selectedPlatform].name} is connect-only right now. Direct publishing is currently available for X and LinkedIn.`}
               </p>
-              <button
-                onClick={() => handleConnectPlatform(selectedPlatform)}
-                disabled={connectingPlatform === selectedPlatform}
-                className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
-              >
-                {connectingPlatform === selectedPlatform ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Connecting
-                  </>
-                ) : (
-                  'Connect'
-                )}
-              </button>
+              {!selectedPlatformConnected && (
+                <button
+                  onClick={() => handleConnectPlatform(selectedPlatform)}
+                  disabled={connectingPlatform === selectedPlatform}
+                  className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
+                >
+                  {connectingPlatform === selectedPlatform ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Connecting
+                    </>
+                  ) : (
+                    'Connect'
+                  )}
+                </button>
+              )}
             </div>
           )}
 
@@ -719,6 +773,7 @@ export default function NewContentPage() {
                 const isActive = selectedPlatform === platformId
                 const isConnected = connectedPlatforms.includes(platformId)
                 const isTarget = publishTargets.includes(platformId)
+                const isPublishable = publishablePlatforms.has(platformId)
                 const primaryAccount = platform.accounts[0]
                 return (
                   <div
@@ -738,6 +793,7 @@ export default function NewContentPage() {
                               ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
                               : 'Connected')
                             : 'Not connected'}
+                          {isConnected && !isPublishable ? ' • Connect-only' : ''}
                         </p>
                       </div>
                     </div>
@@ -746,10 +802,10 @@ export default function NewContentPage() {
                       <button
                         type="button"
                         onClick={() => toggleTargetPlatform(platformId)}
-                        disabled={!isConnected}
+                        disabled={!isConnected || !isPublishable}
                         className={cn(
                           'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
-                          isConnected
+                          isConnected && isPublishable
                             ? (isTarget
                               ? 'bg-emerald-500/15 text-emerald-300'
                               : 'border border-border text-foreground hover:bg-accent')

@@ -70,6 +70,9 @@ export async function postToLinkedIn(
   if (!credentials) {
     return { success: false, error: 'LinkedIn credentials not found' }
   }
+  if (!credentials.personId || credentials.personId === 'linkedin_user') {
+    return { success: false, error: 'LinkedIn account is missing profile id. Reconnect this account.' }
+  }
 
   try {
     const shareContent: LinkedInShareContent = {
@@ -151,6 +154,9 @@ export async function postArticleToLinkedIn(
 
   if (!credentials) {
     return { success: false, error: 'LinkedIn credentials not found' }
+  }
+  if (!credentials.personId || credentials.personId === 'linkedin_user') {
+    return { success: false, error: 'LinkedIn account is missing profile id. Reconnect this account.' }
   }
 
   try {

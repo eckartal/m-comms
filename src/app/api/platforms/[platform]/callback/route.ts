@@ -257,6 +257,7 @@ async function exchangeCodeForToken(platform: string, code: string, codeVerifier
   if (platform === 'linkedin') {
     // Get user profile
     let accountName = ''
+    let accountId = ''
     try {
       const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
         headers: {
@@ -265,6 +266,7 @@ async function exchangeCodeForToken(platform: string, code: string, codeVerifier
       })
       if (profileResponse.ok) {
         const profile = await profileResponse.json()
+        accountId = profile.id || ''
         accountName = `${profile.localizedFirstName} ${profile.localizedLastName}`
       }
     } catch (e) {
@@ -278,7 +280,7 @@ async function exchangeCodeForToken(platform: string, code: string, codeVerifier
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : null,
       scope: data.scope,
-      accountId: 'linkedin_user',
+      accountId,
       accountName,
       accountHandle: '',
     }

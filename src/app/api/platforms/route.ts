@@ -42,6 +42,8 @@ function shouldForceDevConnect() {
   return process.env.FORCE_REAL_OAUTH_IN_DEV !== 'true'
 }
 
+const PUBLISHABLE_PLATFORMS = new Set(['twitter', 'linkedin'])
+
 async function resolveTeamContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -159,6 +161,9 @@ export async function GET(request: Request) {
         connected_at: string | null
       }>
       connection_status: 'connected' | 'degraded' | 'disconnected'
+      connectable?: boolean
+      publishable?: boolean
+      support_status?: 'publish_ready' | 'connect_only' | 'internal'
     }> = [
       {
         id: 'twitter',
@@ -324,11 +329,27 @@ export async function GET(request: Request) {
       },
     ]
 
+    const integrationsWithCapabilities = integrations.map((integration) => {
+      const connectable = integration.id !== 'blog'
+      const publishable = PUBLISHABLE_PLATFORMS.has(integration.id)
+      return {
+        ...integration,
+        connectable,
+        publishable,
+        support_status: publishable
+          ? 'publish_ready'
+          : connectable
+          ? 'connect_only'
+          : 'internal',
+      }
+    })
+
     return NextResponse.json({
-      data: integrations,
+      data: integrationsWithCapabilities,
       meta: {
         default_connection_mode: shouldForceDevConnect() ? 'local_sandbox' : 'real_oauth',
         environment: process.env.NODE_ENV || 'development',
+        publishable_platforms: Array.from(PUBLISHABLE_PLATFORMS),
       },
     })
   } catch (error) {
