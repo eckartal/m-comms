@@ -53,8 +53,8 @@ function normalizeUser(user: RawUser | RawUser[] | null | undefined) {
   }
 }
 
-// GET /api/content - List all content
-export async function GET() {
+// GET /api/content - List content (optionally filtered by team_id)
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -63,7 +63,10 @@ export async function GET() {
 
     if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
-    const { data, error } = await supabase
+    const url = new URL(request.url)
+    const teamId = url.searchParams.get('team_id')
+
+    let query = supabase
       .from('content')
       .select(`
         *,
@@ -73,6 +76,12 @@ export async function GET() {
         comment_count:comments(count)
       `)
       .order('created_at', { ascending: false })
+
+    if (teamId) {
+      query = query.eq('team_id', teamId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching content:', error)

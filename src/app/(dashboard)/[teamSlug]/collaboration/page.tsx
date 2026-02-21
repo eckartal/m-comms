@@ -81,8 +81,8 @@ export default function CollaborationPage() {
     throw new RequestError(message, response.status)
   }
 
-  const fetchContentData = useCallback(async () => {
-    const response = await fetch('/api/content', { cache: 'no-store' })
+  const fetchContentData = useCallback(async (teamId: string) => {
+    const response = await fetch(`/api/content?team_id=${encodeURIComponent(teamId)}`, { cache: 'no-store' })
     if (!response.ok) {
       await parseRequestError(response, 'Failed to fetch content')
     }
@@ -109,7 +109,7 @@ export default function CollaborationPage() {
     setErrorStatus(null)
 
     const [contentResult, teamMembersResult] = await Promise.allSettled([
-      fetchContentData(),
+      fetchContentData(currentTeam.id),
       fetchTeamMembersData(currentTeam.id),
     ])
 
