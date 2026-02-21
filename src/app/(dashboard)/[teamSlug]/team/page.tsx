@@ -40,7 +40,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
@@ -70,7 +69,8 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'EDITOR' | 'ADMIN'>('EDITOR')
+  const [inviteRole, setInviteRole] = useState<'ADMIN' | 'EDITOR' | 'VIEWER'>('VIEWER')
+  const [inviteLink, setInviteLink] = useState('')
   const [inviting, setInviting] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -94,19 +94,29 @@ export default function TeamPage() {
   }
 
   async function handleInvite() {
-    if (!inviteEmail.trim() || !currentTeam?.id) return
+    if (!currentTeam?.id) return
     setInviting(true)
     try {
-      const res = await fetch(`/api/teams/${currentTeam.id}/members`, {
+      const res = await fetch(`/api/teams/${currentTeam.id}/invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail.trim() || undefined,
+          role: inviteRole,
+        }),
       })
       if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const url = data?.data?.inviteUrl
+        if (typeof url === 'string' && url.length > 0) {
+          setInviteLink(url)
+          await navigator.clipboard.writeText(url)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        }
         setInviteEmail('')
-        setInviteRole('EDITOR')
+        setInviteRole('VIEWER')
         setInviteDialogOpen(false)
-        fetchMembers()
       }
     } catch (error) {
       console.error('Failed to invite member:', error)
@@ -146,8 +156,8 @@ export default function TeamPage() {
   }
 
   function copyInviteLink() {
-    const link = `${window.location.origin}/invite/${currentTeam?.id}`
-    navigator.clipboard.writeText(link)
+    if (!inviteLink) return
+    navigator.clipboard.writeText(inviteLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -194,33 +204,34 @@ export default function TeamPage() {
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Invite Member
+                Create Invite Link
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite Team Member</DialogTitle>
+                <DialogTitle>Create Team Invite Link</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to join your team
+                  Generate a secure, one-time invite URL.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Input
-                    placeholder="Email address"
+                    placeholder="Email address (optional)"
                     type="email"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'EDITOR' | 'ADMIN')}>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'ADMIN' | 'EDITOR' | 'VIEWER')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin - Can manage team and content</SelectItem>
                       <SelectItem value="EDITOR">Editor - Can create and edit content</SelectItem>
+                      <SelectItem value="VIEWER">Viewer - Can only view content</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -229,9 +240,9 @@ export default function TeamPage() {
                 <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+                <Button onClick={handleInvite} disabled={inviting}>
                   {inviting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Send Invite
+                  Generate Link
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -252,10 +263,11 @@ export default function TeamPage() {
             <div className="flex items-center gap-2">
               <Input
                 readOnly
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/invite/${currentTeam?.id}`}
+                value={inviteLink}
+                placeholder="Generate a link to invite a teammate"
                 className="font-mono text-sm"
               />
-              <Button variant="outline" size="icon" onClick={copyInviteLink}>
+              <Button variant="outline" size="icon" onClick={copyInviteLink} disabled={!inviteLink}>
                 {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>

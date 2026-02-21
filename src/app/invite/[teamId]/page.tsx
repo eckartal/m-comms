@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { trackEvent } from '@/lib/analytics/trackEvent'
 
@@ -9,12 +9,18 @@ export default function InvitePage() {
   const params = useParams()
   const teamId = String(params.teamId || '')
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const token = searchParams.get('token')?.trim() || ''
 
   const handleJoin = async () => {
     if (!teamId) {
       setError('Invalid invite link')
+      return
+    }
+    if (!token) {
+      setError('This invite link is missing a token')
       return
     }
 
@@ -23,12 +29,17 @@ export default function InvitePage() {
     void trackEvent('invite_join_started')
 
     try {
-      const response = await fetch(`/api/invite/${teamId}/accept`, { method: 'POST' })
+      const response = await fetch(`/api/invite/${teamId}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
       const body = await response.json().catch(() => ({}))
 
       if (response.status === 401) {
         void trackEvent('invite_join_requires_login')
-        router.push(`/login?next=/invite/${teamId}`)
+        const nextPath = `/invite/${teamId}?token=${token}`
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`)
         return
       }
 
@@ -65,7 +76,10 @@ export default function InvitePage() {
           >
             {loading ? 'Joining...' : 'Join team'}
           </button>
-          <Link href="/login" className="text-sm text-primary hover:underline">
+          <Link
+            href={token ? `/login?next=${encodeURIComponent(`/invite/${teamId}?token=${token}`)}` : '/login'}
+            className="text-sm text-primary hover:underline"
+          >
             Sign in with another account
           </Link>
         </div>
