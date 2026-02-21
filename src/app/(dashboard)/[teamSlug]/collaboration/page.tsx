@@ -70,6 +70,10 @@ export default function CollaborationPage() {
   }
 
   const handleStatusChange = async (contentId: string, newStatus: Content['status']) => {
+    const previous = content
+    setContent((prev) =>
+      prev.map((item) => (item.id === contentId ? { ...item, status: newStatus } : item))
+    )
     try {
       const response = await fetch(`/api/content/${contentId}`, {
         method: 'PUT',
@@ -81,10 +85,16 @@ export default function CollaborationPage() {
         throw new Error('Failed to update status')
       }
 
-      fetchContent()
+      const { data } = await response.json()
+      if (data) {
+        setContent((prev) =>
+          prev.map((item) => (item.id === contentId ? { ...item, ...data } : item))
+        )
+      }
     } catch (err) {
       console.error(err)
       setError('Failed to update status')
+      setContent(previous)
     }
   }
 
