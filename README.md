@@ -54,6 +54,12 @@ For local development:
 - Content detail page (Share action)
 6. Confirm posts are created on provider side and `content_schedule` rows are recorded.
 
+Run a preflight locally before deploy:
+
+```bash
+npm run check:go-live
+```
+
 ## Notes
 
 - In local sandbox mode, connect uses mock accounts (no real provider posts).

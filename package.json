@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3004",
+    "dev:clean": "rm -rf .next && next dev -p 3004",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "lint:layout": "bash scripts/check-dashboard-layout.sh"
+    "lint:layout": "bash scripts/check-dashboard-layout.sh",
+    "check:go-live": "node scripts/check-go-live-readiness.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

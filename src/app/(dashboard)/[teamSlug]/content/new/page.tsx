@@ -65,6 +65,7 @@ type PlatformCatalogItem = {
   accounts: PlatformAccountItem[]
   publishable?: boolean
   support_status?: 'publish_ready' | 'connect_only' | 'internal'
+  oauth_configured?: boolean
 }
 
 const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
@@ -207,6 +208,13 @@ export default function NewContentPage() {
   }
 
   const handleConnectPlatform = async (platform: PlatformType) => {
+    const selected = platformCatalog.find((item) => item.id === platform)
+    const requiresConfiguration = connectionMode === 'real_oauth' && selected?.oauth_configured === false
+    if (requiresConfiguration) {
+      toast.error(`${selected?.name || platform} is not configured. Add client credentials first.`)
+      return
+    }
+
     if (connectionMode === 'local_sandbox') {
       setSandboxConnectPlatform(platform)
       return

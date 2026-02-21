@@ -30,6 +30,7 @@ interface PlatformInfo {
   accounts: Array<{ account_name?: string }>
   connected: boolean
   publishable?: boolean
+  oauth_configured?: boolean
 }
 
 interface PublishResult {
@@ -57,6 +58,7 @@ export function PublishModal({ contentId }: PublishModalProps) {
   const [status, setStatus] = useState<'idle' | 'publishing' | 'success' | 'error'>('idle')
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null)
   const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<string | null>(null)
+  const [connectableMap, setConnectableMap] = useState<Record<string, { oauthConfigured: boolean }>>({})
   const { mode: connectionMode } = useConnectionMode(teamSlug)
 
   const fetchConnectedPlatforms = useCallback(async () => {
@@ -69,6 +71,12 @@ export function PublishModal({ contentId }: PublishModalProps) {
         const platformsRes = await fetch(`/api/platforms?teamId=${teamId}`)
         if (platformsRes.ok) {
           const { data: platformData } = await platformsRes.json()
+          const allPlatforms = (platformData as PlatformInfo[]) || []
+          setConnectableMap(
+            Object.fromEntries(
+              allPlatforms.map((p) => [p.id, { oauthConfigured: p.oauth_configured !== false }])
+            )
+          )
           const connectedPlatforms = (platformData as PlatformInfo[])
             .filter((p) => p.connected && p.publishable !== false)
             .map((p) => ({
@@ -170,6 +178,10 @@ export function PublishModal({ contentId }: PublishModalProps) {
   }
 
   const quickConnect = async (platform: string) => {
+    if (connectionMode === 'real_oauth' && connectableMap[platform] && !connectableMap[platform].oauthConfigured) {
+      toast.error(`${platform} OAuth is not configured. Add provider client credentials first.`)
+      return
+    }
     if (connectionMode === 'local_sandbox') {
       setSandboxConnectPlatform(platform)
       return
