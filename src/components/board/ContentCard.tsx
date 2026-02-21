@@ -1,22 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { getBlockPreview, getContentTitle } from '@/lib/contentText'
+import { getBlockPreview } from '@/lib/contentText'
+import { getTicketKey, inferTitleFromContent } from '@/lib/ticketPresentation'
+import { useContentStore } from '@/stores'
 import {
-  MessageSquare,
   Eye,
   Clock,
   MoreHorizontal,
   CheckCircle,
   FileText,
-  Share2,
-  Edit,
   Lightbulb,
   type LucideIcon,
 } from 'lucide-react'
@@ -25,7 +22,6 @@ import type { Content } from '@/types'
 
 interface ContentCardProps {
   content: Content
-  teamSlug?: string
   onClick?: () => void
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onConvertIdea?: (contentId: string) => void
@@ -34,24 +30,16 @@ interface ContentCardProps {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
-  DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: FileText },
-  IN_REVIEW: { label: 'In Review', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Eye },
-  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle },
-  SCHEDULED: { label: 'Scheduled', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Clock },
-  PUBLISHED: { label: 'Shared', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle },
-  ARCHIVED: { label: 'Archived', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: FileText },
-}
-
-const PLATFORM_ICONS: Record<string, string> = {
-  twitter: '𝕏',
-  linkedin: 'in',
-  instagram: '📷',
-  blog: '📝',
+  DRAFT: { label: 'Draft', color: 'bg-muted text-muted-foreground', icon: FileText },
+  IN_REVIEW: { label: 'In Review', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', icon: Eye },
+  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', icon: CheckCircle },
+  SCHEDULED: { label: 'Scheduled', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300', icon: Clock },
+  PUBLISHED: { label: 'Shared', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', icon: CheckCircle },
+  ARCHIVED: { label: 'Archived', color: 'bg-muted text-muted-foreground', icon: FileText },
 }
 
 export function ContentCard({
   content,
-  teamSlug,
   onClick,
   onStatusChange,
   onConvertIdea,
@@ -59,58 +47,88 @@ export function ContentCard({
   onOpenLinkedPost,
 }: ContentCardProps) {
   const [showHover, setShowHover] = useState(false)
+  const allContents = useContentStore((state) => state.contents)
 
   const itemType = content.item_type || 'POST'
   const isIdea = itemType === 'IDEA'
   const isConvertedIdea = isIdea && content.idea_state === 'CONVERTED'
   const hasSourceIdea = !isIdea && !!content.source_idea_id
-  const title = getContentTitle(content.title)
+  const title = inferTitleFromContent(content)
+  const ticketKey = useMemo(() => getTicketKey(content.id, allContents), [content.id, allContents])
   const preview = getBlockPreview(content.blocks)
   const statusConfig = STATUS_CONFIG[content.status] || STATUS_CONFIG.DRAFT
   const assignedUser = content.assignedTo || content.createdBy
+  const ownerUser = content.assignedTo || null
+  const creatorUser = content.createdBy || null
+  const writerUser = content.writer || ownerUser || creatorUser || null
   const ownerName = assignedUser?.name || assignedUser?.email || null
   const createdAt = formatDistanceToNow(content.created_at)
   const latestUpdater = content.latest_activity?.user?.name || content.latest_activity?.user?.email || null
-  const activityCount = content.activity_count || 0
   const canChangeStatus = !isIdea && !!onStatusChange
+  const linkedPostTicketKey = useMemo(() => {
+    if (!content.converted_post_id) return null
+    return getTicketKey(content.converted_post_id, allContents)
+  }, [content.converted_post_id, allContents])
   const ideaStageLabel =
     content.idea_state === 'ARCHIVED'
       ? 'ARCHIVED'
       : content.idea_state === 'CONVERTED'
         ? 'CONVERTED'
         : 'IDEA INBOX'
+  const platformLabel = useMemo(() => {
+    if (!content.platforms?.length) return null
+    return content.platforms.slice(0, 2).map((p) => p.platform).join(' · ')
+  }, [content.platforms])
+
+  const handlePrimaryOpen = (event?: { preventDefault: () => void; stopPropagation: () => void }) => {
+    event?.preventDefault()
+    event?.stopPropagation()
+    onClick?.()
+  }
+
+  const renderRole = (label: 'O' | 'C' | 'W', user: typeof ownerUser) => (
+    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <span className="font-medium text-foreground/80">{label}:</span>
+      {user ? (
+        <Avatar className="h-4 w-4 border border-border/80">
+          <AvatarImage src={user.avatar_url || undefined} />
+          <AvatarFallback className="text-[9px]">
+            {(user.name || user.email || '?').charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      ) : (
+        <span className="text-[10px] text-muted-foreground">-</span>
+      )}
+    </span>
+  )
 
   return (
-    <Card
+    <div
       className={cn(
-        'group relative cursor-pointer overflow-hidden rounded-lg border bg-card p-3 transition-colors hover:border-ring/40',
-        isIdea ? 'border-amber-300/40 dark:border-amber-900/50' : 'border-blue-300/40 dark:border-blue-900/50'
+        'collab-card group relative cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 transition-colors hover:border-border hover:bg-accent/20'
       )}
       onMouseEnter={() => setShowHover(true)}
       onMouseLeave={() => setShowHover(false)}
       onClick={onClick}
     >
-      <span
-        className={cn(
-          'absolute left-0 top-0 h-full w-[3px]',
-          isIdea ? 'bg-amber-500/70' : 'bg-blue-500/70'
-        )}
-      />
-      <CardContent className="p-0 space-y-3">
+      <div className="space-y-3">
         {/* Card Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                {ticketKey}
+              </span>
               <span
                 className={cn(
                   'text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide',
-                  isIdea ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                  isIdea ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-muted text-muted-foreground'
                 )}
               >
                 {isIdea ? 'Idea' : 'Post'}
               </span>
             </div>
-            <h4 className="mt-1 text-sm font-medium text-foreground truncate pr-2">{title}</h4>
+            <h4 className="mt-1 text-sm font-medium leading-tight text-foreground truncate pr-2">{title}</h4>
             {(ownerName || latestUpdater || isConvertedIdea || hasSourceIdea) ? (
               <p className="mt-1 text-[10px] text-muted-foreground truncate">
                 {ownerName ? `Owner ${ownerName}` : ''}
@@ -121,8 +139,12 @@ export function ContentCard({
               </p>
             ) : null}
           </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground">
+          <div className="flex items-center gap-1 opacity-70">
+            <Button
+              variant="ghost"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={handlePrimaryOpen}
+            >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -130,40 +152,25 @@ export function ContentCard({
 
         {/* Content Preview */}
         {preview && (
-          <div className="text-xs text-muted-foreground line-clamp-2">
+          <div className="text-[11px] text-muted-foreground line-clamp-2">
             {preview}
           </div>
         )}
 
-        {/* Platforms */}
-        {content.platforms.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            {content.platforms.slice(0, 3).map((platform, i) => (
-              <span
-                key={i}
-                className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[9px] font-medium text-muted-foreground"
-              >
-                {PLATFORM_ICONS[platform.platform] || platform.platform}
-              </span>
-            ))}
-            {content.platforms.length > 3 && (
-              <span className="text-[9px] text-muted-foreground">+{content.platforms.length - 3}</span>
-            )}
-          </div>
-        )}
+        {platformLabel ? <div className="text-[10px] text-muted-foreground">{platformLabel}</div> : null}
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2">
             {/* Status Badge */}
             {isIdea ? (
-              <Badge variant="outline" className="border-0 bg-amber-100 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              <Badge variant="outline" className="h-5 rounded border-0 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                 <Lightbulb className="h-2.5 w-2.5 mr-1" />
                 {ideaStageLabel}
               </Badge>
             ) : (
               <>
-                <Badge variant="outline" className={cn(statusConfig.color, 'border-0 text-[10px]')}>
+                <Badge variant="outline" className={cn(statusConfig.color, 'h-5 rounded border-0 px-1.5 text-[10px]')}>
                   <statusConfig.icon className="h-2.5 w-2.5 mr-1" />
                   {statusConfig.label}
                 </Badge>
@@ -190,7 +197,6 @@ export function ContentCard({
               </>
             )}
 
-            {/* Date */}
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Clock className="h-3 w-3" />
               <span>{createdAt}</span>
@@ -213,26 +219,17 @@ export function ContentCard({
           )}
         </div>
 
-        {/* Hover Actions */}
-        <div className={cn('flex items-center gap-1 border-t border-border pt-1', showHover ? 'opacity-100' : 'opacity-0 transition-opacity')}>
-          <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
-            <MessageSquare className="h-3.5 w-3.5 mr-1" />
-            {content.comments_count || 0}
-          </Button>
-          {activityCount > 0 && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-              {activityCount} updates
-            </span>
-          )}
-          <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
-            <Eye className="h-3.5 w-3.5 mr-1" />
-            {content.views_count || 0}
-          </Button>
-          <div className="flex-1" />
+        <div className={cn('flex items-center justify-between gap-1 border-t border-border/80 pt-1', showHover ? 'opacity-100' : 'opacity-70 transition-opacity')}>
+          <div className="flex items-center gap-2">
+            {renderRole('O', ownerUser)}
+            {renderRole('C', creatorUser)}
+            {renderRole('W', writerUser)}
+          </div>
+          <div className="flex items-center gap-1">
           {isIdea && !isConvertedIdea && onConvertIdea ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-amber-700 hover:text-amber-600 dark:text-amber-300 dark:hover:text-amber-200"
+              className="h-6 px-1.5 text-[11px] text-amber-700 hover:text-amber-600 dark:text-amber-300 dark:hover:text-amber-200"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -245,20 +242,20 @@ export function ContentCard({
           {isConvertedIdea && content.converted_post_id && onOpenLinkedPost ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-emerald-700 hover:text-emerald-600 dark:text-emerald-300 dark:hover:text-emerald-200"
+              className="h-5 rounded border border-emerald-200/70 bg-emerald-50/70 px-1.5 text-[10px] font-medium text-emerald-800 hover:bg-emerald-100/70 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
                 onOpenLinkedPost(content.converted_post_id as string)
               }}
             >
-              Open Post
+              {linkedPostTicketKey || 'POST'}
             </Button>
           ) : null}
           {hasSourceIdea && content.source_idea_id && onOpenLinkedIdea ? (
             <Button
               variant="ghost"
-              className="h-7 px-2 text-xs text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
+              className="h-6 px-1.5 text-[11px] text-blue-700 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-200"
               onClick={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -268,33 +265,9 @@ export function ContentCard({
               Open Idea
             </Button>
           ) : null}
-          <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
-            <Share2 className="h-3.5 w-3.5 mr-1" />
-            Share
-          </Button>
-          {!isIdea ? (
-            <Link href={teamSlug ? `/${teamSlug}/content/${content.id}` : '#'}>
-              <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
-                <Edit className="h-3.5 w-3.5 mr-1" />
-                Edit
-              </Button>
-            </Link>
-          ) : (
-            <Button
-              variant="ghost"
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                onClick?.()
-              }}
-            >
-              <Edit className="h-3.5 w-3.5 mr-1" />
-              Open Idea
-            </Button>
-          )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

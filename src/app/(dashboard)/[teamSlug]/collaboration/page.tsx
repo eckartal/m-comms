@@ -67,6 +67,7 @@ type ViewState =
   | 'ready'
 
 type ItemTypeFilter = 'all' | 'IDEA' | 'POST'
+const COLLAB_UI_VERSION = '2026-02-21-linear-v3'
 
 function isOverdue(item: Content) {
   if (!item.scheduled_at) return false
@@ -202,6 +203,46 @@ export default function CollaborationPage() {
     }
   }, [currentTeam?.id, loadData])
 
+  useEffect(() => {
+    if (!currentTeam?.id) return
+
+    const onFocus = () => {
+      loadData()
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadData()
+      }
+    }
+
+    const onContentUpdated = (event: Event) => {
+      const custom = event as CustomEvent<{ content?: Content; team_id?: string }>
+      const updated = custom.detail?.content
+      if (!updated) return
+      if (custom.detail?.team_id && custom.detail.team_id !== currentTeam.id) return
+
+      setContent((prev) => {
+        const exists = prev.some((item) => item.id === updated.id)
+        const next = exists
+          ? prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+          : [updated, ...prev]
+        setContents(next)
+        return next
+      })
+    }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('content:updated', onContentUpdated as EventListener)
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('content:updated', onContentUpdated as EventListener)
+    }
+  }, [currentTeam?.id, loadData, setContents])
+
   const handleStatusChange = async (contentId: string, newStatus: Content['status']) => {
     const previous = content
     const optimistic = previous.map((item) => (item.id === contentId ? { ...item, status: newStatus } : item))
@@ -282,6 +323,23 @@ export default function CollaborationPage() {
     if (routeTeamSlug) {
       router.push(`/${routeTeamSlug}/content/${postId}`)
     }
+  }
+
+  const openLinkedPostById = (postId: string, source: 'idea_card' | 'idea_panel') => {
+    const exists = content.some(
+      (item) => item.id === postId && (item.item_type || 'POST') === 'POST'
+    )
+    if (!exists) {
+      setActionError('Linked post is not loaded in this view yet. Opening it directly.')
+    }
+
+    trackCollabEvent('idea_linked_post_opened', {
+      post_id: postId,
+      source,
+      team_id: currentTeam?.id || null,
+      post_loaded: exists,
+    })
+    openPost(postId)
   }
 
   const handleCardClick = (contentItem: Content) => {
@@ -501,26 +559,32 @@ export default function CollaborationPage() {
       const post = body?.data?.post as Content | undefined
       const alreadyConverted = Boolean(body?.data?.already_converted)
 
-      if (updatedIdea) {
-        const next = content.map((item) =>
-          item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item
-        )
-        setContent(next)
-        setContents(next)
+      if (updatedIdea || post) {
+        setContent((prev) => {
+          let next = prev
+
+          if (updatedIdea) {
+            next = next.map((item) =>
+              item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item
+            )
+          }
+
+          if (post && !next.some((item) => item.id === post.id)) {
+            next = [post, ...next]
+          }
+
+          setContents(next)
+          return next
+        })
       }
 
       if (post) {
-        const next = content.some((item) => item.id === post.id) ? content : [post, ...content]
-        setContent(next)
-        setContents(next)
         trackCollabEvent('idea_converted_to_post', {
           idea_id: ideaId,
           post_id: post.id,
           already_converted: alreadyConverted,
           team_id: currentTeam.id,
         })
-        setIsIdeaPanelOpen(false)
-        openPost(post.id)
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to convert idea')
@@ -544,30 +608,35 @@ export default function CollaborationPage() {
   ) || null
 
   return (
-    <DashboardContainer className="flex h-full flex-1 flex-col py-4 md:py-5">
-      <div className="flex items-center justify-between border-b border-border px-0 py-4">
-        <div className="flex items-center gap-4">
+    <DashboardContainer className="flex h-full flex-1 flex-col py-3 md:py-4">
+      <div className="collab-toolbar flex flex-wrap items-center justify-between gap-3 px-0 py-3">
+        <div className="flex min-w-[220px] items-center gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
-            <p className="text-xs text-muted-foreground">Manage content workflow</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                UI {COLLAB_UI_VERSION}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Manage content workflow</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="relative min-w-[220px] flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search content..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 pl-9 bg-card border-border text-xs"
+              className="h-8 w-full sm:w-[210px] pl-9 bg-card border-border text-xs"
             />
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-8 gap-2 text-xs">
+              <Button variant="outline" className="h-8 gap-2 rounded-md text-xs">
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 Filters
                 {activeAdvancedFilterCount > 0 ? (
@@ -625,9 +694,9 @@ export default function CollaborationPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="h-6 w-px bg-border" />
+          <div className="hidden h-6 w-px bg-border md:block" />
 
-          <div className="flex rounded-lg border border-border bg-card p-0.5">
+          <div className="flex rounded-md border border-border bg-card p-0.5">
             <Button
               variant="ghost"
               size="sm"
@@ -636,8 +705,8 @@ export default function CollaborationPage() {
                 trackCollabEvent('collab_view_changed', { view: 'kanban', team_id: currentTeam.id })
               }}
               className={cn(
-                'h-7 px-2',
-                view === 'kanban' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                'h-7 rounded-sm px-2',
+                view === 'kanban' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -650,8 +719,8 @@ export default function CollaborationPage() {
                 trackCollabEvent('collab_view_changed', { view: 'list', team_id: currentTeam.id })
               }}
               className={cn(
-                'h-7 px-2',
-                view === 'list' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                'h-7 rounded-sm px-2',
+                view === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <List className="h-4 w-4" />
@@ -664,8 +733,8 @@ export default function CollaborationPage() {
                 trackCollabEvent('collab_view_changed', { view: 'calendar', team_id: currentTeam.id })
               }}
               className={cn(
-                'h-7 px-2',
-                view === 'calendar' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                'h-7 rounded-sm px-2',
+                view === 'calendar' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <Calendar className="h-4 w-4" />
@@ -674,13 +743,13 @@ export default function CollaborationPage() {
 
           <Button
             variant="outline"
-            className="h-8 text-xs"
+            className="h-8 rounded-md text-xs"
             onClick={goToNewPost}
           >
             New Post
           </Button>
           <Button
-            className="h-8 bg-foreground text-background hover:bg-foreground/90 text-xs"
+            className="h-8 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs"
             onClick={createIdea}
             disabled={isCreatingIdea}
           >
@@ -689,13 +758,18 @@ export default function CollaborationPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-card/40 px-0 py-2">
+      <div className="collab-toolbar flex items-center gap-0.5 overflow-x-auto px-0 py-2">
         {quickFilterMeta.map((filter) => (
           <Button
             key={filter.id}
             size="sm"
-            variant={quickFilter === filter.id ? 'default' : 'outline'}
-            className="h-7 text-xs whitespace-nowrap"
+            variant="ghost"
+            className={cn(
+              'h-7 whitespace-nowrap rounded px-2 text-[11px] font-medium',
+              quickFilter === filter.id
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+            )}
             onClick={() => {
               setQuickFilter(filter.id)
               trackCollabEvent('collab_quick_filter_selected', {
@@ -712,7 +786,7 @@ export default function CollaborationPage() {
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 text-xs text-muted-foreground hover:text-foreground ml-1"
+            className="ml-1 h-7 rounded px-2 text-[11px] text-muted-foreground hover:bg-accent/60 hover:text-foreground"
             onClick={clearFilters}
           >
             Clear filters
@@ -777,14 +851,13 @@ export default function CollaborationPage() {
               content={filteredContent}
               onStatusChange={handleStatusChange}
               onCardClick={handleCardClick}
-              teamSlug={routeTeamSlug}
               view={view}
               onViewChange={setView}
               teamMembers={teamMembers}
               onAssign={handleAssign}
               onConvertIdea={handleConvertIdea}
               onOpenLinkedIdea={openIdeaById}
-              onOpenLinkedPost={openPost}
+              onOpenLinkedPost={(postId) => openLinkedPostById(postId, 'idea_card')}
             />
           </div>
         ) : null}
@@ -803,7 +876,7 @@ export default function CollaborationPage() {
           setContents(next)
         }}
         onConvertIdea={handleConvertIdea}
-        onOpenLinkedPost={openPost}
+        onOpenLinkedPost={(postId) => openLinkedPostById(postId, 'idea_panel')}
       />
     </DashboardContainer>
   )

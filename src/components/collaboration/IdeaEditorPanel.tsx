@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
+import { useContentStore } from '@/stores'
 
 type TeamMemberItem = {
   id: string
@@ -63,6 +65,7 @@ export function IdeaEditorPanel({
   onConvertIdea,
   onOpenLinkedPost,
 }: IdeaEditorPanelProps) {
+  const allContents = useContentStore((state) => state.contents)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
@@ -75,6 +78,7 @@ export function IdeaEditorPanel({
   const [convertStatus, setConvertStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED'>('DRAFT')
   const [convertAssignee, setConvertAssignee] = useState('')
   const [includeNotes, setIncludeNotes] = useState(true)
+  const [titleTouched, setTitleTouched] = useState(false)
 
   useEffect(() => {
     if (!idea) return
@@ -90,6 +94,7 @@ export function IdeaEditorPanel({
     setConvertAssignee(idea.assigned_to || '')
     setIncludeNotes(true)
     setSaveError(null)
+    setTitleTouched(false)
   }, [idea?.id, idea])
 
   const hasChanges = useMemo(() => {
@@ -113,6 +118,10 @@ export function IdeaEditorPanel({
     idea.title === 'Untitled idea' &&
     extractIdeaNotes(idea.blocks).trim().length === 0 &&
     !idea.converted_post_id
+  const linkedPostTicketKey = useMemo(() => {
+    if (!idea?.converted_post_id) return null
+    return getTicketKey(idea.converted_post_id, allContents)
+  }, [idea?.converted_post_id, allContents])
 
   useEffect(() => {
     if (!open || !idea) return
@@ -129,6 +138,9 @@ export function IdeaEditorPanel({
     setSaveError(null)
 
     try {
+      const normalizedTitle = titleTouched
+        ? (title.trim() || 'Untitled idea')
+        : inferTitleFromNotes(notes, 'IDEA', title)
       const blocks = notes.trim()
         ? [{ id: `idea-note-${Date.now()}`, type: 'text', content: notes.trim() }]
         : []
@@ -137,7 +149,7 @@ export function IdeaEditorPanel({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim() || 'Untitled idea',
+          title: normalizedTitle,
           blocks,
           idea_state: ideaState,
           assigned_to: assignedTo || null,
@@ -151,6 +163,12 @@ export function IdeaEditorPanel({
 
       if (body?.data) {
         onIdeaUpdated(body.data as Content)
+        setTitle(normalizedTitle)
+        setConvertTitle((prev) =>
+          prev.trim() && prev.trim().toLowerCase() !== 'untitled idea'
+            ? prev
+            : normalizedTitle
+        )
       }
       return true
     } catch (error) {
@@ -174,7 +192,7 @@ export function IdeaEditorPanel({
       }
 
       await onConvertIdea(idea.id, {
-        post_title: convertTitle.trim() || title.trim() || 'Untitled from Idea',
+        post_title: convertTitle.trim() || inferTitleFromNotes(notes, 'POST', title),
         post_status: convertStatus,
         assigned_to: convertAssignee || null,
         include_notes: includeNotes,
@@ -190,9 +208,10 @@ export function IdeaEditorPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full border-l border-border bg-background p-0 text-foreground shadow-2xl sm:max-w-xl"
+        showOverlay={false}
+        className="w-full gap-0 overflow-hidden border-l border-border bg-white p-0 text-foreground shadow-none dark:bg-[#050505] sm:max-w-xl"
       >
-        <SheetHeader className="border-b border-border bg-background p-4">
+        <SheetHeader className="border-b border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
           <SheetTitle className="text-sm font-semibold text-foreground">
             {isNewIdea ? 'New Idea' : 'Idea'}
           </SheetTitle>
@@ -202,8 +221,11 @@ export function IdeaEditorPanel({
         </SheetHeader>
 
         {idea ? (
-          <div className="flex h-full flex-col">
-            <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 custom-scrollbar">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex-1 space-y-3.5 overflow-y-auto bg-white p-4 custom-scrollbar dark:bg-[#050505]">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {getTicketKey(idea.id, allContents)}
+            </div>
             {isNewIdea ? (
               <div className="rounded-md border border-amber-300/40 bg-amber-100 px-3 py-2 text-xs text-amber-900">
                 You are creating a new idea. Start with the title, then add notes.
@@ -215,9 +237,12 @@ export function IdeaEditorPanel({
               <Input
                 ref={titleInputRef}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitleTouched(true)
+                  setTitle(e.target.value)
+                }}
                 placeholder="Untitled idea"
-                className="border-border bg-card text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="h-8 border-border bg-card text-xs text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50"
               />
             </div>
 
@@ -227,7 +252,7 @@ export function IdeaEditorPanel({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Write the idea details..."
-                className="min-h-[160px] border-border bg-card text-foreground placeholder:text-muted-foreground"
+                className="min-h-[140px] border-border bg-card text-xs text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
@@ -237,7 +262,7 @@ export function IdeaEditorPanel({
                 <select
                   value={ideaState}
                   onChange={(e) => setIdeaState(e.target.value as 'INBOX' | 'CONVERTED' | 'ARCHIVED')}
-                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                  className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
                 >
                   <option value="INBOX">Inbox</option>
                   <option value="CONVERTED">Converted</option>
@@ -250,7 +275,7 @@ export function IdeaEditorPanel({
                 <select
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                  className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
                 >
                   <option value="">Unassigned</option>
                   {teamMembers
@@ -274,7 +299,7 @@ export function IdeaEditorPanel({
                     value={convertTitle}
                     onChange={(e) => setConvertTitle(e.target.value)}
                     placeholder="Title for the post"
-                    className="border-border bg-background text-foreground placeholder:text-muted-foreground"
+                    className="h-8 border-border bg-background text-xs text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
 
@@ -284,7 +309,7 @@ export function IdeaEditorPanel({
                     <select
                       value={convertStatus}
                       onChange={(e) => setConvertStatus(e.target.value as 'DRAFT' | 'IN_REVIEW' | 'APPROVED')}
-                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
+                      className="h-8 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                     >
                       <option value="DRAFT">Draft</option>
                       <option value="IN_REVIEW">In Review</option>
@@ -296,7 +321,7 @@ export function IdeaEditorPanel({
                     <select
                       value={convertAssignee}
                       onChange={(e) => setConvertAssignee(e.target.value)}
-                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
+                      className="h-8 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                     >
                       <option value="">Unassigned</option>
                       {teamMembers
@@ -329,7 +354,7 @@ export function IdeaEditorPanel({
             ) : null}
             </div>
 
-            <div className="sticky bottom-0 border-t border-border bg-background px-4 py-3">
+            <div className="sticky bottom-0 border-t border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
               <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -344,10 +369,10 @@ export function IdeaEditorPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8"
+                  className="h-7 border-emerald-200/70 bg-emerald-50/70 px-2 text-[10px] font-medium text-emerald-800 hover:bg-emerald-100/80 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
                   onClick={() => onOpenLinkedPost(idea.converted_post_id as string)}
                 >
-                  Open Post
+                  {linkedPostTicketKey || 'POST'}
                 </Button>
               ) : (
                 <Button
