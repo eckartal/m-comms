@@ -14,6 +14,22 @@ type IdeaRow = {
   converted_post_id: string | null
 }
 
+function isMissingIdeaColumnsError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+
+  return (
+    message.includes('item_type') ||
+    message.includes('idea_state') ||
+    message.includes('source_idea_id') ||
+    message.includes('converted_post_id') ||
+    message.includes('converted_at') ||
+    message.includes('converted_by')
+  )
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ ideaId: string }> }
@@ -37,6 +53,16 @@ export async function POST(
       .single()
 
     if (ideaError || !idea) {
+      if (isMissingIdeaColumnsError(ideaError)) {
+        return NextResponse.json(
+          {
+            error:
+              'Database migration required for ideas support. Apply migration 20260221_ideas_posts_conversion.sql',
+            code: 'migration_required',
+          },
+          { status: 500 }
+        )
+      }
       return NextResponse.json({ error: 'Idea not found', code: 'idea_not_found' }, { status: 404 })
     }
 
@@ -99,6 +125,16 @@ export async function POST(
 
     if (postError || !post) {
       console.error('Error creating post from idea:', postError)
+      if (isMissingIdeaColumnsError(postError)) {
+        return NextResponse.json(
+          {
+            error:
+              'Database migration required for ideas support. Apply migration 20260221_ideas_posts_conversion.sql',
+            code: 'migration_required',
+          },
+          { status: 500 }
+        )
+      }
       return NextResponse.json(
         { error: 'Failed to create post from idea', code: 'post_create_failed' },
         { status: 500 }
@@ -120,6 +156,17 @@ export async function POST(
 
     if (updateIdeaError || !updatedIdea) {
       console.error('Error linking converted idea:', updateIdeaError)
+      if (isMissingIdeaColumnsError(updateIdeaError)) {
+        await supabase.from('content').delete().eq('id', post.id)
+        return NextResponse.json(
+          {
+            error:
+              'Database migration required for ideas support. Apply migration 20260221_ideas_posts_conversion.sql',
+            code: 'migration_required',
+          },
+          { status: 500 }
+        )
+      }
       await supabase.from('content').delete().eq('id', post.id)
       return NextResponse.json(
         { error: 'Failed to finalize conversion', code: 'conversion_finalize_failed' },

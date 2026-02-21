@@ -7,6 +7,7 @@ type ApiErrorCode =
   | 'content_fetch_failed'
   | 'content_create_failed'
   | 'invalid_item_type'
+  | 'migration_required'
   | 'internal_server_error'
   | 'validation_error'
 
@@ -53,6 +54,22 @@ function normalizeUser(user: RawUser | RawUser[] | null | undefined) {
     full_name: source.full_name ?? name,
     avatar_url: source.avatar_url ?? null,
   }
+}
+
+function isMissingIdeaColumnsError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+
+  return (
+    message.includes('item_type') ||
+    message.includes('idea_state') ||
+    message.includes('source_idea_id') ||
+    message.includes('converted_post_id') ||
+    message.includes('converted_at') ||
+    message.includes('converted_by')
+  )
 }
 
 // GET /api/content - List content (optionally filtered by team_id)
@@ -222,6 +239,14 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating content:', error)
+      if (isMissingIdeaColumnsError(error)) {
+        return apiError(
+          'Database migration required for ideas support. Apply migration 20260221_ideas_posts_conversion.sql',
+          500,
+          'migration_required',
+          false
+        )
+      }
       return apiError(error.message || 'Failed to create content', 500, 'content_create_failed', true)
     }
 
