@@ -640,11 +640,14 @@ export default function EditContentPage() {
           onChange={(e) => setTitle(e.target.value)}
           className="w-full text-3xl font-semibold text-[#37352f] placeholder:text-[#c4c4c4] border-none focus:outline-none bg-transparent"
         />
-        <p className="text-sm text-[#9ca3af] mt-1 flex items-center gap-2">
+        <p className="text-sm text-[#9ca3af] mt-1 flex items-center gap-2 flex-wrap">
           <span className="w-1.5 h-1.5 rounded-full bg-[#6b7280]" />
           {statusLabels[status]}
           {scheduledAt && (
             <>· Scheduled for {new Date(scheduledAt).toLocaleDateString()}</>
+          )}
+          {content?.updated_at && (
+            <>· Updated {new Date(content.updated_at).toLocaleString()}</>
           )}
         </p>
       </div>
@@ -759,18 +762,13 @@ export default function EditContentPage() {
               ))}
           </select>
         </div>
-      </div>
-
-      {/* Schedule */}
-      <div className="mb-12">
-        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Schedule</h2>
-        <div className="mb-3">
+        <div className="mt-2">
           <button
             type="button"
             onClick={() => setShowReasonPrompt((prev) => !prev)}
             className="text-xs text-[#6b7280] hover:text-[#37352f]"
           >
-            {showReasonPrompt ? 'Hide reason' : 'Add a reason (optional)'}
+            {showReasonPrompt ? 'Hide reason' : 'Add reason for change (optional)'}
           </button>
           {showReasonPrompt && (
             <div className="mt-2">
@@ -784,6 +782,11 @@ export default function EditContentPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Schedule */}
+      <div className="mb-12">
+        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Schedule</h2>
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-xs">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
