@@ -22,6 +22,7 @@ import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
 import { IdeaEditorPanel } from '@/components/collaboration/IdeaEditorPanel'
+import { PostEditorPanel } from '@/components/collaboration/PostEditorPanel'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import {
   DropdownMenu,
@@ -110,6 +111,8 @@ export default function CollaborationPage() {
   const [isCreatingIdea, setIsCreatingIdea] = useState(false)
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [isIdeaPanelOpen, setIsIdeaPanelOpen] = useState(false)
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+  const [isPostPanelOpen, setIsPostPanelOpen] = useState(false)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
   const quickFilterFromQuery = parseQuickFilter(searchParams.get('quickFilter'))
@@ -325,13 +328,23 @@ export default function CollaborationPage() {
     }
   }
 
-  const openLinkedPostById = (postId: string, source: 'idea_card' | 'idea_panel') => {
+  const openPostPanelById = (postId: string) => {
     const exists = content.some(
       (item) => item.id === postId && (item.item_type || 'POST') === 'POST'
     )
     if (!exists) {
-      setActionError('Linked post is not loaded in this view yet. Opening it directly.')
+      setActionError('Linked post is not loaded in this view yet. Opening full editor.')
+      openPost(postId)
+      return
     }
+    setSelectedPostId(postId)
+    setIsPostPanelOpen(true)
+  }
+
+  const openLinkedPostById = (postId: string, source: 'idea_card' | 'idea_panel') => {
+    const exists = content.some(
+      (item) => item.id === postId && (item.item_type || 'POST') === 'POST'
+    )
 
     trackCollabEvent('idea_linked_post_opened', {
       post_id: postId,
@@ -339,7 +352,7 @@ export default function CollaborationPage() {
       team_id: currentTeam?.id || null,
       post_loaded: exists,
     })
-    openPost(postId)
+    openPostPanelById(postId)
   }
 
   const handleCardClick = (contentItem: Content) => {
@@ -349,7 +362,8 @@ export default function CollaborationPage() {
       return
     }
 
-    openPost(contentItem.id)
+    setSelectedPostId(contentItem.id)
+    setIsPostPanelOpen(true)
   }
 
   const openIdeaById = (ideaId: string) => {
@@ -585,6 +599,9 @@ export default function CollaborationPage() {
           already_converted: alreadyConverted,
           team_id: currentTeam.id,
         })
+        setIsIdeaPanelOpen(false)
+        setSelectedPostId(post.id)
+        setIsPostPanelOpen(true)
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to convert idea')
@@ -605,6 +622,9 @@ export default function CollaborationPage() {
 
   const selectedIdea = content.find(
     (item) => item.id === selectedIdeaId && (item.item_type || 'POST') === 'IDEA'
+  ) || null
+  const selectedPost = content.find(
+    (item) => item.id === selectedPostId && (item.item_type || 'POST') === 'POST'
   ) || null
 
   return (
@@ -877,6 +897,23 @@ export default function CollaborationPage() {
         }}
         onConvertIdea={handleConvertIdea}
         onOpenLinkedPost={(postId) => openLinkedPostById(postId, 'idea_panel')}
+      />
+
+      <PostEditorPanel
+        open={isPostPanelOpen}
+        post={selectedPost}
+        teamMembers={teamMembers}
+        onOpenChange={setIsPostPanelOpen}
+        onPostUpdated={(updatedPost) => {
+          setContent((prev) => {
+            const next = prev.map((item) =>
+              item.id === updatedPost.id ? { ...item, ...updatedPost } : item
+            )
+            setContents(next)
+            return next
+          })
+        }}
+        onOpenFullEditor={openPost}
       />
     </DashboardContainer>
   )

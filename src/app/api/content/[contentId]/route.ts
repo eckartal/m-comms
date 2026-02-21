@@ -10,6 +10,25 @@ type ApiErrorCode =
   | 'content_fetch_failed'
   | 'internal_server_error'
 
+type RawUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+}
+
+function normalizeUser(user: RawUser | RawUser[] | null | undefined) {
+  const source = Array.isArray(user) ? user[0] : user
+  if (!source) return null
+  return {
+    id: source.id,
+    email: source.email ?? null,
+    name: source.full_name ?? source.name ?? null,
+    avatar_url: source.avatar_url ?? null,
+  }
+}
+
 function apiError(error: string, status: number, code: ApiErrorCode, retryable: boolean) {
   return NextResponse.json({ error, code, retryable }, { status })
 }
@@ -23,6 +42,22 @@ function isMissingContentCommentsRelationError(error: unknown) {
     message.includes("relationship between 'content' and 'comments'") ||
     message.includes("Could not find a relationship between 'content' and 'comments'")
   )
+}
+
+function isMissingWriterColumnError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  return message.includes('writer_id')
+}
+
+function isMissingNameColumnError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  return message.includes('full_name') || message.includes('name')
 }
 
 // GET /api/content/[id] - Get single content
@@ -49,72 +84,92 @@ export async function GET(
     const membership = await requireTeamMembership(supabase, user.id, contentMeta.team_id)
     if (!membership) return apiError('Forbidden', 403, 'forbidden', false)
 
-    let { data, error } = await supabase
-      .from('content')
-      .select(`
-        *,
-        createdBy:created_by(id, name, email, avatar_url),
-        assignedTo:assigned_to(id, name, email, avatar_url),
-        versions:content_versions(
-          id,
-          blocks,
-          created_at,
-          createdBy:created_by(id, name, avatar_url)
-        ),
-        comments:comments(
-          id,
-          text,
-          created_at,
-          resolved_at,
-          user:user_id(id, name, email, avatar_url),
-          replies:comments(
-            id,
-            text,
-            created_at,
-            user:user_id(id, name, email, avatar_url)
-          )
-        ).eq('parent_id', null)
-      `)
-      .eq('id', contentId)
-      .single()
-
-    if (error && isMissingContentCommentsRelationError(error)) {
-      // Compatibility fallback for older schemas missing content<->comments relation.
-      const fallback = await supabase
+    const fetchBase = async (withWriter: boolean, withFullName: boolean) => {
+      const userCols = withFullName
+        ? 'id, full_name, name, email, avatar_url'
+        : 'id, name, email, avatar_url'
+      const writerJoin = withWriter ? `,\n        writer:writer_id(${userCols})` : ''
+      return supabase
         .from('content')
         .select(`
-          *,
-          createdBy:created_by(id, name, email, avatar_url),
-          assignedTo:assigned_to(id, name, email, avatar_url),
-          versions:content_versions(
-            id,
-            blocks,
-            created_at,
-            createdBy:created_by(id, name, avatar_url)
-          )
-        `)
+        *,
+        createdBy:created_by(${userCols}),
+        assignedTo:assigned_to(${userCols})${writerJoin}
+      `)
         .eq('id', contentId)
         .single()
-      data = fallback.data
-      error = fallback.error
     }
 
-    if (error) {
-      console.error('Error fetching content:', error)
-      if (isMissingContentCommentsRelationError(error)) {
-        return apiError(
-          'Database migration required for comments relation.',
-          500,
-          'migration_required',
-          false
-        )
-      }
+    let base = await fetchBase(true, true)
+    if (base.error && isMissingWriterColumnError(base.error)) {
+      base = await fetchBase(false, true)
+    }
+    if (base.error && isMissingNameColumnError(base.error)) {
+      base = await fetchBase(false, false)
+    }
+
+    if (base.error || !base.data) {
+      console.error('Error fetching content base:', base.error)
       return apiError('Failed to fetch content', 500, 'content_fetch_failed', true)
     }
 
-    if (!data) return apiError('Content not found', 404, 'not_found', false)
+    const versionsResult = await supabase
+      .from('content_versions')
+      .select(`
+        id,
+        blocks,
+        created_at,
+        createdBy:created_by(id, name, avatar_url)
+      `)
+      .eq('content_id', contentId)
+      .order('created_at', { ascending: false })
 
-    return NextResponse.json({ data })
+    if (versionsResult.error) {
+      console.error('Error fetching content versions:', versionsResult.error)
+    }
+
+    const commentsResult = await supabase
+      .from('comments')
+      .select(`
+        id,
+        text,
+        created_at,
+        resolved_at,
+        user:user_id(id, name, email, avatar_url),
+        replies:comments(
+          id,
+          text,
+          created_at,
+          user:user_id(id, name, email, avatar_url)
+        )
+      `)
+      .eq('content_id', contentId)
+      .is('parent_id', null)
+      .order('created_at', { ascending: true })
+
+    if (commentsResult.error && !isMissingContentCommentsRelationError(commentsResult.error)) {
+      console.error('Error fetching content comments:', commentsResult.error)
+    }
+
+    const baseData = base.data as Record<string, unknown>
+    const createdBy = normalizeUser((baseData as { createdBy?: RawUser | RawUser[] | null }).createdBy)
+    const assignedTo = normalizeUser((baseData as { assignedTo?: RawUser | RawUser[] | null }).assignedTo)
+    const writer = normalizeUser((baseData as { writer?: RawUser | RawUser[] | null }).writer)
+
+    const contentData = {
+      ...baseData,
+      versions: versionsResult.data || [],
+      comments: commentsResult.data || [],
+    } as Record<string, unknown>
+
+    return NextResponse.json({
+      data: {
+        ...contentData,
+        createdBy,
+        assignedTo,
+        writer: writer || assignedTo || createdBy,
+      },
+    })
   } catch (error) {
     console.error('Error in GET /api/content/[id]:', error)
     return apiError('Internal server error', 500, 'internal_server_error', true)
@@ -136,13 +191,25 @@ export async function PUT(
 
     const { contentId } = await params
     const body = await request.json()
-    const { title, blocks, platforms, status, scheduled_at, assigned_to, change_reason, idea_state } = body
+    const { title, blocks, platforms, status, scheduled_at, assigned_to, writer_id, change_reason, idea_state } = body
 
-    const { data: currentContent, error: currentError } = await supabase
+    let { data: currentContent, error: currentError } = await supabase
       .from('content')
-      .select('status, scheduled_at, assigned_to, team_id')
+      .select('status, scheduled_at, assigned_to, writer_id, team_id')
       .eq('id', contentId)
       .single()
+
+    if (currentError && isMissingWriterColumnError(currentError)) {
+      const fallbackCurrent = await supabase
+        .from('content')
+        .select('status, scheduled_at, assigned_to, team_id')
+        .eq('id', contentId)
+        .single()
+      currentContent = fallbackCurrent.data
+        ? { ...fallbackCurrent.data, writer_id: null }
+        : null
+      currentError = fallbackCurrent.error
+    }
 
     if (currentError || !currentContent) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
@@ -168,6 +235,7 @@ export async function PUT(
     if (status !== undefined) updateData.status = status
     if (scheduled_at !== undefined) updateData.scheduled_at = scheduled_at
     if (assigned_to !== undefined) updateData.assigned_to = assigned_to
+    if (writer_id !== undefined) updateData.writer_id = writer_id
     if (idea_state !== undefined) updateData.idea_state = idea_state
 
     const shouldVersion = blocks !== undefined
@@ -201,15 +269,32 @@ export async function PUT(
       }
     }
 
-    const { data, error } = await supabase
+    const updateQuery = supabase
       .from('content')
       .update(updateData)
       .eq('id', contentId)
       .select(`
         *,
-        createdBy:created_by(id, name, email, avatar_url)
+        createdBy:created_by(id, name, email, avatar_url),
+        assignedTo:assigned_to(id, name, email, avatar_url),
+        writer:writer_id(id, name, email, avatar_url)
       `)
-      .single()
+    let { data, error } = await updateQuery.single()
+
+    if (error && isMissingWriterColumnError(error)) {
+      const fallbackUpdate = await supabase
+        .from('content')
+        .update(updateData)
+        .eq('id', contentId)
+        .select(`
+          *,
+          createdBy:created_by(id, name, email, avatar_url),
+          assignedTo:assigned_to(id, name, email, avatar_url)
+        `)
+        .single()
+      data = fallbackUpdate.data
+      error = fallbackUpdate.error
+    }
 
     if (error) {
       console.error('Error updating content:', error)
@@ -263,6 +348,19 @@ export async function PUT(
       })
     }
 
+    if (writer_id !== undefined && writer_id !== currentContent.writer_id) {
+      activityEntries.push({
+        content_id: contentId,
+        team_id: currentContent.team_id,
+        user_id: user.id,
+        action: 'WRITER_UPDATED',
+        metadata: {
+          from_writer_id: currentContent.writer_id,
+          to_writer_id: writer_id,
+        },
+      })
+    }
+
     if (activityEntries.length > 0) {
       const { data: inserted, error: activityError } = await supabase
         .from('content_activity')
@@ -286,7 +384,18 @@ export async function PUT(
       }
     }
 
-    return NextResponse.json({ data })
+    const createdBy = normalizeUser((data as { createdBy?: RawUser | RawUser[] | null }).createdBy)
+    const assignedTo = normalizeUser((data as { assignedTo?: RawUser | RawUser[] | null }).assignedTo)
+    const writer = normalizeUser((data as { writer?: RawUser | RawUser[] | null }).writer)
+    const updatedData = (data ?? {}) as unknown as Record<string, unknown>
+    return NextResponse.json({
+      data: {
+        ...updatedData,
+        createdBy,
+        assignedTo,
+        writer: writer || assignedTo || createdBy,
+      },
+    })
   } catch (error) {
     console.error('Error in PUT /api/content/[id]:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
