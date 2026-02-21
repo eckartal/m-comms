@@ -9,11 +9,13 @@ import { useAppStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
 import { cn } from '@/lib/utils'
+import { getContentTitle } from '@/lib/contentText'
 import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
 import { PipelineSummary } from '@/components/collaboration/PipelineSummary'
 import { CollabRightRail } from '@/components/collaboration/CollabRightRail'
+import { IdeaEditorPanel } from '@/components/collaboration/IdeaEditorPanel'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 type TeamMemberItem = {
@@ -90,6 +92,8 @@ export default function CollaborationPage() {
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
   const [isCreatingIdea, setIsCreatingIdea] = useState(false)
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
+  const [isIdeaPanelOpen, setIsIdeaPanelOpen] = useState(false)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
 
@@ -253,10 +257,20 @@ export default function CollaborationPage() {
     }
   }
 
-  const handleCardClick = (contentItem: Content) => {
+  const openPost = (postId: string) => {
     if (currentTeam?.slug) {
-      window.location.href = `/${currentTeam.slug}/content/${contentItem.id}`
+      router.push(`/${currentTeam.slug}/content/${postId}`)
     }
+  }
+
+  const handleCardClick = (contentItem: Content) => {
+    if ((contentItem.item_type || 'POST') === 'IDEA') {
+      setSelectedIdeaId(contentItem.id)
+      setIsIdeaPanelOpen(true)
+      return
+    }
+
+    openPost(contentItem.id)
   }
 
   const hasActiveFilters =
@@ -268,7 +282,7 @@ export default function CollaborationPage() {
   const filteredContent = useMemo(
     () =>
       content.filter((item) => {
-        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesSearch = getContentTitle(item.title, '').toLowerCase().includes(searchQuery.toLowerCase())
         if (!matchesSearch) return false
         if (itemTypeFilter !== 'all' && (item.item_type || 'POST') !== itemTypeFilter) return false
 
@@ -406,6 +420,8 @@ export default function CollaborationPage() {
       setQuickFilter('all')
       setItemTypeFilter('IDEA')
       setView('kanban')
+      setSelectedIdeaId(idea.id)
+      setIsIdeaPanelOpen(true)
       trackCollabEvent('idea_created', {
         team_id: currentTeam.id,
         idea_id: idea.id,
@@ -449,7 +465,8 @@ export default function CollaborationPage() {
           already_converted: alreadyConverted,
           team_id: currentTeam.id,
         })
-        router.push(`/${currentTeam.slug}/content/${post.id}`)
+        setIsIdeaPanelOpen(false)
+        openPost(post.id)
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to convert idea')
@@ -467,6 +484,10 @@ export default function CollaborationPage() {
       </div>
     )
   }
+
+  const selectedIdea = content.find(
+    (item) => item.id === selectedIdeaId && (item.item_type || 'POST') === 'IDEA'
+  ) || null
 
   return (
     <DashboardContainer className="flex h-full flex-1 flex-col py-4 md:py-5">
@@ -736,6 +757,20 @@ export default function CollaborationPage() {
           </div>
         ) : null}
       </div>
+
+      <IdeaEditorPanel
+        open={isIdeaPanelOpen}
+        idea={selectedIdea}
+        teamMembers={teamMembers}
+        onOpenChange={setIsIdeaPanelOpen}
+        onIdeaUpdated={(updatedIdea) => {
+          setContent((prev) =>
+            prev.map((item) => (item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item))
+          )
+        }}
+        onConvertIdea={handleConvertIdea}
+        onOpenLinkedPost={openPost}
+      />
     </DashboardContainer>
   )
 }
