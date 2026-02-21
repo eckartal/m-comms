@@ -1,17 +1,33 @@
 'use client'
 
-import { useState, useEffect, KeyboardEvent, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { useAppStore, useContentStore } from '@/stores'
-import { PlatformIcon, platformIcons } from '@/components/oauth/PlatformIcon'
-import { createContent, updateContent, autoSaveContent } from '@/stores'
+import { PlatformIcon } from '@/components/oauth/PlatformIcon'
+import { createContent, updateContent } from '@/stores'
+import type { PlatformType } from '@/types'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import {
   Plus,
   X,
+  Loader2,
+  Settings2,
+  ChevronDown,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlatform'
+import { toast } from 'sonner'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
+import { getLocalConnectedPlatforms } from '@/lib/oauth/localConnections'
 
 // Platform configurations with character limits
 const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
@@ -33,12 +49,32 @@ interface ThreadItem {
   content: string
 }
 
+type PlatformAccountItem = {
+  id: string
+  account_name: string
+}
+
+type PlatformCatalogItem = {
+  id: string
+  name: string
+  connected: boolean
+  accounts: PlatformAccountItem[]
+}
+
+const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
+
+function isSupportedPlatform(id: string): id is PlatformType {
+  return SUPPORTED_PLATFORM_KEYS.has(id)
+}
+
 export default function NewContentPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const params = useParams()
+  const searchParams = useSearchParams()
   const teamSlug = params.teamSlug as string
-  const { currentUser } = useAppStore()
-  const { currentTeam, saving, lastSaved, setSaving } = useContentStore()
+  const { currentUser, currentTeam } = useAppStore()
+  const { saving, setSaving } = useContentStore()
 
   const [contentId, setContentId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -47,6 +83,11 @@ export default function NewContentPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
+  const [platformCatalog, setPlatformCatalog] = useState<PlatformCatalogItem[]>([])
+  const [connectionsLoading, setConnectionsLoading] = useState(true)
+  const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
+  const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
 
   const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
@@ -55,6 +96,62 @@ export default function NewContentPage() {
   const isNearLimit = characterCount > maxChars * 0.8
   const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
   const isSaved = !saving
+  const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
+  const activePlatformMeta = PLATFORMS[selectedPlatform]
+  const connectedCount = connectedPlatforms.length
+
+  const fetchConnectedPlatforms = useCallback(async () => {
+    try {
+      setConnectionsLoading(true)
+      const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
+      const data = await res.json()
+      const localConnected = getLocalConnectedPlatforms(teamSlug, currentTeam?.id)
+      if (!res.ok) {
+        setConnectedPlatforms(localConnected as PlatformType[])
+        setPlatformCatalog([])
+        return
+      }
+
+      const catalog = ((data.data || []) as PlatformCatalogItem[]).filter((platform) =>
+        isSupportedPlatform(platform.id)
+      )
+      setPlatformCatalog(catalog)
+
+      const connected = catalog
+        .filter((platform) => platform.connected)
+        .map((platform) => platform.id as PlatformType)
+      const merged = Array.from(new Set([...connected, ...localConnected])) as PlatformType[]
+      setConnectedPlatforms(merged)
+    } catch (error) {
+      console.error('Failed to fetch connected platforms for composer:', error)
+      setConnectedPlatforms(getLocalConnectedPlatforms(teamSlug, currentTeam?.id) as PlatformType[])
+      setPlatformCatalog([])
+    } finally {
+      setConnectionsLoading(false)
+    }
+  }, [teamSlug, currentTeam?.id])
+
+  const handleConnectPlatform = async (platform: PlatformType) => {
+    setConnectingPlatform(platform)
+
+    try {
+      await connectPlatform({
+        platform,
+        teamId: currentTeam?.id,
+        teamSlug,
+        returnTo: `/${teamSlug}/content/new`,
+        mode: 'popup',
+        source: 'composer',
+        onSuccess: async () => {
+          await fetchConnectedPlatforms()
+        },
+      })
+    } catch (error) {
+      console.error('Failed to connect from composer:', error)
+    } finally {
+      setConnectingPlatform(null)
+    }
+  }
 
   // Load saved draft from localStorage on mount
   useEffect(() => {
@@ -73,6 +170,31 @@ export default function NewContentPage() {
       }
     }
   }, [teamSlug])
+
+  useEffect(() => {
+    fetchConnectedPlatforms()
+  }, [fetchConnectedPlatforms])
+
+  useEffect(() => {
+    const connected = searchParams.get('connected')
+    const error = searchParams.get('error')
+
+    if (connected) {
+      toast.success(`${connected.charAt(0).toUpperCase() + connected.slice(1)} connected.`)
+      if (Object.keys(PLATFORMS).includes(connected)) {
+        setSelectedPlatform(connected as PlatformType)
+      }
+      fetchConnectedPlatforms()
+    }
+
+    if (error) {
+      toast.error(`Connection failed: ${getConnectErrorMessage(decodeURIComponent(error))}`)
+    }
+
+    if (connected || error) {
+      router.replace(pathname)
+    }
+  }, [searchParams, fetchConnectedPlatforms, router, pathname])
 
   // Auto-save to Supabase and localStorage
   useEffect(() => {
@@ -179,7 +301,7 @@ export default function NewContentPage() {
     }
   }
 
-  const handleSchedule = async (scheduledAt: Date) => {
+  const handleSchedule = async (scheduledAt: Date = new Date()) => {
     const hasContent = thread.some(t => t.content.trim().length > 0)
     if (!hasContent) return
 
@@ -236,63 +358,70 @@ export default function NewContentPage() {
   // Merge tweets indicator
   const canMerge = thread.length > 1 && activeIndex < thread.length - 1
 
+  const platformSummary = connectedCount > 0
+    ? `${activePlatformMeta.name} +${Math.max(connectedCount - 1, 0)}`
+    : activePlatformMeta.name
+
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex min-h-full flex-col bg-background">
       {/* Account Header */}
-      <header className="px-12 py-4 border-b border-border">
-        <div className="flex items-center justify-between">
-          <span className="text-[14px] font-medium text-foreground">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
-          <div className="flex items-center gap-4">
-            {/* Thread count */}
-            {thread.length > 1 && (
-              <span className="text-xs text-muted-foreground">
-                {thread.length} tweets
-              </span>
-            )}
-            {/* Auto-save indicator */}
-            <span className={cn(
-              'text-xs flex items-center gap-1',
-              isSaved ? 'text-muted-foreground' : 'text-primary'
-            )}>
-              <span className={cn(
-                'w-2 h-2 rounded-full',
-                isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
-              )} />
-              {isSaved ? 'Saved' : 'Saving...'}
-            </span>
+      <header className="border-b border-border">
+        <DashboardContainer className="max-w-[680px] py-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-medium text-foreground">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
+              <div className="flex items-center gap-4">
+                {/* Thread count */}
+                {thread.length > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    {thread.length} tweets
+                  </span>
+                )}
+                {/* Auto-save indicator */}
+                <span className={cn(
+                  'text-xs flex items-center gap-1',
+                  isSaved ? 'text-muted-foreground' : 'text-primary'
+                )}>
+                  <span className={cn(
+                    'w-2 h-2 rounded-full',
+                    isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
+                  )} />
+                  {isSaved ? 'Saved' : 'Saving...'}
+                </span>
+              </div>
+            </div>
+
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Draft title (optional)"
+              className="w-full bg-transparent border border-border rounded-[8px] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
           </div>
-        </div>
+        </DashboardContainer>
       </header>
 
       {/* Composition Area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[680px] mx-auto px-12 py-8">
-          {/* Platform Selector & Quick Actions */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-1">
-              {Object.entries(PLATFORMS).map(([key, config]) => {
-                const isSelected = selectedPlatform === key
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedPlatform(key as PlatformType)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-[8px] transition-all duration-200',
-                      isSelected
-                        ? 'bg-foreground text-primary-foreground border border-border shadow-sm'
-                        : 'bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
-                    )}
-                  >
-                    <PlatformIcon platform={key} className={cn('h-4 w-4', isSelected ? 'text-foreground' : 'text-current')} />
-                    <span className={cn('text-[13px] font-medium transition-colors', isSelected ? 'text-foreground' : '')}>
-                      {config.name.split(' ')[0]}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+        <DashboardContainer className="max-w-[680px] py-6">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setPlatformPickerOpen(true)}
+              className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+            >
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Platform Scope</span>
+              <span className="text-muted-foreground">{platformSummary}</span>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Thread count */}
+              <span className="text-xs text-muted-foreground">
+                Active: {activePlatformMeta.name}
+              </span>
               {thread.some(t => t.content) && (
                 <button
                   onClick={clearAll}
@@ -303,6 +432,28 @@ export default function NewContentPage() {
               )}
             </div>
           </div>
+
+          {!connectionsLoading && !selectedPlatformConnected && (
+            <div className="mb-5 rounded-[8px] border border-border bg-card px-3 py-2 flex items-center justify-between">
+              <p className="text-[13px] text-muted-foreground">
+                Connect {PLATFORMS[selectedPlatform].name} to publish without leaving the editor.
+              </p>
+              <button
+                onClick={() => handleConnectPlatform(selectedPlatform)}
+                disabled={connectingPlatform === selectedPlatform}
+                className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
+              >
+                {connectingPlatform === selectedPlatform ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Connecting
+                  </>
+                ) : (
+                  'Connect'
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Thread Items */}
           <div className="space-y-0">
@@ -427,25 +578,100 @@ export default function NewContentPage() {
             onAddThread={selectedPlatform === 'twitter' ? addTweet : undefined}
           />
 
-          {/* Publish Controls */}
-          <PublishControls
-            onPublish={handlePublish}
-            onSchedule={handleSchedule}
-            isPublishing={isPublishing}
-            disabled={totalCharacters === 0}
-            scheduledDate={null}
-          />
-
-          {/* Total character count (for threads) */}
-          {thread.length > 1 && (
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <span className="text-[12px] text-muted-foreground">
-                {totalCharacters.toLocaleString()} total characters • {thread.length} tweets
+          <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                Target: {activePlatformMeta.name}
+                {connectedCount > 1 ? ` • ${connectedCount - 1} more connected` : ''}
               </span>
+              {thread.length > 1 && (
+                <span>{totalCharacters.toLocaleString()} chars • {thread.length} tweets</span>
+              )}
             </div>
-          )}
-        </div>
+            <PublishControls
+              onPublish={handlePublish}
+              onSchedule={handleSchedule}
+              isPublishing={isPublishing}
+              disabled={totalCharacters === 0}
+              scheduledDate={null}
+            />
+          </div>
+        </DashboardContainer>
       </div>
+
+      <Dialog open={platformPickerOpen} onOpenChange={setPlatformPickerOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Platform Scope</DialogTitle>
+            <DialogDescription>
+              Choose your active compose channel and manage connection state.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2 pr-1">
+            {platformCatalog
+              .filter((platform) => isSupportedPlatform(platform.id))
+              .map((platform) => {
+                const platformId = platform.id as PlatformType
+                const isActive = selectedPlatform === platformId
+                const isConnected = connectedPlatforms.includes(platformId)
+                const primaryAccount = platform.accounts[0]?.account_name
+                return (
+                  <div
+                    key={platform.id}
+                    className={cn(
+                      'flex items-center justify-between rounded-[10px] border px-3 py-2',
+                      isActive ? 'border-ring bg-accent/50' : 'border-border bg-background/60'
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <PlatformIcon platform={platform.id} className="h-4 w-4" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{platform.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {isConnected ? (primaryAccount || 'Connected') : 'Not connected'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {!isConnected ? (
+                        <button
+                          type="button"
+                          onClick={() => handleConnectPlatform(platformId)}
+                          disabled={connectingPlatform === platformId}
+                          className="inline-flex items-center rounded-[6px] border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-70"
+                        >
+                          {connectingPlatform === platformId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Connect'}
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlatform(platformId)}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
+                          isActive
+                            ? 'bg-foreground text-background'
+                            : 'border border-border text-foreground hover:bg-accent'
+                        )}
+                      >
+                        {isActive ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Active
+                          </>
+                        ) : (
+                          'Use'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
