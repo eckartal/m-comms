@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils'
 import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlatform'
 import { toast } from 'sonner'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
-import { getLocalConnectedPlatforms } from '@/lib/oauth/localConnections'
+import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
 
 // Platform configurations with character limits
 const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
@@ -52,6 +52,8 @@ interface ThreadItem {
 type PlatformAccountItem = {
   id: string
   account_name: string
+  account_handle?: string | null
+  source?: 'real_oauth' | 'local_sandbox' | 'unknown'
 }
 
 type PlatformCatalogItem = {
@@ -124,15 +126,31 @@ export default function NewContentPage() {
       const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
       const data = await res.json()
       const localConnected = getLocalConnectedPlatforms(teamSlug, currentTeam?.id)
+      const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
       if (!res.ok) {
         setConnectedPlatforms(localConnected as PlatformType[])
         setPlatformCatalog([])
         return
       }
 
-      const catalog = ((data.data || []) as PlatformCatalogItem[]).filter((platform) =>
-        isSupportedPlatform(platform.id)
-      )
+      const catalog = ((data.data || []) as PlatformCatalogItem[])
+        .filter((platform) => isSupportedPlatform(platform.id))
+        .map((platform) => {
+          const localAccount = localConnections[platform.id]
+          if (!localAccount || platform.accounts.length > 0) return platform
+          return {
+            ...platform,
+            connected: true,
+            accounts: [
+              {
+                id: `local:${platform.id}`,
+                account_name: localAccount.account_name,
+                account_handle: localAccount.account_handle,
+                source: localAccount.source,
+              },
+            ],
+          }
+        })
       setPlatformCatalog(catalog)
 
       const connected = catalog
@@ -417,7 +435,9 @@ export default function NewContentPage() {
         <DashboardContainer className="max-w-[680px] py-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[14px] font-medium text-foreground">@{currentUser?.name?.toLowerCase() || 'asimov'}</span>
+              <span className="text-[14px] font-medium text-foreground">
+                Logged in as @{currentUser?.email?.split('@')[0] || 'user'}
+              </span>
               <div className="flex items-center gap-4">
                 {/* Thread count */}
                 {thread.length > 1 && (
@@ -649,7 +669,6 @@ export default function NewContentPage() {
             maxCharacters={maxChars}
             isBookmarked={isBookmarked}
             onBookmark={() => setIsBookmarked(!isBookmarked)}
-            onAddThread={selectedPlatform === 'twitter' ? addTweet : undefined}
           />
 
           <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
@@ -687,7 +706,7 @@ export default function NewContentPage() {
                 const isActive = selectedPlatform === platformId
                 const isConnected = connectedPlatforms.includes(platformId)
                 const isTarget = publishTargets.includes(platformId)
-                const primaryAccount = platform.accounts[0]?.account_name
+                const primaryAccount = platform.accounts[0]
                 return (
                   <div
                     key={platform.id}
@@ -701,7 +720,11 @@ export default function NewContentPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{platform.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {isConnected ? (primaryAccount || 'Connected') : 'Not connected'}
+                          {isConnected
+                            ? (primaryAccount
+                              ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
+                              : 'Connected')
+                            : 'Not connected'}
                         </p>
                       </div>
                     </div>
