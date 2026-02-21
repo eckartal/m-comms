@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
 import { PipelineSummary } from '@/components/collaboration/PipelineSummary'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 type TeamMemberItem = {
   id: string
@@ -56,6 +57,19 @@ function isOverdue(item: Content) {
   return new Date(item.scheduled_at).getTime() < Date.now()
 }
 
+function trackCollabEvent(name: string, payload: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('collaboration:analytics', {
+      detail: {
+        name,
+        payload,
+        ts: Date.now(),
+      },
+    })
+  )
+}
+
 export default function CollaborationPage() {
   const router = useRouter()
   const { currentTeam, currentUser } = useAppStore()
@@ -71,6 +85,8 @@ export default function CollaborationPage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
+  const hasTrackedViewLoaded = useRef(false)
+  const lastTrackedEmptyState = useRef<string | null>(null)
 
   const parseRequestError = async (response: Response, fallbackMessage: string) => {
     let message = fallbackMessage
@@ -297,6 +313,36 @@ export default function CollaborationPage() {
     return 'ready'
   }, [isLoading, errorStatus, error, content.length, filteredContent.length, hasActiveFilters])
 
+  useEffect(() => {
+    if (!hasTrackedViewLoaded.current && viewState === 'ready') {
+      hasTrackedViewLoaded.current = true
+      trackCollabEvent('collab_view_loaded', {
+        team_id: currentTeam?.id || null,
+        content_count: content.length,
+      })
+    }
+  }, [viewState, currentTeam?.id, content.length])
+
+  useEffect(() => {
+    const emptyVariant =
+      viewState === 'empty_permission'
+        ? 'permission'
+        : viewState === 'empty_first_use'
+          ? 'first_use'
+          : viewState === 'empty_filtered'
+            ? 'filtered'
+            : null
+
+    if (!emptyVariant) return
+    if (lastTrackedEmptyState.current === emptyVariant) return
+    lastTrackedEmptyState.current = emptyVariant
+
+    trackCollabEvent('collab_empty_state_seen', {
+      variant: emptyVariant,
+      team_id: currentTeam?.id || null,
+    })
+  }, [viewState, currentTeam?.id])
+
   const goToTeam = () => {
     if (currentTeam?.slug) {
       router.push(`/${currentTeam.slug}/team`)
@@ -311,15 +357,15 @@ export default function CollaborationPage() {
 
   if (!currentTeam) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div className="flex min-h-full items-center justify-center text-muted-foreground">
         <p>Please select a team</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-black">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-900">
+    <DashboardContainer className="flex h-full flex-1 flex-col py-4 md:py-5">
+      <div className="flex items-center justify-between border-b border-gray-900 px-0 py-4">
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-lg font-semibold text-foreground">Collaboration</h1>
@@ -400,7 +446,7 @@ export default function CollaborationPage() {
       </div>
 
       <PipelineSummary content={content} />
-      <div className="px-6 py-2 border-b border-gray-900 bg-[#050505] flex items-center gap-2 overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-gray-900 bg-[#050505] px-0 py-2">
         {quickFilterMeta.map((filter) => (
           <Button
             key={filter.id}
@@ -428,7 +474,7 @@ export default function CollaborationPage() {
         ) : null}
       </div>
 
-      <div className="px-6 py-2 border-b border-gray-900">
+      <div className="border-b border-gray-900 px-0 py-2">
         <button
           type="button"
           onClick={() => setShowReasonPrompt((prev) => !prev)}
@@ -456,7 +502,13 @@ export default function CollaborationPage() {
           <CollabErrorState
             message={error || 'Failed to load collaboration data'}
             showRetry={errorRetryable}
-            onRetry={loadData}
+            onRetry={() => {
+              trackCollabEvent('collab_retry_clicked', {
+                team_id: currentTeam.id,
+                error_status: errorStatus,
+              })
+              loadData()
+            }}
             onGoToTeam={goToTeam}
           />
         ) : null}
@@ -513,6 +565,6 @@ export default function CollaborationPage() {
           />
         ) : null}
       </div>
-    </div>
+    </DashboardContainer>
   )
 }
