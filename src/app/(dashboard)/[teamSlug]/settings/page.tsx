@@ -2,14 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useParams } from 'next/navigation'
 import {
   Globe,
   Clock,
   Bell,
-  Shield,
-  Palette,
   Link as LinkIcon,
   Check,
 } from 'lucide-react'
@@ -34,7 +31,6 @@ const workingHours = [
 ]
 
 export default function SettingsPage() {
-  const router = useRouter()
   const params = useParams()
   const teamSlug = params.teamSlug as string
   const { currentTeam } = useAppStore()
@@ -198,70 +194,17 @@ export default function SettingsPage() {
             <LinkIcon className="w-5 h-5 text-muted-foreground" />
             <h2 className="text-[16px] font-medium text-foreground">Integrations</h2>
           </div>
-          <div className="border border-border rounded-[8px] overflow-hidden">
-            <IntegrationRow
-              name="X (Twitter)"
-              icon="𝕏"
-              connected={true}
-              account="@yourbrand"
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="LinkedIn"
-              icon="in"
-              connected={true}
-              account="Your Company"
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Instagram"
-              icon="📷"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="TikTok"
-              icon="🎵"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="YouTube"
-              icon="▶️"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Threads"
-              icon="💬"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Bluesky"
-              icon="🔵"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Mastodon"
-              icon="🐘"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Facebook"
-              icon="f"
-              connected={false}
-              teamSlug={teamSlug}
-            />
-            <IntegrationRow
-              name="Blog"
-              icon="📝"
-              connected={true}
-              account="yourblog.com"
-              teamSlug={teamSlug}
-            />
+          <div className="border border-border rounded-[8px] p-4">
+            <p className="text-[14px] text-muted-foreground">
+              Connect social accounts from the integrations page. Platform status is shown from your real team
+              connections.
+            </p>
+            <Link
+              href={`/${teamSlug}/integrations`}
+              className="mt-3 inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[13px] font-medium text-background hover:bg-hover"
+            >
+              Open Integrations
+            </Link>
           </div>
         </div>
 
@@ -317,57 +260,6 @@ function ToggleOption({
             checked ? 'left-6' : 'left-1'
           )}
         />
-      </button>
-    </div>
-  )
-}
-
-function IntegrationRow({
-  name,
-  icon,
-  connected,
-  account,
-  teamSlug,
-}: {
-  name: string
-  icon: string
-  connected: boolean
-  account?: string
-  teamSlug: string
-}) {
-  const router = useRouter()
-
-  const handleConnect = () => {
-    if (connected) {
-      // Disconnect logic would go here
-      console.log(`Disconnect ${name}`)
-    } else {
-      // Navigate to integrations page to connect
-      router.push(`/${teamSlug}/integrations`)
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-between py-3 px-4 border-b border-border last:border-0 hover:bg-muted transition-colors">
-      <div className="flex items-center gap-3">
-        <span className="text-[20px]">{icon}</span>
-        <div>
-          <p className="text-[14px] font-medium text-foreground">{name}</p>
-          {connected && account && (
-            <p className="text-[12px] text-muted-foreground">{account}</p>
-          )}
-        </div>
-      </div>
-      <button
-        onClick={handleConnect}
-        className={cn(
-          'px-3 py-1.5 text-[13px] font-medium rounded-[6px] transition-colors',
-          connected
-            ? 'bg-muted text-muted-foreground hover:bg-border'
-            : 'bg-foreground text-foreground hover:bg-hover'
-        )}
-      >
-        {connected ? 'Disconnect' : 'Connect'}
       </button>
     </div>
   )

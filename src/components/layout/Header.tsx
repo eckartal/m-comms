@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { Bell, Search, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,9 +14,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme/ThemeProvider'
+import { useAppStore } from '@/stores'
 
 export function Header({ className }: { className?: string }) {
   const { theme, toggleTheme } = useTheme()
+  const currentUser = useAppStore((state) => state.currentUser)
 
   return (
     <header className={cn(
@@ -74,16 +75,18 @@ export function Header({ className }: { className?: string }) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-6 w-6 rounded-none">
               <Avatar className="h-5 w-5 border border-border">
-                <AvatarImage src={undefined} />
-                <AvatarFallback className="bg-accent text-[10px]">EU</AvatarFallback>
+                <AvatarImage src={currentUser?.avatar_url || undefined} />
+                <AvatarFallback className="bg-accent text-[10px]">
+                  {(currentUser?.name || 'U').slice(0, 2).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-popover border-border">
             <DropdownMenuLabel>
               <div className="flex flex-col gap-0.5">
-                <p className="text-xs">Emre Kartal</p>
-                <p className="text-[10px] text-muted-foreground">emre@example.com</p>
+                <p className="text-xs">{currentUser?.name || 'Unknown User'}</p>
+                <p className="text-[10px] text-muted-foreground">{currentUser?.email || '-'}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border" />

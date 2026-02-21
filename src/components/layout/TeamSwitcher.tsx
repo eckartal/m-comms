@@ -24,25 +24,46 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Plus, Check } from 'lucide-react'
 import { useState } from 'react'
+import { useAppStore, syncTeamsWithStore } from '@/stores'
 
 export function TeamSwitcher() {
   const router = useRouter()
+  const { teams, currentTeam, setCurrentTeam } = useAppStore()
   const [showNewTeam, setShowNewTeam] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
 
-  const teams = [
-    { id: '1', name: 'Acme Corp', slug: 'acme-corp', logo: undefined },
-    { id: '2', name: 'Personal', slug: 'personal', logo: undefined },
-  ]
-
-  const currentTeam = teams[0]
-
   const handleTeamChange = (team: typeof teams[0]) => {
+    setCurrentTeam(team)
     router.push(`/${team.slug}`)
   }
 
-  const handleCreateTeam = () => {
-    console.log('Creating team:', newTeamName)
+  const handleCreateTeam = async () => {
+    const trimmedName = newTeamName.trim()
+    if (!trimmedName) return
+
+    const slug = trimmedName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+
+    const response = await fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmedName, slug }),
+    })
+
+    if (!response.ok) {
+      return
+    }
+
+    await syncTeamsWithStore()
+    const createdTeam = useAppStore.getState().teams.find((team) => team.slug === slug)
+    if (createdTeam) {
+      setCurrentTeam(createdTeam)
+      router.push(`/${createdTeam.slug}`)
+    }
+
     setShowNewTeam(false)
     setNewTeamName('')
   }
@@ -77,11 +98,11 @@ export function TeamSwitcher() {
                 </AvatarFallback>
               </Avatar>
               <span className="text-xs tracking-wide">{team.name}</span>
-              {team.id === currentTeam.id && (
-                <Check className="h-4 w-4 ml-auto text-sidebar-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
+                {team.id === currentTeam?.id && (
+                  <Check className="h-4 w-4 ml-auto text-sidebar-primary" />
+                )}
+              </DropdownMenuItem>
+            ))}
           <DropdownMenuSeparator className="bg-sidebar-border" />
           <Dialog open={showNewTeam} onOpenChange={setShowNewTeam}>
             <DialogTrigger asChild>

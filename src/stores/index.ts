@@ -283,9 +283,14 @@ export async function syncTeamsWithStore() {
     `)
 
   if (data) {
-    useAppStore.getState().setTeams(data)
-    if (data.length > 0) {
-      useAppStore.getState().setCurrentTeam(data[0].team)
+    const teamRows = data as Array<{ team: Team | null }>
+    const teams = teamRows
+      .map((entry) => entry.team)
+      .filter(Boolean)
+
+    useAppStore.getState().setTeams(teams as Team[])
+    if (teams.length > 0) {
+      useAppStore.getState().setCurrentTeam(teams[0] as Team)
     }
   }
 }

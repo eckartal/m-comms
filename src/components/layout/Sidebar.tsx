@@ -1,24 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
-import { useAppStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { cn } from '@/lib/utils'
-import { Home, BarChart3, Calendar, Settings, Hash, Plus, Users } from 'lucide-react'
-
-interface Draft {
-  id: string
-  title: string
-  updatedAt: Date
-  status: 'draft' | 'scheduled' | 'posted'
-}
+import { Home, BarChart3, Calendar, Settings, Hash, Plus } from 'lucide-react'
 
 export function Sidebar({ className }: { className?: string }) {
   const pathname = usePathname()
   const params = useParams()
   const teamSlug = params.teamSlug as string
   const { currentUser } = useAppStore()
+  const contents = useContentStore((state) => state.contents)
 
   const primaryNavItems = [
     { icon: Home, href: `/${teamSlug}`, label: "Home" },
@@ -27,11 +21,19 @@ export function Sidebar({ className }: { className?: string }) {
     { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
   ]
 
-  const [drafts] = useState<Draft[]>([
-    { id: '1', title: 'Product launch announcement', updatedAt: new Date(), status: 'draft' },
-    { id: '2', title: 'Weekly newsletter update', updatedAt: new Date(Date.now() - 86400000), status: 'scheduled' },
-    { id: '3', title: 'Thank you post for new customers', updatedAt: new Date(Date.now() - 172800000), status: 'draft' },
-  ])
+  const drafts = useMemo(
+    () =>
+      contents
+        .filter((content) => content.status !== 'PUBLISHED')
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        .slice(0, 3)
+        .map((content) => ({
+          id: content.id,
+          title: content.title,
+          updatedAt: new Date(content.updated_at),
+        })),
+    [contents]
+  )
 
   const getRelativeTime = (date: Date) => {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
@@ -124,6 +126,9 @@ export function Sidebar({ className }: { className?: string }) {
               </Link>
             </div>
             <div className="space-y-1 max-h-[200px] overflow-y-auto custom-scrollbar">
+              {drafts.length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">No drafts yet</p>
+              )}
               {drafts.map((draft) => {
                 const isActive = pathname === `/${teamSlug}/content/${draft.id}`
                 return (

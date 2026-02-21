@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,48 +26,39 @@ type Integration = {
   accounts: Account[]
 }
 
-// Default integrations data (fallback)
-const defaultIntegrations: Integration[] = [
-  {
-    id: 'twitter',
-    name: 'Twitter/X',
-    description: 'Post threads, schedule tweets, and track engagement',
-    icon: '𝕏',
-    connected: false,
-    accounts: [],
-  },
-  {
-    id: 'linkedin',
-    name: 'LinkedIn',
-    description: 'Share articles, updates, and company news',
-    icon: 'in',
-    connected: false,
-    accounts: [],
-  },
-  {
-    id: 'instagram',
-    name: 'Instagram',
-    description: 'Post images, stories, and track visual content',
-    icon: '📷',
-    connected: false,
-    accounts: [],
-  },
-  {
-    id: 'blog',
-    name: 'Blog / CMS',
-    description: 'Publish to WordPress or other CMS platforms',
-    icon: '📝',
-    connected: false,
-    accounts: [],
-  },
-]
-
 export default function IntegrationsPage() {
   const { currentTeam } = useAppStore()
   const searchParams = useSearchParams()
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const fetchIntegrations = useCallback(async () => {
+    if (!currentTeam?.id) {
+      setErrorMessage('No active team selected.')
+      setIntegrations([])
+      setLoading(false)
+      return
+    }
+    try {
+      setErrorMessage(null)
+      const res = await fetch(`/api/platforms?teamId=${currentTeam.id}`)
+      const data = await res.json()
+      if (res.ok) {
+        setIntegrations(data.data || [])
+      } else {
+        setErrorMessage(data.error || 'Failed to fetch integrations')
+        setIntegrations([])
+      }
+    } catch (error) {
+      console.error('Failed to fetch integrations:', error)
+      setErrorMessage('Failed to fetch integrations')
+      setIntegrations([])
+    } finally {
+      setLoading(false)
+    }
+  }, [currentTeam?.id])
 
   useEffect(() => {
     // Check for connection success/error
@@ -82,33 +73,11 @@ export default function IntegrationsPage() {
     if (error) {
       toast.error(`Connection failed: ${decodeURIComponent(error)}`)
     }
-  }, [searchParams])
+  }, [fetchIntegrations, searchParams])
 
   useEffect(() => {
     fetchIntegrations()
-  }, [currentTeam?.id])
-
-  async function fetchIntegrations() {
-    if (!currentTeam?.id) {
-      setIntegrations(defaultIntegrations)
-      setLoading(false)
-      return
-    }
-    try {
-      const res = await fetch(`/api/platforms?teamId=${currentTeam.id}`)
-      if (res.ok) {
-        const data = await res.json()
-        setIntegrations(data.data || defaultIntegrations)
-      } else {
-        setIntegrations(defaultIntegrations)
-      }
-    } catch (error) {
-      console.error('Failed to fetch integrations:', error)
-      setIntegrations(defaultIntegrations)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [fetchIntegrations])
 
   async function handleConnect(platform: string) {
     // Blog is a content format, not an external platform to connect
@@ -163,7 +132,7 @@ export default function IntegrationsPage() {
     }
   }
 
-  const handleSync = (platform: string) => {
+  const handleSync = () => {
     toast.info('Syncing...')
     // Implementation would trigger a sync job
     setTimeout(() => {
@@ -195,6 +164,11 @@ export default function IntegrationsPage() {
         <h1 className="text-3xl font-bold text-foreground">Integrations</h1>
         <p className="text-muted-foreground mt-1">Connect your social media accounts and publishing platforms</p>
       </div>
+      {errorMessage && (
+        <div className="rounded-md border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+          {errorMessage}
+        </div>
+      )}
 
       {/* Connected Platforms */}
       {connectedIntegrations.length > 0 && (
@@ -246,7 +220,7 @@ export default function IntegrationsPage() {
                       <Plus className="mr-1 h-3 w-3" />
                       Add Account
                     </Button>
-                    <Button variant="outline" size="sm" className="h-8 text-xs border-border text-muted-foreground hover:text-foreground hover:bg-accent" onClick={() => handleSync(integration.id)}>
+                    <Button variant="outline" size="sm" className="h-8 text-xs border-border text-muted-foreground hover:text-foreground hover:bg-accent" onClick={handleSync}>
                       <RefreshCw className="mr-1 h-3 w-3" />
                       Sync
                     </Button>
