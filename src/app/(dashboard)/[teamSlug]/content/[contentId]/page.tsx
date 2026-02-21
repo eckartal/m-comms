@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ContentBlock, PlatformConfig, ContentStatus, Content } from '@/types'
-import { useAppStore } from '@/stores'
+import { useAppStore, useContentStore } from '@/stores'
 import { CommentList } from '@/components/comments/CommentList'
 import { InlineComments } from '@/components/comments/InlineComments'
 import { ShareModal } from '@/components/share/ShareModal'
@@ -257,6 +257,8 @@ const statusLabels: Record<string, string> = {
   ARCHIVED: 'Archived',
 }
 
+const DEFAULT_PUBLISHABLE_PLATFORMS = new Set(['twitter', 'linkedin'])
+
 type ActivityItem = {
   id: string
   action: string
@@ -348,6 +350,7 @@ export default function EditContentPage() {
   const [diffOpen, setDiffOpen] = useState(false)
   const [diffData, setDiffData] = useState<DiffPayload | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
+  const updateContentStore = useContentStore((state) => state.updateContent)
 
   const fetchContent = useCallback(async () => {
     try {
@@ -455,20 +458,74 @@ export default function EditContentPage() {
   const handleSave = async (publishStatus?: ContentStatus) => {
     setIsSubmitting(true)
     try {
-      await fetch(`/api/content/${contentId}`, {
+      const isPublishAction = publishStatus === 'PUBLISHED'
+      const requestedStatus = isPublishAction ? 'DRAFT' : (publishStatus || status)
+
+      const response = await fetch(`/api/content/${contentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           blocks,
           platforms,
-          status: publishStatus || status,
+          status: requestedStatus,
           scheduled_at: scheduledAt || null,
           assigned_to: assignedTo || null,
           change_reason: changeReason.trim() || null,
         }),
       })
-      if (publishStatus === 'PUBLISHED') {
+
+      if (!response.ok) {
+        throw new Error('Failed to save content')
+      }
+
+      const body = await response.json().catch(() => null)
+      const updated = body?.data as Content | undefined
+      if (updated) {
+        updateContentStore(contentId, updated)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('content:updated', {
+              detail: {
+                content: updated,
+                team_id: updated.team_id,
+              },
+            })
+          )
+        }
+      }
+
+      if (isPublishAction) {
+        const publishTargets = platforms
+          .filter((platform) => platform.enabled && DEFAULT_PUBLISHABLE_PLATFORMS.has(platform.platform))
+          .map((platform) => platform.platform)
+
+        if (publishTargets.length === 0) {
+          throw new Error('No publish-ready platform enabled. Enable X or LinkedIn to share.')
+        }
+
+        const publishResponse = await fetch(`/api/content/${contentId}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforms: publishTargets }),
+        })
+
+        const publishBody = await publishResponse.json().catch(() => null)
+        if (!publishResponse.ok) {
+          throw new Error(publishBody?.error || 'Failed to publish content')
+        }
+
+        const successful = Number(publishBody?.data?.summary?.successful || 0)
+        const failed = Number(publishBody?.data?.summary?.failed || 0)
+
+        if (successful <= 0) {
+          throw new Error('No platforms were published successfully')
+        }
+
+        if (failed > 0) {
+          alert(`Published to ${successful} platform(s), but ${failed} failed. Check activity and publish history.`)
+        }
+
         router.push(`/${teamSlug}/content`)
       } else {
         await fetchContent()

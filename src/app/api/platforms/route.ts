@@ -405,49 +405,58 @@ export async function POST(request: Request) {
     const safeConnectMode: 'redirect' | 'popup' = connectMode === 'popup' ? 'popup' : 'redirect'
 
     // OAuth configurations
-    const oauthConfigs: Record<string, { clientId: string; authUrl: string; scope: string }> = {
+    const oauthConfigs: Record<string, { clientId: string; clientSecret?: string; authUrl: string; scope: string }> = {
       twitter: {
         clientId: process.env.TWITTER_CLIENT_ID || '',
+        clientSecret: process.env.TWITTER_CLIENT_SECRET || '',
         authUrl: 'https://twitter.com/i/oauth2/authorize',
         scope: 'tweet.read tweet.write users.read',
       },
       linkedin: {
         clientId: process.env.LINKEDIN_CLIENT_ID || '',
+        clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
         authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
         scope: 'r_liteprofile w_member_social',
       },
       instagram: {
         clientId: process.env.INSTAGRAM_CLIENT_ID || '',
+        clientSecret: process.env.INSTAGRAM_CLIENT_SECRET || '',
         authUrl: 'https://api.instagram.com/oauth/authorize',
         scope: 'instagram_basic user_profile',
       },
       tiktok: {
         clientId: process.env.TIKTOK_CLIENT_ID || '',
+        clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
         authUrl: 'https://www.tiktok.com/v2/auth/authorize/',
         scope: 'user.info.basic feed.video.upload',
       },
       youtube: {
         clientId: process.env.YOUTUBE_CLIENT_ID || '',
+        clientSecret: process.env.YOUTUBE_CLIENT_SECRET || '',
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         scope: 'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload',
       },
       threads: {
         clientId: process.env.THREADS_CLIENT_ID || '',
+        clientSecret: process.env.THREADS_CLIENT_SECRET || '',
         authUrl: 'https://threads.net/oauth/authorize',
         scope: 'threads_basic',
       },
       bluesky: {
         clientId: process.env.BSKY_CLIENT_ID || '',
+        clientSecret: process.env.BSKY_CLIENT_SECRET || '',
         authUrl: 'https://bsky.social/oauth/authorize',
         scope: 'write posts',
       },
       mastodon: {
         clientId: process.env.MASTODON_CLIENT_ID || '',
+        clientSecret: process.env.MASTODON_CLIENT_SECRET || '',
         authUrl: 'https://mastodon.social/oauth/authorize',
         scope: 'read write follow',
       },
       facebook: {
         clientId: process.env.FACEBOOK_CLIENT_ID || '',
+        clientSecret: process.env.FACEBOOK_CLIENT_SECRET || '',
         authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
         scope: 'pages_show_list pages_manage_posts',
       },
@@ -473,8 +482,11 @@ export async function POST(request: Request) {
       })
     }
 
-    if (!config.clientId) {
-      return NextResponse.json({ error: `${platform} OAuth not configured` }, { status: 500 })
+    if (!config.clientId || !config.clientSecret) {
+      return NextResponse.json(
+        { error: `${platform} OAuth not configured (missing client credentials)` },
+        { status: 500 }
+      )
     }
 
     // Generate PKCE code verifier and random state token
