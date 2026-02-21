@@ -56,6 +56,14 @@ function CharacterCircles({ current, max }: { current: number; max: number }) {
   )
 }
 
+function getBlockText(block: ContentBlock): string {
+  if (typeof block.content === 'string') return block.content
+  if (block.content && typeof block.content === 'object' && 'text' in block.content) {
+    return String((block.content as { text?: string }).text || '')
+  }
+  return ''
+}
+
 // Block-based content editor component
 function BlockEditor({
   blocks,
@@ -121,14 +129,14 @@ function BlockEditor({
             {readOnly ? (
               <div className="py-2 px-3 -mx-3 rounded hover:bg-[#f7f7f5]">
                 <p className="whitespace-pre-wrap text-[#37352f]">
-                  {block.content || <span className="text-[#c4c4c4] italic">Empty</span>}
+                  {getBlockText(block) || <span className="text-[#c4c4c4] italic">Empty</span>}
                 </p>
               </div>
             ) : block.type === 'heading' ? (
               <input
                 type="text"
                 placeholder="Heading..."
-                value={block.content}
+                value={getBlockText(block)}
                 onChange={(e) => updateBlock(block.id, e.target.value)}
                 className="w-full border-b border-[#e5e5e5] pb-2 text-lg font-semibold text-[#37352f] placeholder:text-[#c4c4c4] focus:outline-none focus:border-[#2383e2] bg-transparent"
               />
@@ -140,14 +148,14 @@ function BlockEditor({
             ) : block.type === 'quote' ? (
               <Textarea
                 placeholder="Quote..."
-                value={block.content}
+                value={getBlockText(block)}
                 onChange={(e) => updateBlock(block.id, e.target.value)}
                 className="border-l-2 border-[#2383e2] pl-4 resize-none text-[#37352f] placeholder:text-[#c4c4c4] focus:outline-none"
               />
             ) : block.type === 'code' ? (
               <Textarea
                 placeholder="Code..."
-                value={block.content}
+                value={getBlockText(block)}
                 onChange={(e) => updateBlock(block.id, e.target.value)}
                 className="font-mono text-sm bg-[#f7f7f5] p-3 rounded-lg resize-none text-[#37352f] focus:outline-none focus:border-[#2383e2] border border-[#e5e5e5]"
               />
@@ -157,12 +165,12 @@ function BlockEditor({
               <>
                 {inlineComments ? (
                   <InlineComments
-                    content={block.content || ''}
+                    content={getBlockText(block)}
                     comments={inlineComments.getComments(block.id)}
                     currentUserId={inlineComments.currentUserId}
                     onChangeContent={(value) => updateBlock(block.id, value)}
                     onAddComment={(text, startPos, endPos) =>
-                      inlineComments.onAdd(block.id, text, startPos, endPos, block.content || '')
+                      inlineComments.onAdd(block.id, text, startPos, endPos, getBlockText(block))
                     }
                     onResolveComment={(id) => inlineComments.onResolve(id)}
                     onReplyComment={(id, text) => inlineComments.onReply(id, text)}
@@ -172,7 +180,7 @@ function BlockEditor({
                 ) : (
                   <Textarea
                     placeholder="Type '/' for commands..."
-                    value={block.content}
+                    value={getBlockText(block)}
                     onChange={(e) => updateBlock(block.id, e.target.value)}
                     className="resize-none px-0 py-2 min-h-[60px] text-[#37352f] placeholder:text-[#c4c4c4] focus:outline-none border-0"
                   />
@@ -219,7 +227,7 @@ function BlockEditor({
 }
 
 function getTotalChars(blocks: ContentBlock[]): number {
-  return blocks.reduce((acc, b) => acc + b.content.length, 0)
+  return blocks.reduce((acc, b) => acc + getBlockText(b).length, 0)
 }
 
 const statusLabels: Record<string, string> = {
