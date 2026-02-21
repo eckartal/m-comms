@@ -88,6 +88,43 @@ export default function CollaborationPage() {
     }
   }
 
+  const handleAssign = async (contentId: string, userId: string | null) => {
+    try {
+      const response = await fetch(`/api/content/${contentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_to: userId }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update owner')
+      }
+
+      const member = teamMembers.find((m) => m.user?.id === userId) || null
+      setContent((prev) =>
+        prev.map((item) =>
+          item.id === contentId
+            ? {
+                ...item,
+                assigned_to: userId,
+                assignedTo: member?.user
+                  ? {
+                      id: member.user.id,
+                      name: member.user.full_name || null,
+                      email: member.user.email,
+                      avatar_url: member.user.avatar_url || null,
+                    }
+                  : null,
+              }
+            : item
+        )
+      )
+    } catch (err) {
+      console.error(err)
+      setError('Failed to update owner')
+    }
+  }
+
   const handleCardClick = (contentItem: Content) => {
     // Navigate to content detail page
     if (currentTeam?.slug) {
@@ -218,6 +255,8 @@ export default function CollaborationPage() {
             teamId={currentTeam.id}
             view={view}
             onViewChange={setView}
+            teamMembers={teamMembers}
+            onAssign={handleAssign}
           />
         )}
       </div>

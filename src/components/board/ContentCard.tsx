@@ -63,7 +63,14 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
         {/* Card Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-medium text-foreground truncate pr-4">{content.title}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-medium text-foreground truncate pr-2">{content.title}</h4>
+              {ownerName && (
+                <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[120px]">
+                  Owner {ownerName}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground">

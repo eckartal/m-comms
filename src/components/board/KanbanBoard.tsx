@@ -15,6 +15,17 @@ interface KanbanBoardProps {
   teamId: string
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
+  teamMembers?: Array<{
+    id: string
+    user?: {
+      id: string
+      name?: string | null
+      full_name?: string | null
+      email?: string | null
+      avatar_url?: string | null
+    } | null
+  }>
+  onAssign?: (contentId: string, userId: string | null) => void
 }
 
 // Group content by status
@@ -53,6 +64,8 @@ export function KanbanBoard({
   teamId,
   view,
   onViewChange,
+  teamMembers,
+  onAssign,
 }: KanbanBoardProps) {
   const [groupedContent, setGroupedContent] = useState<Record<string, Content[]>>({})
   const [internalView, setInternalView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
@@ -72,6 +85,12 @@ export function KanbanBoard({
   const handleCardClick = (content: Content) => {
     if (onCardClick) {
       onCardClick(content)
+    }
+  }
+
+  const handleAssign = (contentId: string, userId: string | null) => {
+    if (onAssign) {
+      onAssign(contentId, userId)
     }
   }
 
@@ -112,35 +131,61 @@ export function KanbanBoard({
                 <span>Schedule</span>
               </div>
               <div className="divide-y divide-[#1f1f1f]">
-                {content.map((item) => {
-                  const ownerName =
-                    item.assignedTo?.name ||
-                    item.assignedTo?.email ||
-                    item.createdBy?.name ||
-                    item.createdBy?.email ||
-                    'Unassigned'
-                  const dateStr = item.published_at || item.scheduled_at
-                  const dateLabel = dateStr
-                    ? new Date(dateStr).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })
-                    : '—'
-                  return (
-                    <button
-                      key={item.id}
-                      className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
-                      onClick={() => handleCardClick(item)}
-                    >
-                      <span className="text-sm text-foreground truncate">{item.title}</span>
-                      <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
-                      <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
-                      <span className="text-xs text-muted-foreground">{dateLabel}</span>
-                    </button>
-                  )
-                })}
+                    {content.map((item) => {
+                      const ownerName =
+                        item.assignedTo?.name ||
+                        item.assignedTo?.email ||
+                        item.createdBy?.name ||
+                        item.createdBy?.email ||
+                        'Unassigned'
+                      const ownerId = item.assignedTo?.id || null
+                      const dateStr = item.published_at || item.scheduled_at
+                      const dateLabel = dateStr
+                        ? new Date(dateStr).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })
+                        : '—'
+                      return (
+                        <button
+                          key={item.id}
+                          className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
+                          onClick={() => handleCardClick(item)}
+                        >
+                          <span className="text-sm text-foreground truncate">{item.title}</span>
+                          <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
+                          {teamMembers && onAssign ? (
+                            <select
+                              className="text-xs text-muted-foreground bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1"
+                              value={ownerId || ''}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => handleAssign(item.id, event.target.value || null)}
+                            >
+                              <option value="">Unassigned</option>
+                              {teamMembers
+                                .filter((member) => member.user?.id)
+                                .map((member) => {
+                                  const label =
+                                    member.user?.full_name ||
+                                    member.user?.name ||
+                                    member.user?.email ||
+                                    'Unknown'
+                                  return (
+                                    <option key={member.id} value={member.user?.id}>
+                                      {label}
+                                    </option>
+                                  )
+                                })}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                        </button>
+                      )
+                    })}
               </div>
             </div>
           )}

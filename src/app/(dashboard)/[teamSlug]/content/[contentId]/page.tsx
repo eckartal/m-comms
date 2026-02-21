@@ -450,8 +450,9 @@ export default function EditContentPage() {
         ) : (
           <div className="space-y-3">
             {activity.map((item) => (
-              <div key={item.id} className="flex items-start justify-between gap-4 border border-[#e5e5e5] rounded-[6px] p-3">
-                <div className="min-w-0">
+              <div key={item.id} className="relative pl-5">
+                <div className="absolute left-1 top-2 h-2 w-2 rounded-full bg-[#37352f]" />
+                <div className="border-l border-[#e5e5e5] pl-4 py-2">
                   <p className="text-sm text-[#37352f]">{renderActivityLabel(item)}</p>
                   <p className="text-xs text-[#9ca3af]">
                     {item.user?.name || item.user?.email || 'Unknown user'} · {new Date(item.created_at).toLocaleString()}
