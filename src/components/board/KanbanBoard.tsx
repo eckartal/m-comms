@@ -139,6 +139,11 @@ export function KanbanBoard({
                         item.createdBy?.email ||
                         'Unassigned'
                       const ownerId = item.assignedTo?.id || null
+                      const latestUpdater =
+                        (item as any).latest_activity?.user?.name ||
+                        (item as any).latest_activity?.user?.email ||
+                        null
+                      const activityCount = (item as any).activity_count || 0
                       const dateStr = item.published_at || item.scheduled_at
                       const dateLabel = dateStr
                         ? new Date(dateStr).toLocaleDateString('en-US', {
@@ -148,44 +153,53 @@ export function KanbanBoard({
                             minute: '2-digit',
                           })
                         : '—'
-                      return (
-                        <button
-                          key={item.id}
-                          className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
-                          onClick={() => handleCardClick(item)}
+                  return (
+                    <button
+                      key={item.id}
+                      className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
+                      onClick={() => handleCardClick(item)}
+                    >
+                      <div className="min-w-0">
+                        <span className="block text-sm text-foreground truncate">{item.title}</span>
+                        {(latestUpdater || activityCount > 0) && (
+                          <span className="block text-[10px] text-muted-foreground truncate">
+                            {latestUpdater ? `Updated by ${latestUpdater}` : ''}
+                            {latestUpdater && activityCount > 0 ? ' · ' : ''}
+                            {activityCount > 0 ? `${activityCount} updates` : ''}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
+                      {teamMembers && onAssign ? (
+                        <select
+                          className="text-xs text-muted-foreground bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1"
+                          value={ownerId || ''}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => handleAssign(item.id, event.target.value || null)}
                         >
-                          <span className="text-sm text-foreground truncate">{item.title}</span>
-                          <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
-                          {teamMembers && onAssign ? (
-                            <select
-                              className="text-xs text-muted-foreground bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1"
-                              value={ownerId || ''}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => handleAssign(item.id, event.target.value || null)}
-                            >
-                              <option value="">Unassigned</option>
-                              {teamMembers
-                                .filter((member) => member.user?.id)
-                                .map((member) => {
-                                  const label =
-                                    member.user?.full_name ||
-                                    member.user?.name ||
-                                    member.user?.email ||
-                                    'Unknown'
-                                  return (
-                                    <option key={member.id} value={member.user?.id}>
-                                      {label}
-                                    </option>
-                                  )
-                                })}
-                            </select>
-                          ) : (
-                            <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
-                          )}
-                          <span className="text-xs text-muted-foreground">{dateLabel}</span>
-                        </button>
-                      )
-                    })}
+                          <option value="">Unassigned</option>
+                          {teamMembers
+                            .filter((member) => member.user?.id)
+                            .map((member) => {
+                              const label =
+                                member.user?.full_name ||
+                                member.user?.name ||
+                                member.user?.email ||
+                                'Unknown'
+                              return (
+                                <option key={member.id} value={member.user?.id}>
+                                  {label}
+                                </option>
+                              )
+                            })}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
