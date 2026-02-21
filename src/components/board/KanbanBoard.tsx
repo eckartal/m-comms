@@ -170,6 +170,13 @@ export function KanbanBoard({
                       const time = dateStr
                         ? new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
                         : ''
+                      const ownerName =
+                        item.assignedTo?.name ||
+                        item.assignedTo?.email ||
+                        item.createdBy?.name ||
+                        item.createdBy?.email ||
+                        null
+
                       return (
                         <button
                           key={item.id}
@@ -180,6 +187,9 @@ export function KanbanBoard({
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
                               <p className="text-xs text-muted-foreground">{time}</p>
+                              {ownerName && (
+                                <p className="text-[10px] text-muted-foreground truncate">Owner {ownerName}</p>
+                              )}
                             </div>
                             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
                               {item.status === 'PUBLISHED' ? 'Shared' : 'Scheduled'}

@@ -22,6 +22,12 @@ type ContentItem = {
   scheduled_at: string | null
   published_at: string | null
   platforms: string[]
+  assignedTo?: {
+    id: string
+    name: string | null
+    email: string
+    avatar_url?: string | null
+  } | null
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -54,7 +60,7 @@ export default function CalendarPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('content')
-        .select('id, title, status, scheduled_at, published_at, platforms')
+        .select('id, title, status, scheduled_at, published_at, platforms, assignedTo:assigned_to(id, name, email, avatar_url)')
         .eq('team_id', currentTeam.id)
         .in('status', ['SCHEDULED', 'PUBLISHED'])
         .or('scheduled_at.not.is.null,published_at.not.is.null')
@@ -328,6 +334,11 @@ export default function CalendarPage() {
                           <p className="text-[13px] font-medium text-foreground">
                             {item.title}
                           </p>
+                          {item.assignedTo && (
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              Owner {item.assignedTo?.name || item.assignedTo?.email}
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>
