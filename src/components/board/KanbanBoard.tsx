@@ -128,7 +128,7 @@ export function KanbanBoard({
                 <span>Title</span>
                 <span>Status</span>
                 <span>Owner</span>
-                <span>Schedule</span>
+                <span>Last updated</span>
               </div>
               <div className="divide-y divide-[#1f1f1f]">
                     {content.map((item) => {

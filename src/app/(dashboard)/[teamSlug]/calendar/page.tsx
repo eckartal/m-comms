@@ -65,7 +65,23 @@ export default function CalendarPage() {
         .in('status', ['SCHEDULED', 'PUBLISHED'])
         .or('scheduled_at.not.is.null,published_at.not.is.null')
 
-      setScheduledContent(data || [])
+      const contentIds = (data || []).map((item: any) => item.id)
+      const { data: activities } = await supabase
+        .from('content_activity')
+        .select('content_id')
+        .in('content_id', contentIds)
+
+      const activityCount: Record<string, number> = {}
+      ;(activities || []).forEach((activity: any) => {
+        activityCount[activity.content_id] = (activityCount[activity.content_id] || 0) + 1
+      })
+
+      const enriched = (data || []).map((item: any) => ({
+        ...item,
+        activity_count: activityCount[item.id] || 0,
+      }))
+
+      setScheduledContent(enriched)
       setLoading(false)
     }
     fetchScheduledContent()
@@ -334,6 +350,11 @@ export default function CalendarPage() {
                           <p className="text-[13px] font-medium text-foreground">
                             {item.title}
                           </p>
+                          {(item as any).activity_count > 0 && (
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              {(item as any).activity_count} updates
+                            </p>
+                          )}
                           {item.assignedTo && (
                             <p className="text-[11px] text-muted-foreground mt-1">
                               Owner {item.assignedTo?.name || item.assignedTo?.email}
