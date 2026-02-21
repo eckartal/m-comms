@@ -284,7 +284,7 @@ export default function EditContentPage() {
       const response = await fetch(`/api/content/${contentId}/activity`)
       if (response.ok) {
         const data = await response.json()
-        setActivity(Array.isArray(data) ? data : [])
+        setActivity(Array.isArray(data.data) ? data.data : [])
       }
     } catch (error) {
       console.error('Error fetching activity:', error)

@@ -48,7 +48,7 @@ export default function CollaborationPage() {
       }
 
       const data = await response.json()
-      setContent(data || [])
+      setContent(data.data || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load content')
       console.error(err)

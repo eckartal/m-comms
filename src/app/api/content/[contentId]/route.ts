@@ -124,16 +124,20 @@ export async function GET(
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     const { contentId } = await params
 
     // If no user (or for demo), return mock content
     if (!user) {
-      const content = MOCK_CONTENT.find((c) => c.id === contentId)
-      if (content) {
-        return NextResponse.json({ data: content })
+      if (demoMode) {
+        const content = MOCK_CONTENT.find((c) => c.id === contentId)
+        if (content) {
+          return NextResponse.json({ data: content })
+        }
+        return NextResponse.json({ error: 'Content not found' }, { status: 404 })
       }
-      return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { data, error } = await supabase
@@ -167,12 +171,15 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching content:', error)
-      // Return mock content if database is not available
-      const content = MOCK_CONTENT.find((c) => c.id === contentId)
-      if (content) {
-        return NextResponse.json({ data: content })
+      if (demoMode) {
+        // Return mock content if database is not available
+        const content = MOCK_CONTENT.find((c) => c.id === contentId)
+        if (content) {
+          return NextResponse.json({ data: content })
+        }
+        return NextResponse.json({ error: 'Content not found' }, { status: 404 })
       }
-      return NextResponse.json({ error: 'Content not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 })
     }
 
     if (!data) {
@@ -182,10 +189,13 @@ export async function GET(
     return NextResponse.json({ data })
   } catch (error) {
     console.error('Error in GET /api/content/[id]:', error)
-    // Return mock content on error
-    const content = MOCK_CONTENT.find((c) => c.id === contentId)
-    if (content) {
-      return NextResponse.json({ data: content })
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    if (demoMode) {
+      // Return mock content on error
+      const content = MOCK_CONTENT.find((c) => c.id === contentId)
+      if (content) {
+        return NextResponse.json({ data: content })
+      }
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

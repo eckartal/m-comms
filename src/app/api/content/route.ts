@@ -121,10 +121,14 @@ export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
     if (!user) {
-      // Return mock data for demo mode
-      return NextResponse.json(MOCK_CONTENT)
+      if (demoMode) {
+        // Return mock data for demo mode
+        return NextResponse.json({ data: MOCK_CONTENT })
+      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { data, error } = await supabase
@@ -140,20 +144,26 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching content:', error)
-      // Return mock data if database is not available
-      return NextResponse.json(MOCK_CONTENT)
+      if (demoMode) {
+        // Return mock data if database is not available
+        return NextResponse.json({ data: MOCK_CONTENT })
+      }
+      return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 })
     }
 
-    // If no data in database, return mock data
     if (!data || data.length === 0) {
-      return NextResponse.json(MOCK_CONTENT)
+      return NextResponse.json({ data: [] })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ data })
   } catch (error) {
     console.error('Error in GET /api/content:', error)
-    // Return mock data on error (for demo mode)
-    return NextResponse.json(MOCK_CONTENT)
+    const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    if (demoMode) {
+      // Return mock data on error (for demo mode)
+      return NextResponse.json({ data: MOCK_CONTENT })
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -199,7 +209,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json({ data }, { status: 201 })
   } catch (error) {
     console.error('Error in POST /api/content:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

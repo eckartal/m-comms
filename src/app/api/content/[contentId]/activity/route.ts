@@ -39,10 +39,9 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch activity' }, { status: 500 })
     }
 
-    return NextResponse.json(data || [])
+    return NextResponse.json({ data: data || [] })
   } catch (error) {
     console.error('Error in GET /api/content/[id]/activity:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
