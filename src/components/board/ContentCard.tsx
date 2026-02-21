@@ -49,6 +49,7 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
 
   const statusConfig = STATUS_CONFIG[content.status] || STATUS_CONFIG.DRAFT
   const assignedUser = content.assignedTo || content.createdBy
+  const ownerName = assignedUser?.name || assignedUser?.email || null
   const createdAt = formatDistanceToNow(content.created_at)
 
   return (
@@ -118,6 +119,11 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
                 <AvatarImage src={assignedUser.avatar_url || undefined} />
                 <AvatarFallback>{assignedUser.name?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
+              {ownerName && (
+                <span className="text-[10px] text-muted-foreground max-w-[90px] truncate">
+                  {ownerName}
+                </span>
+              )}
             </div>
           )}
         </div>

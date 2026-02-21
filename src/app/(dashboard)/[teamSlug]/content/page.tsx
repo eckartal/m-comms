@@ -409,9 +409,19 @@ export default function ContentPage() {
                         </p>
                       )}
 
-                      <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+                      <div className="flex items-center gap-3 text-[12px] text-muted-foreground flex-wrap">
                         {/* Created date */}
                         <span>Created {formatDate(item.created_at)}</span>
+
+                        {/* Owner */}
+                        {(item.assignedTo || item.createdBy) && (
+                          <>
+                            <span>·</span>
+                            <span>
+                              Owner {item.assignedTo?.name || item.assignedTo?.email || item.createdBy?.name || item.createdBy?.email}
+                            </span>
+                          </>
+                        )}
 
                         {/* Scheduled date */}
                         {item.scheduled_at && (
