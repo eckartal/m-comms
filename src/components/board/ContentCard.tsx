@@ -32,6 +32,7 @@ interface ContentCardProps {
   content: Content
   onClick?: () => void
   onOpenFullEditor?: (contentId: string) => void
+  onRemove?: (contentId: string) => void
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onConvertIdea?: (contentId: string) => void
   onOpenLinkedIdea?: (ideaId: string) => void
@@ -51,6 +52,7 @@ export function ContentCard({
   content,
   onClick,
   onOpenFullEditor,
+  onRemove,
   onStatusChange,
   onConvertIdea,
   onOpenLinkedIdea,
@@ -165,15 +167,6 @@ export function ContentCard({
               onClick={(event) => event.stopPropagation()}
             >
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  onClick?.()
-                }}
-              >
-                Open
-              </DropdownMenuItem>
               {!isIdea && onOpenFullEditor ? (
                 <DropdownMenuItem
                   onClick={(event) => {
@@ -182,7 +175,18 @@ export function ContentCard({
                     onOpenFullEditor(content.id)
                   }}
                 >
-                  Open Full Editor
+                  Open Post
+                </DropdownMenuItem>
+              ) : null}
+              {isIdea && onClick ? (
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onClick()
+                  }}
+                >
+                  Open Idea
                 </DropdownMenuItem>
               ) : null}
               {isIdea && !isConvertedIdea && onConvertIdea ? (
@@ -247,6 +251,21 @@ export function ContentCard({
                     }}
                   >
                     Archive
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+              {onRemove ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-red-600 focus:bg-red-50 dark:text-red-400 dark:focus:bg-red-950/30"
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onRemove(content.id)
+                    }}
+                  >
+                    Remove
                   </DropdownMenuItem>
                 </>
               ) : null}

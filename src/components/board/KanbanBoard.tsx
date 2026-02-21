@@ -15,6 +15,7 @@ interface KanbanBoardProps {
   onOpenLinkedIdea?: (ideaId: string) => void
   onOpenLinkedPost?: (postId: string) => void
   onOpenFullEditor?: (postId: string) => void
+  onRemoveContent?: (contentId: string) => void
   onCardClick?: (content: Content) => void
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
@@ -112,6 +113,7 @@ export function KanbanBoard({
   onOpenLinkedIdea,
   onOpenLinkedPost,
   onOpenFullEditor,
+  onRemoveContent,
   view,
   teamMembers,
   onAssign,
@@ -397,6 +399,7 @@ export function KanbanBoard({
                 content={item}
                 onClick={() => handleCardClick(item)}
                 onOpenFullEditor={onOpenFullEditor}
+                onRemove={onRemoveContent}
                 onStatusChange={onStatusChange}
                 onConvertIdea={onConvertIdea}
                 onOpenLinkedIdea={onOpenLinkedIdea}

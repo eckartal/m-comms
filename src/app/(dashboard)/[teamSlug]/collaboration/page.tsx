@@ -11,6 +11,7 @@ import {
   Search,
   SlidersHorizontal,
   Check,
+  Lightbulb,
 } from 'lucide-react'
 import { useAppStore, useContentStore } from '@/stores'
 import { Input } from '@/components/ui/input'
@@ -322,6 +323,34 @@ export default function CollaborationPage() {
     }
   }
 
+  const handleRemoveContent = async (contentId: string) => {
+    try {
+      const response = await fetch(`/api/content/${contentId}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        await parseRequestError(response, 'Failed to remove content')
+      }
+
+      setContent((prev) => {
+        const next = prev.filter((item) => item.id !== contentId)
+        setContents(next)
+        return next
+      })
+
+      if (selectedIdeaId === contentId) {
+        setIsIdeaPanelOpen(false)
+        setSelectedIdeaId(null)
+      }
+      if (selectedPostId === contentId) {
+        setIsPostPanelOpen(false)
+        setSelectedPostId(null)
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to remove content')
+    }
+  }
+
   const openPost = (postId: string) => {
     if (routeTeamSlug) {
       router.push(`/${routeTeamSlug}/content/${postId}`)
@@ -497,6 +526,12 @@ export default function CollaborationPage() {
   const goToNewPost = () => {
     if (routeTeamSlug) {
       router.push(`/${routeTeamSlug}/content/new`)
+    }
+  }
+
+  const goToIdeaMoodboard = () => {
+    if (routeTeamSlug) {
+      router.push(`/${routeTeamSlug}/collaboration/idea-inbox`)
     }
   }
 
@@ -764,6 +799,14 @@ export default function CollaborationPage() {
           <Button
             variant="outline"
             className="h-8 rounded-md text-xs"
+            onClick={goToIdeaMoodboard}
+          >
+            <Lightbulb className="mr-1 h-3.5 w-3.5" />
+            Idea Moodboard
+          </Button>
+          <Button
+            variant="outline"
+            className="h-8 rounded-md text-xs"
             onClick={goToNewPost}
           >
             New Post
@@ -872,6 +915,7 @@ export default function CollaborationPage() {
               onStatusChange={handleStatusChange}
               onCardClick={handleCardClick}
               onOpenFullEditor={openPost}
+              onRemoveContent={handleRemoveContent}
               view={view}
               onViewChange={setView}
               teamMembers={teamMembers}
