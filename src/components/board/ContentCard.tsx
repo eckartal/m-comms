@@ -156,7 +156,12 @@ export function ContentCard({
             <DropdownMenuContent
               align="end"
               sideOffset={6}
-              className="z-[120] w-44 border-border !bg-card !text-foreground !opacity-100 shadow-2xl data-[state=open]:animate-none data-[state=closed]:animate-none"
+              className="z-[120] w-44 border-border shadow-2xl data-[state=open]:animate-none data-[state=closed]:animate-none"
+              style={{
+                backgroundColor: 'var(--card)',
+                color: 'var(--foreground)',
+                opacity: 1,
+              }}
               onClick={(event) => event.stopPropagation()}
             >
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
