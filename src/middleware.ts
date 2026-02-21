@@ -1,16 +1,28 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function isPublicPath(pathname: string) {
+  if (pathname === '/') return true
+  if (pathname === '/login') return true
+  if (pathname === '/register') return true
+  if (pathname === '/check-email') return true
+  if (pathname === '/forgot-password') return true
+  if (pathname === '/auth/auth-code-error') return true
+  if (pathname.startsWith('/auth/callback')) return true
+  if (pathname.startsWith('/invite/')) return true
+  return false
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/register')
-  const isSharePage = request.nextUrl.pathname.startsWith('/share/')
+  const pathname = request.nextUrl.pathname
+  const isSharePage = pathname.startsWith('/share/')
   const hasToken = request.nextUrl.searchParams.has('token')
-  const isDevMode = !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  const isDevMode =
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder')
 
   // Skip Supabase client creation in dev mode
@@ -26,12 +38,8 @@ export async function updateSession(request: NextRequest) {
             return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              request.cookies.set(name, value)
-            )
-            supabaseResponse = NextResponse.next({
-              request,
-            })
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            supabaseResponse = NextResponse.next({ request })
             cookiesToSet.forEach(({ name, value, options }) =>
               supabaseResponse.cookies.set(name, value, options)
             )
@@ -41,7 +49,9 @@ export async function updateSession(request: NextRequest) {
     )
 
     // Refresh session if expired
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
     user = authUser
   }
 
@@ -50,14 +60,18 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Allow access to dashboard in dev mode without auth
-  if (isDevMode && !isAuthPage) {
+  const publicPath = isPublicPath(pathname)
+
+  // Allow access in dev mode without auth
+  if (isDevMode) {
     return supabaseResponse
   }
 
-  if (!user && !isAuthPage) {
+  if (!user && !publicPath) {
     // No user, redirect to login
-    return NextResponse.redirect(new URL('/login', request.url))
+    const url = new URL('/login', request.url)
+    url.searchParams.set('next', pathname)
+    return NextResponse.redirect(url)
   }
 
   return supabaseResponse

@@ -70,7 +70,8 @@ export async function POST(request: Request) {
 
     if (teamError) {
       console.error('Error creating team:', teamError)
-      return NextResponse.json({ error: teamError.message }, { status: 500 })
+      const status = teamError.code === '23505' ? 409 : 500
+      return NextResponse.json({ error: teamError.message }, { status })
     }
 
     // Add user as owner

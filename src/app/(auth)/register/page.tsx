@@ -10,11 +10,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Loader2 } from 'lucide-react'
-import { useAppStore, syncUserWithStore, syncTeamsWithStore } from '@/stores'
+import { persistOnboardingComplete, syncUserWithStore, syncTeamsWithStore } from '@/stores'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { setCurrentUser, setCurrentTeam, setTeams, onboarded, markOnboardingComplete: markOnboardingCompleteStore } = useAppStore()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,7 +22,44 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState<'auth' | 'team'>('auth')
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const createTeam = async () => {
+    if (!teamName.trim()) {
+      throw new Error('Team name is required')
+    }
+
+    const teamSlug = teamName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+
+    if (!teamSlug) {
+      throw new Error('Team name must include letters or numbers')
+    }
+
+    const teamResponse = await fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: teamName.trim(),
+        slug: teamSlug,
+        createWelcomeContent: true,
+      }),
+    })
+
+    const teamPayload = await teamResponse.json().catch(() => ({}))
+    if (!teamResponse.ok) {
+      throw new Error(teamPayload.error || teamPayload?.data?.error || 'Failed to create team')
+    }
+
+    await syncTeamsWithStore()
+    await persistOnboardingComplete()
+    const createdSlug = teamPayload?.data?.slug || teamSlug
+    router.push(`/${createdSlug}`)
+    router.refresh()
+  }
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -43,53 +79,28 @@ export default function RegisterPage() {
       if (error) throw error
 
       if (data.session) {
-        // Sync user with store
         await syncUserWithStore()
-
-        if (step === 'auth') {
-          // Switch to team creation step
-          setStep('team')
-          setLoading(false)
-          return
-        }
-
-        if (step === 'team') {
-          if (!teamName.trim()) {
-            setError('Team name is required')
-            setLoading(false)
-            return
-          }
-
-          const teamSlug = teamName.toLowerCase().replace(/\s+/g, '-')
-
-          const teamResponse = await fetch('/api/teams', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: teamName,
-              slug: teamSlug,
-              createWelcomeContent: true,
-            }),
-          })
-
-          if (teamResponse.ok) {
-            // Sync teams and mark onboarding complete
-            await syncTeamsWithStore()
-            markOnboardingCompleteStore()
-
-            router.push('/')
-            router.refresh()
-          } else {
-            const errorData = await teamResponse.json()
-            setError(errorData.error || errorData?.data?.error || 'Failed to create team')
-            setLoading(false)
-          }
-        }
+        setStep('team')
       } else {
         router.push('/check-email')
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create account'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      await createTeam()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create team'
       setError(message)
     } finally {
       setLoading(false)
@@ -103,7 +114,7 @@ export default function RegisterPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/post-login`,
         },
       })
       if (error) throw error
@@ -145,7 +156,7 @@ export default function RegisterPage() {
           )}
 
           {step === 'auth' ? (
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={handleCreateAccount} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-xs uppercase tracking-widest">Name</Label>
                 <Input
@@ -198,7 +209,7 @@ export default function RegisterPage() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
+            <form onSubmit={handleCreateTeam} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="teamName" className="text-xs uppercase tracking-widest">Team Name</Label>
                 <Input

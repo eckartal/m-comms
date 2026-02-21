@@ -148,7 +148,7 @@ export async function createContent(
   // Mark onboarding complete if this is the first content (not the welcome draft)
   const appState = useAppStore.getState()
   if (!appState.onboarded) {
-    useAppStore.getState().markOnboardingComplete()
+    await persistOnboardingComplete()
   }
 
   return content
@@ -245,6 +245,7 @@ export const useAppStore = create<{
   setCurrentTeam: (currentTeam: Team | null) => void
   setTeams: (teams: Team[]) => void
   onboarded: boolean
+  setOnboarded: (onboarded: boolean) => void
   markOnboardingComplete: () => void
   sidebarOpen: boolean
   toggleSidebar: () => void
@@ -263,6 +264,7 @@ export const useAppStore = create<{
 
       // Onboarding
       onboarded: false,
+      setOnboarded: (onboarded) => set({ onboarded }),
       markOnboardingComplete: () => set({ onboarded: true }),
 
       // UI
@@ -285,22 +287,39 @@ export async function syncUserWithStore() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, name, email, avatar_url, created_at')
-      .eq('id', user.id)
-      .single()
+  if (!user) return
 
-    if (profile) {
-      useAppStore.getState().setCurrentUser({
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        avatar_url: profile.avatar_url,
-        created_at: profile.created_at,
-      })
-    }
+  const metaName = (user.user_metadata?.name as string | undefined) || null
+  const fallbackUser = {
+    id: user.id,
+    name: metaName,
+    email: user.email || '',
+    avatar_url: (user.user_metadata?.avatar_url as string | undefined) || null,
+    created_at: user.created_at || new Date().toISOString(),
+  }
+
+  useAppStore.getState().setCurrentUser(fallbackUser)
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile && typeof profile === 'object') {
+    const source = profile as Record<string, unknown>
+    const profileName =
+      (source.name as string | null | undefined) ??
+      (source.full_name as string | null | undefined) ??
+      fallbackUser.name
+
+    useAppStore.getState().setCurrentUser({
+      id: String(source.id || fallbackUser.id),
+      name: profileName || null,
+      email: String(source.email || fallbackUser.email),
+      avatar_url: (source.avatar_url as string | null | undefined) ?? fallbackUser.avatar_url,
+      created_at: String(source.created_at || fallbackUser.created_at),
+    })
   }
 }
 
@@ -326,4 +345,38 @@ export async function syncTeamsWithStore() {
       useAppStore.getState().setCurrentTeam(teams[0] as Team)
     }
   }
+}
+
+export async function syncOnboardingWithStore() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data } = await supabase
+    .from('user_onboarding')
+    .select('completed')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  useAppStore.getState().setOnboarded(Boolean(data?.completed))
+}
+
+export async function persistOnboardingComplete() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase
+    .from('user_onboarding')
+    .upsert(
+      {
+        user_id: user.id,
+        completed: true,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+
+  useAppStore.getState().markOnboardingComplete()
 }

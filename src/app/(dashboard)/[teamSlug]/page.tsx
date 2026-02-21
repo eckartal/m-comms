@@ -4,8 +4,9 @@ import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, FileText, Calendar, Clock, Edit, Eye, CheckCircle, BarChart3, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAppStore } from '@/stores'
+import { persistOnboardingComplete, syncOnboardingWithStore, useAppStore } from '@/stores'
 import { Badge } from '@/components/ui/badge'
+import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { ContentStatus } from '@/types'
 
 type DashboardContent = {
@@ -47,7 +48,7 @@ function formatShortDate(value: string | null) {
 }
 
 export default function DashboardPage() {
-  const { currentTeam, onboarded, markOnboardingComplete } = useAppStore()
+  const { currentTeam, onboarded } = useAppStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -55,10 +56,19 @@ export default function DashboardPage() {
   const [contentItems, setContentItems] = useState<DashboardContent[]>([])
 
   useEffect(() => {
+    void syncOnboardingWithStore()
+  }, [])
+
+  useEffect(() => {
     if (currentTeam && !onboarded) {
       setShowWelcome(true)
     }
   }, [currentTeam, onboarded])
+
+  const completeOnboarding = async () => {
+    await persistOnboardingComplete()
+    setShowWelcome(false)
+  }
 
   useEffect(() => {
     async function fetchDashboardContent() {
@@ -126,20 +136,17 @@ export default function DashboardPage() {
 
   if (!currentTeam) {
     return (
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <h1 className="text-sm font-medium text-foreground">No team selected</h1>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Create or join a team to start using the dashboard.
-          </p>
-        </div>
-      </div>
+      <DashboardContainer>
+        <h1 className="text-sm font-medium text-foreground">No team selected</h1>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Create or join a team to start using the dashboard.
+        </p>
+      </DashboardContainer>
     )
   }
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar">
-      <div className="max-w-4xl mx-auto px-4 py-4">
+    <DashboardContainer className="py-4 md:py-6">
         <div className="mb-4">
           <h1 className="text-sm font-medium text-foreground">{currentTeam.name}</h1>
           <p className="text-[11px] text-muted-foreground">What&apos;s happening with your content.</p>
@@ -159,20 +166,14 @@ export default function DashboardPage() {
                   Your first post is a draft called &quot;This is your draft&quot;. Edit it or create your own.
                 </p>
                 <button
-                  onClick={() => {
-                    markOnboardingComplete()
-                    setShowWelcome(false)
-                  }}
+                  onClick={completeOnboarding}
                   className="mt-3 text-xs font-medium text-[#f97316] hover:text-white transition-colors"
                 >
                   Got it, start creating
                 </button>
               </div>
               <button
-                onClick={() => {
-                  markOnboardingComplete()
-                  setShowWelcome(false)
-                }}
+                onClick={completeOnboarding}
                 className="mt-1 text-[#737373] hover:text-white transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -283,7 +284,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </DashboardContainer>
   )
 }

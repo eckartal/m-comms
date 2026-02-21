@@ -1,10 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+function getSafeNext(next: string | null) {
+  if (!next) return '/auth/post-login'
+  if (!next.startsWith('/')) return '/auth/post-login'
+  if (next.startsWith('//')) return '/auth/post-login'
+  return next
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const next = getSafeNext(searchParams.get('next'))
 
   if (code) {
     const supabase = await createClient()
@@ -14,6 +21,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // Return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

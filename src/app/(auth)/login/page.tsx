@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { useAppStore, syncUserWithStore, syncTeamsWithStore } from '@/stores'
+import { useAppStore, syncOnboardingWithStore, syncUserWithStore, syncTeamsWithStore } from '@/stores'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,11 +14,20 @@ import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const currentTeam = useAppStore((state) => state.currentTeam)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const getSafeNext = () => {
+    const next = searchParams.get('next')
+    if (!next) return null
+    if (!next.startsWith('/')) return null
+    if (next.startsWith('//')) return null
+    return next
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,8 +45,15 @@ export default function LoginPage() {
 
       await syncUserWithStore()
       await syncTeamsWithStore()
+      await syncOnboardingWithStore()
+      const next = getSafeNext()
+      if (next) {
+        router.push(next)
+        router.refresh()
+        return
+      }
       const teamSlug = useAppStore.getState().currentTeam?.slug || currentTeam?.slug
-      router.push(teamSlug ? `/${teamSlug}` : '/')
+      router.push(teamSlug ? `/${teamSlug}` : '/onboarding/team')
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign in'
@@ -54,7 +70,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/post-login`,
         },
       })
       if (error) throw error
