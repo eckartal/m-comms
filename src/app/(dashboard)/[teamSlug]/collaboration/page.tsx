@@ -80,9 +80,10 @@ export default function CollaborationPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [errorRetryable, setErrorRetryable] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | null>(null)
+  const [loadErrorRetryable, setLoadErrorRetryable] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>('all')
@@ -138,9 +139,9 @@ export default function CollaborationPage() {
     if (!currentTeam?.id) return
 
     setIsLoading(true)
-    setError(null)
-    setErrorStatus(null)
-    setErrorRetryable(true)
+    setLoadError(null)
+    setLoadErrorStatus(null)
+    setLoadErrorRetryable(true)
 
     const [contentResult, teamMembersResult] = await Promise.allSettled([
       fetchContentData(currentTeam.id),
@@ -153,9 +154,9 @@ export default function CollaborationPage() {
       const reason = contentResult.reason
       const isRequestError = reason instanceof RequestError
       setContent([])
-      setError(isRequestError ? reason.message : 'Failed to load content')
-      setErrorStatus(isRequestError ? reason.status : 500)
-      setErrorRetryable(isRequestError ? reason.retryable : true)
+      setLoadError(isRequestError ? reason.message : 'Failed to load content')
+      setLoadErrorStatus(isRequestError ? reason.status : 500)
+      setLoadErrorRetryable(isRequestError ? reason.retryable : true)
       console.error('Failed to load collaboration content:', reason)
     }
 
@@ -206,7 +207,7 @@ export default function CollaborationPage() {
       setShowReasonPrompt(false)
     } catch (err) {
       console.error(err)
-      setError(err instanceof Error ? err.message : 'Failed to update status')
+      setActionError(err instanceof Error ? err.message : 'Failed to update status')
       setContent(previous)
     }
   }
@@ -248,7 +249,7 @@ export default function CollaborationPage() {
       )
     } catch (err) {
       console.error(err)
-      setError(err instanceof Error ? err.message : 'Failed to update owner')
+      setActionError(err instanceof Error ? err.message : 'Failed to update owner')
     }
   }
 
@@ -324,12 +325,12 @@ export default function CollaborationPage() {
 
   const viewState: ViewState = useMemo(() => {
     if (isLoading) return 'loading'
-    if (errorStatus === 401 || errorStatus === 403) return 'empty_permission'
-    if (error) return 'error'
+    if (loadErrorStatus === 401 || loadErrorStatus === 403) return 'empty_permission'
+    if (loadError) return 'error'
     if (content.length === 0) return 'empty_first_use'
     if (filteredContent.length === 0 && hasActiveFilters) return 'empty_filtered'
     return 'ready'
-  }, [isLoading, errorStatus, error, content.length, filteredContent.length, hasActiveFilters])
+  }, [isLoading, loadErrorStatus, loadError, content.length, filteredContent.length, hasActiveFilters])
 
   useEffect(() => {
     if (!hasTrackedViewLoaded.current && viewState === 'ready') {
@@ -410,11 +411,7 @@ export default function CollaborationPage() {
         idea_id: idea.id,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create idea')
-      if (err instanceof RequestError) {
-        setErrorStatus(err.status)
-        setErrorRetryable(err.retryable)
-      }
+      setActionError(err instanceof Error ? err.message : 'Failed to create idea')
     } finally {
       setIsCreatingIdea(false)
     }
@@ -455,7 +452,7 @@ export default function CollaborationPage() {
         router.push(`/${currentTeam.slug}/content/${post.id}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to convert idea')
+      setActionError(err instanceof Error ? err.message : 'Failed to convert idea')
       trackCollabEvent('idea_conversion_failed', {
         idea_id: ideaId,
         team_id: currentTeam.id,
@@ -655,17 +652,23 @@ export default function CollaborationPage() {
         )}
       </div>
 
+      {actionError ? (
+        <div className="border-b border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">
+          {actionError}
+        </div>
+      ) : null}
+
       <div className="flex-1 overflow-hidden">
         {viewState === 'loading' ? <CollabSkeleton view={view} /> : null}
 
         {viewState === 'error' ? (
           <CollabErrorState
-            message={error || 'Failed to load collaboration data'}
-            showRetry={errorRetryable}
+            message={loadError || 'Failed to load collaboration data'}
+            showRetry={loadErrorRetryable}
             onRetry={() => {
               trackCollabEvent('collab_retry_clicked', {
                 team_id: currentTeam.id,
-                error_status: errorStatus,
+                error_status: loadErrorStatus,
               })
               loadData()
             }}

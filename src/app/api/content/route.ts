@@ -217,20 +217,24 @@ export async function POST(request: Request) {
 
     const normalizedStatus = normalizedItemType === 'IDEA' ? 'DRAFT' : status || 'DRAFT'
 
+    const insertData: Record<string, unknown> = {
+      title,
+      blocks: blocks || [],
+      platforms: platforms || [],
+      status: normalizedStatus,
+      item_type: normalizedItemType,
+      idea_state: normalizedIdeaState,
+      team_id,
+      created_by: user.id,
+    }
+
+    // Keep backward compatibility with older schemas where these columns may not exist yet.
+    if (scheduled_at !== undefined) insertData.scheduled_at = scheduled_at
+    if (assigned_to !== undefined) insertData.assigned_to = assigned_to
+
     const { data, error } = await supabase
       .from('content')
-      .insert({
-        title,
-        blocks: blocks || [],
-        platforms: platforms || [],
-        status: normalizedStatus,
-        scheduled_at: scheduled_at || null,
-        assigned_to: assigned_to || null,
-        item_type: normalizedItemType,
-        idea_state: normalizedIdeaState,
-        team_id,
-        created_by: user.id,
-      })
+      .insert(insertData)
       .select(`
         *,
         createdBy:created_by(id, full_name, email, avatar_url)
