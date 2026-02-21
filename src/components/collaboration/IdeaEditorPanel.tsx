@@ -25,7 +25,15 @@ interface IdeaEditorPanelProps {
   teamMembers: TeamMemberItem[]
   onOpenChange: (open: boolean) => void
   onIdeaUpdated: (idea: Content) => void
-  onConvertIdea: (ideaId: string) => Promise<void>
+  onConvertIdea: (
+    ideaId: string,
+    options?: {
+      post_title?: string
+      post_status?: string
+      assigned_to?: string | null
+      include_notes?: boolean
+    }
+  ) => Promise<void>
   onOpenLinkedPost: (postId: string) => void
 }
 
@@ -62,6 +70,10 @@ export function IdeaEditorPanel({
   const [isSaving, setIsSaving] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [convertTitle, setConvertTitle] = useState('')
+  const [convertStatus, setConvertStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED'>('DRAFT')
+  const [convertAssignee, setConvertAssignee] = useState('')
+  const [includeNotes, setIncludeNotes] = useState(true)
 
   useEffect(() => {
     if (!idea) return
@@ -69,6 +81,10 @@ export function IdeaEditorPanel({
     setNotes(extractIdeaNotes(idea.blocks))
     setIdeaState((idea.idea_state || 'INBOX') as 'INBOX' | 'SHAPING' | 'READY' | 'CONVERTED' | 'ARCHIVED')
     setAssignedTo(idea.assigned_to || '')
+    setConvertTitle(idea.title || 'Untitled idea')
+    setConvertStatus('DRAFT')
+    setConvertAssignee(idea.assigned_to || '')
+    setIncludeNotes(true)
     setSaveError(null)
   }, [idea?.id, idea])
 
@@ -88,7 +104,7 @@ export function IdeaEditorPanel({
   }, [idea, title, notes, ideaState, assignedTo])
 
   const handleSave = async () => {
-    if (!idea) return
+    if (!idea) return false
     setIsSaving(true)
     setSaveError(null)
 
@@ -116,8 +132,10 @@ export function IdeaEditorPanel({
       if (body?.data) {
         onIdeaUpdated(body.data as Content)
       }
+      return true
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to save idea')
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -128,7 +146,19 @@ export function IdeaEditorPanel({
     setIsConverting(true)
     setSaveError(null)
     try {
-      await onConvertIdea(idea.id)
+      if (hasChanges) {
+        const saved = await handleSave()
+        if (!saved) {
+          return
+        }
+      }
+
+      await onConvertIdea(idea.id, {
+        post_title: convertTitle.trim() || title.trim() || 'Untitled from Idea',
+        post_status: convertStatus,
+        assigned_to: convertAssignee || null,
+        include_notes: includeNotes,
+      })
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to convert idea')
     } finally {
@@ -202,6 +232,64 @@ export function IdeaEditorPanel({
                 </select>
               </div>
             </div>
+
+            {!idea.converted_post_id ? (
+              <div className="rounded-sm border border-[#262626] bg-[#0a0a0a] p-3 space-y-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversion Setup</p>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Post Title</label>
+                  <Input
+                    value={convertTitle}
+                    onChange={(e) => setConvertTitle(e.target.value)}
+                    placeholder="Title for the post"
+                    className="bg-[#090909] border-[#262626]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Initial Status</label>
+                    <select
+                      value={convertStatus}
+                      onChange={(e) => setConvertStatus(e.target.value as 'DRAFT' | 'IN_REVIEW' | 'APPROVED')}
+                      className="h-9 w-full rounded-sm border border-[#262626] bg-[#090909] px-2 text-xs text-foreground"
+                    >
+                      <option value="DRAFT">Draft</option>
+                      <option value="IN_REVIEW">In Review</option>
+                      <option value="APPROVED">Approved</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Post Owner</label>
+                    <select
+                      value={convertAssignee}
+                      onChange={(e) => setConvertAssignee(e.target.value)}
+                      className="h-9 w-full rounded-sm border border-[#262626] bg-[#090909] px-2 text-xs text-foreground"
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers
+                        .filter((member) => member.user?.id)
+                        .map((member) => (
+                          <option key={member.id} value={member.user?.id || ''}>
+                            {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={includeNotes}
+                    onChange={(e) => setIncludeNotes(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border border-[#444] bg-transparent"
+                  />
+                  Copy idea notes into post draft
+                </label>
+              </div>
+            ) : null}
 
             {saveError ? (
               <div className="rounded-sm border border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">

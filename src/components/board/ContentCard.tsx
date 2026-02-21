@@ -258,9 +258,17 @@ export function ContentCard({
               </Button>
             </Link>
           ) : (
-            <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onClick?.()
+              }}
+            >
               <Edit className="h-3.5 w-3.5 mr-1" />
-              Idea
+              Open Idea
             </Button>
           )}
         </div>

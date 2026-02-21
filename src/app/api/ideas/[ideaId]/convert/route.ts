@@ -46,6 +46,33 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
     }
 
+    const body = await request.json().catch(() => ({}))
+    const requestedTitle =
+      typeof body?.post_title === 'string' && body.post_title.trim().length > 0
+        ? body.post_title.trim()
+        : null
+    const requestedStatus =
+      typeof body?.post_status === 'string' && body.post_status.trim().length > 0
+        ? body.post_status.trim().toUpperCase()
+        : null
+    const requestedAssignee =
+      typeof body?.assigned_to === 'string' && body.assigned_to.trim().length > 0
+        ? body.assigned_to.trim()
+        : null
+    const includeNotes = body?.include_notes !== false
+
+    const allowedPostStatuses = new Set([
+      'DRAFT',
+      'IN_REVIEW',
+      'APPROVED',
+      'SCHEDULED',
+      'PUBLISHED',
+      'ARCHIVED',
+    ])
+
+    const normalizedStatus =
+      requestedStatus && allowedPostStatuses.has(requestedStatus) ? requestedStatus : 'DRAFT'
+
     const { data: idea, error: ideaError } = await supabase
       .from('content')
       .select('*')
@@ -113,12 +140,12 @@ export async function POST(
         team_id: ideaRow.team_id,
         item_type: 'POST',
         source_idea_id: ideaRow.id,
-        title: ideaRow.title || 'Untitled from Idea',
-        blocks: ideaRow.blocks || [],
+        title: requestedTitle || ideaRow.title || 'Untitled from Idea',
+        blocks: includeNotes ? ideaRow.blocks || [] : [],
         platforms: ideaRow.platforms || [],
-        status: 'DRAFT',
+        status: normalizedStatus,
         created_by: user.id,
-        assigned_to: ideaRow.assigned_to,
+        assigned_to: requestedAssignee || ideaRow.assigned_to,
       })
       .select('*')
       .single()

@@ -443,11 +443,23 @@ export default function CollaborationPage() {
     }
   }
 
-  const handleConvertIdea = async (ideaId: string) => {
+  const handleConvertIdea = async (
+    ideaId: string,
+    options?: {
+      post_title?: string
+      post_status?: string
+      assigned_to?: string | null
+      include_notes?: boolean
+    }
+  ) => {
     if (!currentTeam?.slug) return
 
     try {
-      const response = await fetch(`/api/ideas/${ideaId}/convert`, { method: 'POST' })
+      const response = await fetch(`/api/ideas/${ideaId}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options || {}),
+      })
       if (!response.ok) {
         await parseRequestError(response, 'Failed to convert idea')
       }
