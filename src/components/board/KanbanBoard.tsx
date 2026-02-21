@@ -104,7 +104,45 @@ export function KanbanBoard({
               <p className="text-sm">No content yet</p>
             </div>
           ) : (
-            content.map((item) => <ContentCard key={item.id} content={item} onClick={() => handleCardClick(item)} />)
+            <div className="border border-[#262626] rounded-lg overflow-hidden">
+              <div className="grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground bg-[#0f0f0f]">
+                <span>Title</span>
+                <span>Status</span>
+                <span>Owner</span>
+                <span>Schedule</span>
+              </div>
+              <div className="divide-y divide-[#1f1f1f]">
+                {content.map((item) => {
+                  const ownerName =
+                    item.assignedTo?.name ||
+                    item.assignedTo?.email ||
+                    item.createdBy?.name ||
+                    item.createdBy?.email ||
+                    'Unassigned'
+                  const dateStr = item.published_at || item.scheduled_at
+                  const dateLabel = dateStr
+                    ? new Date(dateStr).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : '—'
+                  return (
+                    <button
+                      key={item.id}
+                      className="w-full text-left grid grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 hover:bg-[#0a0a0a] transition-colors"
+                      onClick={() => handleCardClick(item)}
+                    >
+                      <span className="text-sm text-foreground truncate">{item.title}</span>
+                      <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
+                      <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
+                      <span className="text-xs text-muted-foreground">{dateLabel}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>
