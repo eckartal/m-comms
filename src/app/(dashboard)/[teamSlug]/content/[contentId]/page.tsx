@@ -445,6 +445,10 @@ export default function EditContentPage() {
 
   const latestReason = (item: ActivityItem) => item.changeNote?.[0]?.reason || null
 
+  const canShowDiff = (item: ActivityItem) => {
+    return item.action === 'CONTENT_UPDATED' && item.metadata?.['diff_available']
+  }
+
   const buildInlineComments = (blockId: string) => {
     return annotations
       .filter((a) => a.block_id === blockId)
@@ -678,6 +682,11 @@ export default function EditContentPage() {
                   <p className="text-sm text-[#37352f]">{renderActivityLabel(item)}</p>
                   {latestReason(item) && (
                     <p className="text-xs text-[#6b7280] mt-1">Why: {latestReason(item)}</p>
+                  )}
+                  {canShowDiff(item) && (
+                    <button className="text-xs text-[#2383e2] mt-1 hover:underline">
+                      View diff
+                    </button>
                   )}
                   <p className="text-xs text-[#9ca3af]">
                     {item.user?.name || item.user?.email || 'Unknown user'} · {new Date(item.created_at).toLocaleString()}
