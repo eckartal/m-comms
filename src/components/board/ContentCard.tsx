@@ -108,7 +108,7 @@ export function ContentCard({
   return (
     <div
       className={cn(
-        'collab-card group relative cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 transition-colors hover:border-border hover:bg-accent/20'
+        'collab-card group relative cursor-pointer overflow-visible rounded-md border border-border bg-card p-2.5 transition-colors hover:border-border hover:bg-accent/20'
       )}
       onClick={onClick}
     >
@@ -147,7 +147,6 @@ export function ContentCard({
                 aria-label="Item actions"
                 className="h-6 w-6 p-0 text-muted-foreground opacity-100 hover:text-foreground"
                 onClick={(event) => {
-                  event.preventDefault()
                   event.stopPropagation()
                 }}
               >
@@ -157,7 +156,7 @@ export function ContentCard({
             <DropdownMenuContent
               align="end"
               sideOffset={6}
-              className="z-[120] w-44 border-border bg-card text-foreground opacity-100 shadow-2xl"
+              className="z-[120] w-44 border-border !bg-card !text-foreground !opacity-100 shadow-2xl data-[state=open]:animate-none data-[state=closed]:animate-none"
               onClick={(event) => event.stopPropagation()}
             >
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
