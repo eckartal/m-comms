@@ -349,24 +349,6 @@ export default function EditContentPage() {
   const [diffData, setDiffData] = useState<DiffPayload | null>(null)
   const [diffLoading, setDiffLoading] = useState(false)
 
-  useEffect(() => {
-    if (contentId) {
-      fetchContent()
-    }
-  }, [contentId, fetchContent])
-
-  useEffect(() => {
-    if (!contentId || loadState !== 'ready') return
-    fetchActivity()
-    fetchAnnotations()
-  }, [contentId, loadState, fetchActivity, fetchAnnotations])
-
-  useEffect(() => {
-    if (currentTeam?.id) {
-      fetchTeamMembers()
-    }
-  }, [currentTeam?.id, fetchTeamMembers])
-
   const fetchContent = useCallback(async () => {
     try {
       setLoadState('loading')
@@ -451,6 +433,24 @@ export default function EditContentPage() {
       console.error('Error fetching team members:', error)
     }
   }, [currentTeam?.id])
+
+  useEffect(() => {
+    if (contentId) {
+      fetchContent()
+    }
+  }, [contentId, fetchContent])
+
+  useEffect(() => {
+    if (!contentId || loadState !== 'ready') return
+    fetchActivity()
+    fetchAnnotations()
+  }, [contentId, loadState, fetchActivity, fetchAnnotations])
+
+  useEffect(() => {
+    if (currentTeam?.id) {
+      fetchTeamMembers()
+    }
+  }, [currentTeam?.id, fetchTeamMembers])
 
   const handleSave = async (publishStatus?: ContentStatus) => {
     setIsSubmitting(true)
