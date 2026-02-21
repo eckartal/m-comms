@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -336,6 +336,8 @@ export default function EditContentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not_found' | 'forbidden' | 'error'>('loading')
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [activityLoading, setActivityLoading] = useState(true)
   const [changeReason, setChangeReason] = useState('')
@@ -350,39 +352,65 @@ export default function EditContentPage() {
   useEffect(() => {
     if (contentId) {
       fetchContent()
-      fetchActivity()
-      fetchAnnotations()
     }
-  }, [contentId])
+  }, [contentId, fetchContent])
+
+  useEffect(() => {
+    if (!contentId || loadState !== 'ready') return
+    fetchActivity()
+    fetchAnnotations()
+  }, [contentId, loadState, fetchActivity, fetchAnnotations])
 
   useEffect(() => {
     if (currentTeam?.id) {
       fetchTeamMembers()
     }
-  }, [currentTeam?.id])
+  }, [currentTeam?.id, fetchTeamMembers])
 
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
+      setLoadState('loading')
+      setLoadErrorMessage(null)
       const response = await fetch(`/api/content/${contentId}`)
-      if (response.ok) {
-        const data = await response.json()
-        const contentData = data.data ?? data
-        setContent(contentData)
-        setTitle(contentData.title || '')
-        setBlocks(contentData.blocks || [])
-        setPlatforms(contentData.platforms || [])
-        setStatus(contentData.status)
-        setScheduledAt(contentData.scheduled_at || '')
-        setAssignedTo(contentData.assigned_to || null)
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        const message = typeof body?.error === 'string' ? body.error : 'Failed to load content'
+        if (response.status === 404) {
+          setLoadState('not_found')
+          setContent(null)
+        } else if (response.status === 401 || response.status === 403) {
+          setLoadState('forbidden')
+          setLoadErrorMessage(message)
+          setContent(null)
+        } else {
+          setLoadState('error')
+          setLoadErrorMessage(message)
+          setContent(null)
+        }
+        return
       }
+
+      const data = await response.json()
+      const contentData = data.data ?? data
+      setContent(contentData)
+      setTitle(contentData.title || '')
+      setBlocks(contentData.blocks || [])
+      setPlatforms(contentData.platforms || [])
+      setStatus(contentData.status)
+      setScheduledAt(contentData.scheduled_at || '')
+      setAssignedTo(contentData.assigned_to || null)
+      setLoadState('ready')
     } catch (error) {
       console.error('Error fetching content:', error)
+      setLoadState('error')
+      setLoadErrorMessage('Failed to load content')
+      setContent(null)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [contentId])
 
-  const fetchActivity = async () => {
+  const fetchActivity = useCallback(async () => {
     try {
       setActivityLoading(true)
       const response = await fetch(`/api/content/${contentId}/activity`)
@@ -395,9 +423,9 @@ export default function EditContentPage() {
     } finally {
       setActivityLoading(false)
     }
-  }
+  }, [contentId])
 
-  const fetchAnnotations = async () => {
+  const fetchAnnotations = useCallback(async () => {
     try {
       setAnnotationsLoading(true)
       const response = await fetch(`/api/content/${contentId}/annotations`)
@@ -410,9 +438,9 @@ export default function EditContentPage() {
     } finally {
       setAnnotationsLoading(false)
     }
-  }
+  }, [contentId])
 
-  const fetchTeamMembers = async () => {
+  const fetchTeamMembers = useCallback(async () => {
     try {
       const response = await fetch(`/api/teams/${currentTeam?.id}/members`)
       if (response.ok) {
@@ -422,7 +450,7 @@ export default function EditContentPage() {
     } catch (error) {
       console.error('Error fetching team members:', error)
     }
-  }
+  }, [currentTeam?.id])
 
   const handleSave = async (publishStatus?: ContentStatus) => {
     setIsSubmitting(true)
@@ -648,12 +676,47 @@ export default function EditContentPage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || loadState === 'loading') {
     return <DashboardContainer className="max-w-4xl py-8 text-[#9ca3af]">Loading...</DashboardContainer>
   }
 
-  if (!content) {
-    return <DashboardContainer className="max-w-4xl py-8 text-[#37352f]">Content not found</DashboardContainer>
+  if (loadState === 'forbidden') {
+    return (
+      <DashboardContainer className="max-w-4xl py-8 text-[#37352f]">
+        <div className="space-y-3">
+          <p>You do not have access to this content.</p>
+          <Button variant="outline" size="sm" onClick={() => router.push(`/${teamSlug}/content`)}>
+            Back to Content
+          </Button>
+        </div>
+      </DashboardContainer>
+    )
+  }
+
+  if (loadState === 'error') {
+    return (
+      <DashboardContainer className="max-w-4xl py-8 text-[#37352f]">
+        <div className="space-y-3">
+          <p>{loadErrorMessage || 'Something went wrong while loading this content.'}</p>
+          <Button variant="outline" size="sm" onClick={() => fetchContent()}>
+            Retry
+          </Button>
+        </div>
+      </DashboardContainer>
+    )
+  }
+
+  if (loadState === 'not_found' || !content) {
+    return (
+      <DashboardContainer className="max-w-4xl py-8 text-[#37352f]">
+        <div className="space-y-3">
+          <p>Content not found</p>
+          <Button variant="outline" size="sm" onClick={() => router.push(`/${teamSlug}/content`)}>
+            Back to Content
+          </Button>
+        </div>
+      </DashboardContainer>
+    )
   }
 
   return (

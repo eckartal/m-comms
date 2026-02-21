@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
 import {
@@ -88,9 +88,11 @@ function trackCollabEvent(name: string, payload: Record<string, unknown> = {}) {
 }
 
 export default function CollaborationPage() {
+  const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { currentTeam, currentUser } = useAppStore()
+  const routeTeamSlug = params.teamSlug as string
   const setContents = useContentStore((state) => state.setContents)
   const [content, setContent] = useState<Content[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -277,8 +279,8 @@ export default function CollaborationPage() {
   }
 
   const openPost = (postId: string) => {
-    if (currentTeam?.slug) {
-      router.push(`/${currentTeam.slug}/content/${postId}`)
+    if (routeTeamSlug) {
+      router.push(`/${routeTeamSlug}/content/${postId}`)
     }
   }
 
@@ -415,14 +417,14 @@ export default function CollaborationPage() {
   }, [viewState, currentTeam?.id])
 
   const goToTeam = () => {
-    if (currentTeam?.slug) {
-      router.push(`/${currentTeam.slug}/team`)
+    if (routeTeamSlug) {
+      router.push(`/${routeTeamSlug}/team`)
     }
   }
 
   const goToNewPost = () => {
-    if (currentTeam?.slug) {
-      router.push(`/${currentTeam.slug}/content/new`)
+    if (routeTeamSlug) {
+      router.push(`/${routeTeamSlug}/content/new`)
     }
   }
 
@@ -775,7 +777,7 @@ export default function CollaborationPage() {
               content={filteredContent}
               onStatusChange={handleStatusChange}
               onCardClick={handleCardClick}
-              teamSlug={currentTeam.slug}
+              teamSlug={routeTeamSlug}
               view={view}
               onViewChange={setView}
               teamMembers={teamMembers}

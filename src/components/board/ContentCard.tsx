@@ -273,7 +273,7 @@ export function ContentCard({
             Share
           </Button>
           {!isIdea ? (
-            <Link href={`/${teamSlug || content.team_id}/content/${content.id}`}>
+            <Link href={teamSlug ? `/${teamSlug}/content/${content.id}` : '#'}>
               <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
                 <Edit className="h-3.5 w-3.5 mr-1" />
                 Edit

@@ -190,20 +190,20 @@ export function IdeaEditorPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full border-l border-border bg-background p-0 text-foreground shadow-2xl sm:max-w-xl dark:border-[#3a3a3a] dark:bg-[#0b0b0b] dark:text-[#f2f2f2]"
+        className="w-full border-l border-border bg-background p-0 text-foreground shadow-2xl sm:max-w-xl"
       >
-        <SheetHeader className="border-b border-border bg-background p-4 dark:border-[#2f2f2f] dark:bg-[#0b0b0b]">
-          <SheetTitle className="text-sm font-semibold text-foreground dark:text-[#f5f5f5]">
+        <SheetHeader className="border-b border-border bg-background p-4">
+          <SheetTitle className="text-sm font-semibold text-foreground">
             {isNewIdea ? 'New Idea' : 'Idea'}
           </SheetTitle>
-          <SheetDescription className="text-xs text-muted-foreground dark:text-[#b3b3b3]">
+          <SheetDescription className="text-xs text-muted-foreground">
             {isNewIdea ? 'Capture the core thought first, then convert it to a post.' : 'Shape your idea before converting to a post.'}
           </SheetDescription>
         </SheetHeader>
 
         {idea ? (
           <div className="flex h-full flex-col">
-            <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 custom-scrollbar dark:bg-[#0b0b0b]">
+            <div className="flex-1 space-y-4 overflow-y-auto bg-background p-4 custom-scrollbar">
             {isNewIdea ? (
               <div className="rounded-md border border-amber-300/40 bg-amber-100 px-3 py-2 text-xs text-amber-900">
                 You are creating a new idea. Start with the title, then add notes.
@@ -211,33 +211,33 @@ export function IdeaEditorPanel({
             ) : null}
 
             <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Title</label>
+              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</label>
               <Input
                 ref={titleInputRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Untitled idea"
-                className="border-border bg-card text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50 dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2] dark:placeholder:text-[#8a8a8a]"
+                className="border-border bg-card text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/50"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Notes</label>
+              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Notes</label>
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Write the idea details..."
-                className="min-h-[160px] border-border bg-card text-foreground placeholder:text-muted-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2] dark:placeholder:text-[#8a8a8a]"
+                className="min-h-[160px] border-border bg-card text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Idea State</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Idea State</label>
                 <select
                   value={ideaState}
                   onChange={(e) => setIdeaState(e.target.value as 'INBOX' | 'CONVERTED' | 'ARCHIVED')}
-                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2]"
+                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
                 >
                   <option value="INBOX">Inbox</option>
                   <option value="CONVERTED">Converted</option>
@@ -246,11 +246,11 @@ export function IdeaEditorPanel({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Owner</label>
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Owner</label>
                 <select
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2]"
+                  className="h-9 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
                 >
                   <option value="">Unassigned</option>
                   {teamMembers
@@ -265,26 +265,26 @@ export function IdeaEditorPanel({
             </div>
 
             {!idea.converted_post_id ? (
-              <div className="space-y-3 rounded-sm border border-border bg-card p-3 dark:border-[#2f2f2f] dark:bg-[#101010]">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Conversion Setup</p>
+              <div className="space-y-3 rounded-sm border border-border bg-card p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversion Setup</p>
 
                 <div className="space-y-2">
-                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Post Title</label>
+                  <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Post Title</label>
                   <Input
                     value={convertTitle}
                     onChange={(e) => setConvertTitle(e.target.value)}
                     placeholder="Title for the post"
-                    className="border-border bg-background text-foreground placeholder:text-muted-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2] dark:placeholder:text-[#8a8a8a]"
+                    className="border-border bg-background text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Initial Status</label>
+                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Initial Status</label>
                     <select
                       value={convertStatus}
                       onChange={(e) => setConvertStatus(e.target.value as 'DRAFT' | 'IN_REVIEW' | 'APPROVED')}
-                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2]"
+                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                     >
                       <option value="DRAFT">Draft</option>
                       <option value="IN_REVIEW">In Review</option>
@@ -292,11 +292,11 @@ export function IdeaEditorPanel({
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground dark:text-[#b8b8b8]">Post Owner</label>
+                    <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Post Owner</label>
                     <select
                       value={convertAssignee}
                       onChange={(e) => setConvertAssignee(e.target.value)}
-                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground dark:border-[#3a3a3a] dark:bg-[#141414] dark:text-[#f2f2f2]"
+                      className="h-9 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                     >
                       <option value="">Unassigned</option>
                       {teamMembers
@@ -310,7 +310,7 @@ export function IdeaEditorPanel({
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 text-xs text-muted-foreground dark:text-[#c0c0c0]">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
                     checked={includeNotes}
@@ -329,7 +329,7 @@ export function IdeaEditorPanel({
             ) : null}
             </div>
 
-            <div className="sticky bottom-0 border-t border-border bg-background px-4 py-3 dark:border-[#2f2f2f] dark:bg-[#0b0b0b]">
+            <div className="sticky bottom-0 border-t border-border bg-background px-4 py-3">
               <div className="flex items-center gap-2">
               <Button
                 size="sm"
