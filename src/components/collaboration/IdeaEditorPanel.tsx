@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
 import { useContentStore } from '@/stores'
+import { ChevronDown } from 'lucide-react'
 
 type TeamMemberItem = {
   id: string
@@ -71,6 +72,7 @@ export function IdeaEditorPanel({
   const [notes, setNotes] = useState('')
   const [ideaState, setIdeaState] = useState<'INBOX' | 'CONVERTED' | 'ARCHIVED'>('INBOX')
   const [assignedTo, setAssignedTo] = useState<string>('')
+  const [writerId, setWriterId] = useState<string>('')
   const [isSaving, setIsSaving] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -79,6 +81,7 @@ export function IdeaEditorPanel({
   const [convertAssignee, setConvertAssignee] = useState('')
   const [includeNotes, setIncludeNotes] = useState(true)
   const [titleTouched, setTitleTouched] = useState(false)
+  const [isConversionSetupOpen, setIsConversionSetupOpen] = useState(true)
 
   useEffect(() => {
     if (!idea) return
@@ -89,12 +92,14 @@ export function IdeaEditorPanel({
       incomingIdeaState === 'ARCHIVED' || incomingIdeaState === 'CONVERTED' ? incomingIdeaState : 'INBOX'
     setIdeaState(normalizedIdeaState as 'INBOX' | 'CONVERTED' | 'ARCHIVED')
     setAssignedTo(idea.assigned_to || '')
+    setWriterId(idea.writer_id || idea.assigned_to || '')
     setConvertTitle(idea.title || 'Untitled idea')
     setConvertStatus('DRAFT')
     setConvertAssignee(idea.assigned_to || '')
     setIncludeNotes(true)
     setSaveError(null)
     setTitleTouched(false)
+    setIsConversionSetupOpen(true)
   }, [idea?.id, idea])
 
   const hasChanges = useMemo(() => {
@@ -103,14 +108,16 @@ export function IdeaEditorPanel({
     const initialNotes = extractIdeaNotes(idea.blocks)
     const initialState = idea.idea_state || 'INBOX'
     const initialAssigned = idea.assigned_to || ''
+    const initialWriter = idea.writer_id || idea.assigned_to || ''
 
     return (
       title !== initialTitle ||
       notes !== initialNotes ||
       ideaState !== initialState ||
-      assignedTo !== initialAssigned
+      assignedTo !== initialAssigned ||
+      writerId !== initialWriter
     )
-  }, [idea, title, notes, ideaState, assignedTo])
+  }, [idea, title, notes, ideaState, assignedTo, writerId])
 
   const linkedPostMissing = ideaState === 'CONVERTED' && !idea?.converted_post_id
   const isNewIdea =
@@ -153,6 +160,7 @@ export function IdeaEditorPanel({
           blocks,
           idea_state: ideaState,
           assigned_to: assignedTo || null,
+          writer_id: writerId || null,
         }),
       })
 
@@ -246,23 +254,13 @@ export function IdeaEditorPanel({
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Notes</label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Write the idea details..."
-                className="min-h-[140px] border-border bg-card text-xs text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3 rounded-sm border border-border bg-card p-3">
               <div className="space-y-2">
                 <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Idea State</label>
                 <select
                   value={ideaState}
                   onChange={(e) => setIdeaState(e.target.value as 'INBOX' | 'CONVERTED' | 'ARCHIVED')}
-                  className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                  className="h-8 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                 >
                   <option value="INBOX">Inbox</option>
                   <option value="CONVERTED">Converted</option>
@@ -275,7 +273,25 @@ export function IdeaEditorPanel({
                 <select
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="h-8 w-full rounded-sm border border-border bg-card px-2 text-xs text-foreground"
+                  className="h-8 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="">Unassigned</option>
+                  {teamMembers
+                    .filter((member) => member.user?.id)
+                    .map((member) => (
+                      <option key={member.id} value={member.user?.id || ''}>
+                        {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Writer</label>
+                <select
+                  value={writerId}
+                  onChange={(e) => setWriterId(e.target.value)}
+                  className="h-8 w-full rounded-sm border border-border bg-background px-2 text-xs text-foreground"
                 >
                   <option value="">Unassigned</option>
                   {teamMembers
@@ -289,9 +305,31 @@ export function IdeaEditorPanel({
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Notes</label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Capture context, source, details, and next steps..."
+                className="min-h-[300px] border-border bg-card text-xs text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+
             {!idea.converted_post_id ? (
-              <div className="space-y-3 rounded-sm border border-border bg-card p-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversion Setup</p>
+              <div className="rounded-sm border border-border bg-card">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-3 py-2 text-left"
+                  onClick={() => setIsConversionSetupOpen((prev) => !prev)}
+                >
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Conversion Setup</span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${isConversionSetupOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {isConversionSetupOpen ? (
+                  <div className="space-y-3 border-t border-border px-3 pb-3 pt-2">
 
                 <div className="space-y-2">
                   <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Post Title</label>
@@ -344,6 +382,8 @@ export function IdeaEditorPanel({
                   />
                   Copy idea notes into post draft
                 </label>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
