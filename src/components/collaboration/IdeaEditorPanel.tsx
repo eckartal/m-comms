@@ -57,6 +57,27 @@ function extractIdeaNotes(blocks: unknown): string {
   return ''
 }
 
+const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
+
+function resolveIdeaTitle(params: {
+  currentTitle: string
+  notes: string
+  titleTouched: boolean
+}) {
+  const rawTitle = params.currentTitle.trim()
+  const hasMeaningfulTitle = rawTitle.length > 0 && !UNTITLED_TITLE_RE.test(rawTitle)
+
+  if (params.titleTouched) {
+    return rawTitle || 'Untitled idea'
+  }
+
+  if (hasMeaningfulTitle) {
+    return rawTitle
+  }
+
+  return inferTitleFromNotes(params.notes, 'IDEA', params.currentTitle)
+}
+
 export function IdeaEditorPanel({
   open,
   idea,
@@ -144,9 +165,11 @@ export function IdeaEditorPanel({
   }, [open, idea])
 
   const buildSavePayload = useCallback(() => {
-    const normalizedTitle = titleTouched
-      ? (title.trim() || 'Untitled idea')
-      : inferTitleFromNotes(notes, 'IDEA', title)
+    const normalizedTitle = resolveIdeaTitle({
+      currentTitle: title,
+      notes,
+      titleTouched,
+    })
     const blocks = notes.trim()
       ? [{ id: `idea-note-${Date.now()}`, type: 'text', content: notes.trim() }]
       : []

@@ -47,6 +47,27 @@ function extractPrimaryNotes(blocks: unknown): string {
   return ''
 }
 
+const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
+
+function resolvePostTitle(params: {
+  currentTitle: string
+  notes: string
+  titleTouched: boolean
+}) {
+  const rawTitle = params.currentTitle.trim()
+  const hasMeaningfulTitle = rawTitle.length > 0 && !UNTITLED_TITLE_RE.test(rawTitle)
+
+  if (params.titleTouched) {
+    return rawTitle || 'Untitled post'
+  }
+
+  if (hasMeaningfulTitle) {
+    return rawTitle
+  }
+
+  return inferTitleFromNotes(params.notes, 'POST', params.currentTitle)
+}
+
 export function PostEditorPanel({
   open,
   post,
@@ -98,9 +119,11 @@ export function PostEditorPanel({
   }, [post, title, notes, status, assignedTo])
 
   const buildPayload = useCallback(() => {
-    const normalizedTitle = titleTouched
-      ? (title.trim() || 'Untitled post')
-      : inferTitleFromNotes(notes, 'POST', title)
+    const normalizedTitle = resolvePostTitle({
+      currentTitle: title,
+      notes,
+      titleTouched,
+    })
     const blocks = notes.trim()
       ? [{ id: `post-note-${Date.now()}`, type: 'text', content: notes.trim() }]
       : []
