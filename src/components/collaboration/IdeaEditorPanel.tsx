@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Content } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,6 +75,8 @@ export function IdeaEditorPanel({
   const [writerId, setWriterId] = useState<string>('')
   const [isSaving, setIsSaving] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [convertTitle, setConvertTitle] = useState('')
   const [convertStatus, setConvertStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED'>('DRAFT')
@@ -98,6 +100,8 @@ export function IdeaEditorPanel({
     setConvertAssignee(idea.assigned_to || '')
     setIncludeNotes(true)
     setSaveError(null)
+    setIsAutoSaving(false)
+    setLastSavedAt(null)
     setTitleTouched(false)
     setIsConversionSetupOpen(true)
   }, [idea?.id, idea])
@@ -139,53 +143,76 @@ export function IdeaEditorPanel({
     return () => clearTimeout(timer)
   }, [open, idea])
 
-  const handleSave = async () => {
+  const buildSavePayload = useCallback(() => {
+    const normalizedTitle = titleTouched
+      ? (title.trim() || 'Untitled idea')
+      : inferTitleFromNotes(notes, 'IDEA', title)
+    const blocks = notes.trim()
+      ? [{ id: `idea-note-${Date.now()}`, type: 'text', content: notes.trim() }]
+      : []
+
+    return {
+      title: normalizedTitle,
+      blocks,
+      idea_state: ideaState,
+      assigned_to: assignedTo || null,
+      writer_id: writerId || null,
+      normalizedTitle,
+    }
+  }, [titleTouched, title, notes, ideaState, assignedTo, writerId])
+
+  const handleSave = useCallback(async (mode: 'manual' | 'auto' = 'manual') => {
     if (!idea) return false
-    setIsSaving(true)
-    setSaveError(null)
+    if (mode === 'manual') {
+      setIsSaving(true)
+      setSaveError(null)
+    } else {
+      setIsAutoSaving(true)
+    }
 
     try {
-      const normalizedTitle = titleTouched
-        ? (title.trim() || 'Untitled idea')
-        : inferTitleFromNotes(notes, 'IDEA', title)
-      const blocks = notes.trim()
-        ? [{ id: `idea-note-${Date.now()}`, type: 'text', content: notes.trim() }]
-        : []
+      const payload = buildSavePayload()
 
       const response = await fetch(`/api/content/${idea.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: normalizedTitle,
-          blocks,
-          idea_state: ideaState,
-          assigned_to: assignedTo || null,
-          writer_id: writerId || null,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const body = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(body?.error || 'Failed to save idea')
+        const baseMessage = typeof body?.error === 'string' ? body.error : 'Failed to save idea'
+        const code = typeof body?.code === 'string' ? body.code : null
+        throw new Error(code ? `${baseMessage} (${code})` : baseMessage)
       }
 
       if (body?.data) {
         onIdeaUpdated(body.data as Content)
-        setTitle(normalizedTitle)
+        setTitle(payload.normalizedTitle)
         setConvertTitle((prev) =>
           prev.trim() && prev.trim().toLowerCase() !== 'untitled idea'
             ? prev
-            : normalizedTitle
+            : payload.normalizedTitle
         )
+        setLastSavedAt(new Date().toISOString())
+        setSaveError(null)
       }
       return true
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Failed to save idea')
+      if (mode === 'manual') {
+        setSaveError(error instanceof Error ? error.message : 'Failed to save idea')
+      } else {
+        setSaveError(error instanceof Error ? `Autosave failed: ${error.message}` : 'Autosave failed')
+      }
       return false
     } finally {
-      setIsSaving(false)
+      if (mode === 'manual') {
+        setIsSaving(false)
+      } else {
+        setIsAutoSaving(false)
+      }
     }
-  }
+  }, [idea, buildSavePayload, onIdeaUpdated])
 
   const handleConvert = async () => {
     if (!idea) return
@@ -193,7 +220,7 @@ export function IdeaEditorPanel({
     setSaveError(null)
     try {
       if (hasChanges) {
-        const saved = await handleSave()
+        const saved = await handleSave('manual')
         if (!saved) {
           return
         }
@@ -211,6 +238,28 @@ export function IdeaEditorPanel({
       setIsConverting(false)
     }
   }
+
+  useEffect(() => {
+    if (!open || !idea || !hasChanges || isSaving || isConverting || isAutoSaving) return
+    const timer = setTimeout(() => {
+      handleSave('auto')
+    }, 1200)
+
+    return () => clearTimeout(timer)
+  }, [
+    open,
+    idea,
+    hasChanges,
+    isSaving,
+    isConverting,
+    isAutoSaving,
+    title,
+    notes,
+    ideaState,
+    assignedTo,
+    writerId,
+    handleSave,
+  ])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -399,7 +448,7 @@ export function IdeaEditorPanel({
               <Button
                 size="sm"
                 className="h-8"
-                onClick={handleSave}
+                onClick={() => handleSave('manual')}
                 disabled={isSaving || !hasChanges}
               >
                 {isSaving ? 'Saving...' : 'Save Idea'}
@@ -425,6 +474,13 @@ export function IdeaEditorPanel({
                   {isConverting ? 'Converting...' : linkedPostMissing ? 'Recreate Linked Post' : 'Convert to Post'}
                 </Button>
               )}
+              <div className="ml-auto text-[10px] text-muted-foreground">
+                {isAutoSaving
+                  ? 'Autosaving...'
+                  : lastSavedAt
+                    ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Autosave on'}
+              </div>
             </div>
             </div>
 

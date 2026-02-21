@@ -297,29 +297,28 @@ export async function PUT(
       }
     }
 
-    const updateQuery = supabase
-      .from('content')
-      .update(updateData)
-      .eq('id', contentId)
-      .select(`
-        *,
-        createdBy:created_by(id, name, email, avatar_url),
-        assignedTo:assigned_to(id, name, email, avatar_url),
-        writer:writer_id(id, name, email, avatar_url)
-      `)
-    let { data, error } = await updateQuery.single()
-
-    if (error && isMissingWriterColumnError(error)) {
-      const fallbackUpdate = await supabase
+    const runUpdate = async (payload: Record<string, unknown>, includeWriterJoin: boolean) => {
+      const writerJoin = includeWriterJoin
+        ? ',\n        writer:writer_id(id, name, email, avatar_url)'
+        : ''
+      return supabase
         .from('content')
-        .update(updateData)
+        .update(payload)
         .eq('id', contentId)
         .select(`
-          *,
-          createdBy:created_by(id, name, email, avatar_url),
-          assignedTo:assigned_to(id, name, email, avatar_url)
-        `)
+        *,
+        createdBy:created_by(id, name, email, avatar_url),
+        assignedTo:assigned_to(id, name, email, avatar_url)${writerJoin}
+      `)
         .single()
+    }
+
+    let { data, error } = await runUpdate(updateData, true)
+
+    if (error && isMissingWriterColumnError(error)) {
+      const fallbackPayload = { ...updateData }
+      delete fallbackPayload.writer_id
+      const fallbackUpdate = await runUpdate(fallbackPayload, false)
       data = fallbackUpdate.data
       error = fallbackUpdate.error
     }
