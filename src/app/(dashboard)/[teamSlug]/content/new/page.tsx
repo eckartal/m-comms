@@ -2,26 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
-import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { useAppStore, useContentStore } from '@/stores'
-import { PlatformIcon } from '@/components/oauth/PlatformIcon'
 import { createContent, updateContent } from '@/stores'
 import type { PlatformType } from '@/types'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import {
-  Plus,
-  X,
-  Loader2,
-  Settings2,
-  ChevronDown,
-  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlatform'
@@ -30,6 +15,7 @@ import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
 import { useConnectionMode } from '@/hooks/useConnectionMode'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
 
 // Platform configurations with character limits
 const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
@@ -100,13 +86,10 @@ export default function NewContentPage() {
   const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<PlatformType | null>(null)
   const { mode: connectionMode } = useConnectionMode(teamSlug)
 
-  const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
-  const characterCount = currentContent.length
   const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
   const isSaved = !saving
   const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
-  const activePlatformMeta = PLATFORMS[selectedPlatform]
   const publishTargets = useMemo(() => {
     const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
     return Array.from(new Set(targets))
@@ -126,6 +109,23 @@ export default function NewContentPage() {
         }))
     ) as PlatformCatalogItem[],
     [platformCatalog, connectedPlatforms]
+  )
+  const composerPlatformRows = useMemo<ComposerPlatformRow[]>(
+    () =>
+      platformRows.map((platform) => {
+        const platformId = platform.id as PlatformType
+        const primaryAccount = platform.accounts[0]
+        return {
+          id: platformId,
+          name: platform.name,
+          connected: connectedPlatforms.includes(platformId),
+          isPublishable: publishablePlatforms.has(platformId),
+          accountLabel: primaryAccount
+            ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
+            : undefined,
+        }
+      }),
+    [platformRows, connectedPlatforms, publishablePlatforms]
   )
 
   const fetchConnectedPlatforms = useCallback(async () => {
@@ -335,13 +335,6 @@ export default function NewContentPage() {
     setActiveIndex(Math.min(index, newThread.length - 1))
   }
 
-  // Clear all
-  const clearAll = () => {
-    setThread([{ id: Date.now().toString(), content: '' }])
-    setActiveIndex(0)
-    localStorage.removeItem(`draft_${teamSlug}`)
-  }
-
   const toggleTargetPlatform = (platform: PlatformType) => {
     if (!connectedPlatforms.includes(platform)) return
 
@@ -492,13 +485,6 @@ export default function NewContentPage() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [activeIndex, thread.length, currentContent, addTweet, handlePublish])
 
-  // Merge tweets indicator
-  const canMerge = thread.length > 1 && activeIndex < thread.length - 1
-
-  const platformSummary = publishTargets.length > 1
-    ? `${PLATFORMS[publishTargets[0]].name} +${publishTargets.length - 1}`
-    : PLATFORMS[publishTargets[0]].name
-
   return (
     <div className="flex min-h-full flex-col bg-background">
       {/* Account Header */}
@@ -544,327 +530,53 @@ export default function NewContentPage() {
       {/* Composition Area */}
       <div className="flex-1 overflow-y-auto">
         <DashboardContainer className="max-w-[680px] py-6">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setPlatformPickerOpen(true)}
-              className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-            >
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Platform Scope</span>
-              <span className="text-muted-foreground">{platformSummary}</span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </button>
-
-            <div className="flex items-center gap-3">
-              {/* Thread count */}
-              <span className="text-xs text-muted-foreground">
-                Active: {activePlatformMeta.name}
-              </span>
-              {thread.some(t => t.content) && (
-                <button
-                  onClick={clearAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-red-500 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-5 rounded-[10px] border border-border bg-card/60 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Share to</p>
-              <span className="text-xs text-muted-foreground">
-                {publishTargets.length} target{publishTargets.length === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {publishTargets.map((platform) => (
-                <button
-                  key={platform}
-                  type="button"
-                  onClick={() => toggleTargetPlatform(platform)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground hover:bg-accent transition-colors"
-                >
-                  <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
-                  <span>{PLATFORMS[platform].name}</span>
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </button>
-              ))}
-              {publishTargets.length === 0 && (
-                <span className="text-xs text-muted-foreground">No targets selected. Choose channels in Platform Scope.</span>
-              )}
-            </div>
-          </div>
-
-          {!connectionsLoading && (!selectedPlatformConnected || !publishablePlatforms.has(selectedPlatform)) && (
-            <div className="mb-5 rounded-[8px] border border-border bg-card px-3 py-2 flex items-center justify-between">
-              <p className="text-[13px] text-muted-foreground">
-                {publishablePlatforms.has(selectedPlatform)
-                  ? `Connect ${PLATFORMS[selectedPlatform].name} to publish without leaving the editor.`
-                  : `${PLATFORMS[selectedPlatform].name} is connect-only right now. Direct publishing is currently available for X and LinkedIn.`}
-              </p>
-              {!selectedPlatformConnected && (
-                <button
-                  onClick={() => handleConnectPlatform(selectedPlatform)}
-                  disabled={connectingPlatform === selectedPlatform}
-                  className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
-                >
-                  {connectingPlatform === selectedPlatform ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Connecting
-                    </>
-                  ) : (
-                    'Connect'
-                  )}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Thread Items */}
-          <div className="space-y-0">
-            {thread.map((item, index) => {
-              const isActive = activeIndex === index
-              const itemCharCount = item.content.length
-              const itemOverLimit = itemCharCount > maxChars
-
-              return (
-                <div key={item.id}>
-                  {/* Thread connector line */}
-                  {index > 0 && (
-                    <div className="flex">
-                      <div className="w-8 flex items-center justify-center">
-                        <div className="w-0.5 h-6 bg-border" />
-                      </div>
-                      <div className="flex-1" />
-                    </div>
-                  )}
-
-                  {/* Tweet item */}
-                  <div
-                    className={cn(
-                      'relative rounded-[8px] transition-all cursor-text',
-                      isActive
-                        ? 'bg-card'
-                        : 'bg-transparent'
-                    )}
-                    onClick={() => setActiveIndex(index)}
-                  >
-                    {/* Tweet number */}
-                    <div className="absolute left-0 top-3 w-8 flex items-center justify-center">
-                      <span className={cn(
-                        'text-[13px] font-medium',
-                        isActive ? 'text-muted-foreground' : 'text-border'
-                      )}>
-                        {index + 1}
-                      </span>
-                    </div>
-
-                    {/* Content area */}
-                    <div className="pl-12 pr-4">
-                      <textarea
-                        placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add tweet...'}
-                        value={item.content}
-                        onChange={(e) => handleContentChange(index, e.target.value)}
-                        onFocus={() => setActiveIndex(index)}
-                        className={cn(
-                          'w-full min-h-[80px] text-[16px] leading-[1.7] bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground',
-                          isActive && 'mt-3'
-                        )}
-                        style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
-                      />
-
-                      {/* Character count & actions */}
-                      {isActive && (
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-2">
-                            {thread.length > 1 && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removeTweet(index)
-                                }}
-                                className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                                title="Remove tweet"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            )}
-                            {canMerge && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleContentChange(index, item.content + ' ' + thread[index + 1].content)
-                                  removeTweet(index + 1)
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                                title="Merge with next tweet"
-                              >
-                                <Plus className="w-3 h-3" />
-                                Merge
-                              </button>
-                            )}
-                          </div>
-                          <span className={cn(
-                            'text-[12px] tabular-nums',
-                            itemOverLimit
-                              ? 'text-red-500'
-                              : itemCharCount > maxChars * 0.8
-                              ? 'text-amber-500'
-                              : 'text-muted-foreground'
-                          )}>
-                            {itemCharCount} / {maxChars}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Add Tweet Button */}
-          {selectedPlatform === 'twitter' && (
-            <button
-              onClick={addTweet}
-              className="mt-4 flex items-center gap-2 px-4 py-2 text-[14px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-[6px] transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add tweet
-            </button>
-          )}
-
-          {/* Editor Toolbar */}
-          <EditorToolbar
-            characterCount={characterCount}
-            maxCharacters={maxChars}
+          <PostComposerWorkspace
+            title={title}
+            onTitleChange={setTitle}
+            thread={thread}
+            activeIndex={activeIndex}
+            onActiveIndexChange={setActiveIndex}
+            onThreadItemChange={handleContentChange}
+            onAddThreadItem={addTweet}
+            onRemoveThreadItem={removeTweet}
             isBookmarked={isBookmarked}
-            onBookmark={() => setIsBookmarked(!isBookmarked)}
+            onToggleBookmark={() => setIsBookmarked(!isBookmarked)}
+            selectedPlatform={selectedPlatform}
+            onSelectedPlatformChange={setSelectedPlatform}
+            platformMeta={PLATFORMS}
+            publishTargets={publishTargets}
+            targetSummary={targetSummary}
+            onToggleTargetPlatform={toggleTargetPlatform}
+            selectedPlatformConnected={selectedPlatformConnected}
+            selectedPlatformPublishable={publishablePlatforms.has(selectedPlatform)}
+            connectionsLoading={connectionsLoading}
+            connectingPlatform={connectingPlatform}
+            onConnectPlatform={handleConnectPlatform}
+            platformPickerOpen={platformPickerOpen}
+            onPlatformPickerOpenChange={setPlatformPickerOpen}
+            platformRows={composerPlatformRows}
+            footerSection={
+              <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    Targets: {targetSummary}
+                  </span>
+                  {thread.length > 1 ? (
+                    <span>{totalCharacters.toLocaleString()} chars • {thread.length} tweets</span>
+                  ) : null}
+                </div>
+                <PublishControls
+                  onPublish={handlePublish}
+                  onSchedule={handleSchedule}
+                  isPublishing={isPublishing}
+                  disabled={totalCharacters === 0}
+                  scheduledDate={null}
+                />
+              </div>
+            }
           />
-
-          <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                Targets: {targetSummary}
-              </span>
-              {thread.length > 1 && (
-                <span>{totalCharacters.toLocaleString()} chars • {thread.length} tweets</span>
-              )}
-            </div>
-            <PublishControls
-              onPublish={handlePublish}
-              onSchedule={handleSchedule}
-              isPublishing={isPublishing}
-              disabled={totalCharacters === 0}
-              scheduledDate={null}
-            />
-          </div>
         </DashboardContainer>
       </div>
-
-      <Dialog open={platformPickerOpen} onOpenChange={setPlatformPickerOpen}>
-        <DialogContent className="max-w-2xl bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>Platform Scope</DialogTitle>
-            <DialogDescription>
-              Choose your active compose channel and manage connection state.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2 pr-1">
-            {platformRows.map((platform) => {
-                const platformId = platform.id as PlatformType
-                const isActive = selectedPlatform === platformId
-                const isConnected = connectedPlatforms.includes(platformId)
-                const isTarget = publishTargets.includes(platformId)
-                const isPublishable = publishablePlatforms.has(platformId)
-                const primaryAccount = platform.accounts[0]
-                return (
-                  <div
-                    key={platform.id}
-                    className={cn(
-                      'flex items-center justify-between rounded-[10px] border px-3 py-2',
-                      isActive ? 'border-ring bg-accent/50' : 'border-border bg-background/60'
-                    )}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <PlatformIcon platform={platform.id} className="h-4 w-4" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{platform.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {isConnected
-                            ? (primaryAccount
-                              ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
-                              : 'Connected')
-                            : 'Not connected'}
-                          {isConnected && !isPublishable ? ' • Connect-only' : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleTargetPlatform(platformId)}
-                        disabled={!isConnected || !isPublishable}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
-                          isConnected && isPublishable
-                            ? (isTarget
-                              ? 'bg-emerald-500/15 text-emerald-300'
-                              : 'border border-border text-foreground hover:bg-accent')
-                            : 'border border-border text-muted-foreground opacity-70 cursor-not-allowed'
-                        )}
-                      >
-                        {isTarget ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Target
-                          </>
-                        ) : isConnected ? 'Add target' : 'Connect first'}
-                      </button>
-
-                      {!isConnected ? (
-                        <button
-                          type="button"
-                          onClick={() => handleConnectPlatform(platformId)}
-                          disabled={connectingPlatform === platformId}
-                          className="inline-flex items-center rounded-[6px] border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-70"
-                        >
-                          {connectingPlatform === platformId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Connect'}
-                        </button>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlatform(platformId)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
-                          isActive
-                            ? 'bg-foreground text-background'
-                            : 'border border-border text-foreground hover:bg-accent'
-                        )}
-                      >
-                        {isActive ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Active
-                          </>
-                        ) : (
-                          'Use'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <SandboxConfirmDialog
         open={Boolean(sandboxConnectPlatform)}

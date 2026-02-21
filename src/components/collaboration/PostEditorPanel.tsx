@@ -4,20 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, usePathname } from 'next/navigation'
 import type { Content, ContentBlock, PlatformType } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
 import { useAppStore, useContentStore } from '@/stores'
-import { EditorToolbar } from '@/components/editor/EditorToolbar'
-import { PlatformIcon } from '@/components/oauth/PlatformIcon'
 import { connectPlatform } from '@/lib/oauth/connectPlatform'
 import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
 import { useConnectionMode } from '@/hooks/useConnectionMode'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Link2, Plus, X, Settings2, ChevronDown, Check, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Link2 } from 'lucide-react'
+import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
 
 type TeamMemberItem = {
   id: string
@@ -61,8 +57,6 @@ type PlatformCatalogItem = {
   name: string
   connected: boolean
   accounts: PlatformAccountItem[]
-  publishable?: boolean
-  support_status?: 'publish_ready' | 'connect_only' | 'internal'
   oauth_configured?: boolean
 }
 
@@ -94,9 +88,7 @@ function extractBlockText(content: unknown): string {
 }
 
 function parseThreadFromBlocks(blocks: unknown): ThreadItem[] {
-  if (!Array.isArray(blocks) || blocks.length === 0) {
-    return [{ id: 'thread-1', content: '' }]
-  }
+  if (!Array.isArray(blocks) || blocks.length === 0) return [{ id: 'thread-1', content: '' }]
 
   const items: ThreadItem[] = []
   for (const rawBlock of blocks) {
@@ -119,13 +111,10 @@ function parseThreadFromBlocks(blocks: unknown): ThreadItem[] {
     }
 
     const text = extractBlockText(block.content)
-    if (text.length > 0 || items.length === 0) {
-      items.push({ id: blockId, content: text })
-    }
+    if (text.length > 0 || items.length === 0) items.push({ id: blockId, content: text })
   }
 
-  if (items.length === 0) return [{ id: 'thread-1', content: '' }]
-  return items
+  return items.length > 0 ? items : [{ id: 'thread-1', content: '' }]
 }
 
 function serializeThreadToBlocks(thread: ThreadItem[]): ContentBlock[] {
@@ -256,14 +245,12 @@ export function PostEditorPanel({
           return {
             ...platform,
             connected: true,
-            accounts: [
-              {
-                id: `local:${platform.id}`,
-                account_name: localAccount.account_name,
-                account_handle: localAccount.account_handle,
-                source: localAccount.source,
-              },
-            ],
+            accounts: [{
+              id: `local:${platform.id}`,
+              account_name: localAccount.account_name,
+              account_handle: localAccount.account_handle,
+              source: localAccount.source,
+            }],
           }
         })
 
@@ -272,19 +259,17 @@ export function PostEditorPanel({
       const publishableFromApi = ((data?.meta?.publishable_platforms || []) as string[])
         .filter((id) => isSupportedPlatform(id))
       setPublishablePlatforms(
-        publishableFromApi.length > 0
-          ? new Set(publishableFromApi as PlatformType[])
-          : new Set(['twitter', 'linkedin'])
+        publishableFromApi.length > 0 ? new Set(publishableFromApi as PlatformType[]) : new Set(['twitter', 'linkedin'])
       )
 
-      const connected = catalog
-        .filter((platform) => platform.connected)
-        .map((platform) => platform.id as PlatformType)
+      const connected = catalog.filter((platform) => platform.connected).map((platform) => platform.id as PlatformType)
       const merged = Array.from(new Set([...connected, ...localConnected]))
         .filter((id) => isSupportedPlatform(id)) as PlatformType[]
       setConnectedPlatforms(merged)
     } catch {
-      setConnectedPlatforms(getLocalConnectedPlatforms(teamSlug, currentTeam?.id).filter((id) => isSupportedPlatform(id)) as PlatformType[])
+      setConnectedPlatforms(
+        getLocalConnectedPlatforms(teamSlug, currentTeam?.id).filter((id) => isSupportedPlatform(id)) as PlatformType[]
+      )
       setPlatformCatalog([])
       setPublishablePlatforms(new Set(['twitter', 'linkedin']))
     } finally {
@@ -294,7 +279,7 @@ export function PostEditorPanel({
 
   useEffect(() => {
     if (!open) return
-    fetchConnectedPlatforms()
+    void fetchConnectedPlatforms()
   }, [open, fetchConnectedPlatforms])
 
   const runConnectPlatform = async (platform: PlatformType, skipSandboxConfirmation = false) => {
@@ -336,24 +321,12 @@ export function PostEditorPanel({
     await runConnectPlatform(platform)
   }
 
-  const ticketKey = useMemo(() => {
-    if (!post) return null
-    return getTicketKey(post.id, allContents)
-  }, [post, allContents])
-
-  const linkedIdeaTicket = useMemo(() => {
-    if (!linkedIdea?.id) return null
-    return getTicketKey(linkedIdea.id, allContents)
-  }, [linkedIdea?.id, allContents])
-
+  const ticketKey = useMemo(() => (post ? getTicketKey(post.id, allContents) : null), [post, allContents])
+  const linkedIdeaTicket = useMemo(() => (linkedIdea?.id ? getTicketKey(linkedIdea.id, allContents) : null), [linkedIdea?.id, allContents])
   const linkedIdeaNotes = useMemo(() => extractIdeaNotes(linkedIdea?.blocks), [linkedIdea?.blocks])
   const hasLinkedIdeaContext = !!post?.source_idea_id
 
-  const initialTargetsKey = useMemo(() => {
-    if (!post) return ''
-    return getEnabledTargets(post.platforms).slice().sort().join(',')
-  }, [post])
-
+  const initialTargetsKey = useMemo(() => (post ? getEnabledTargets(post.platforms).slice().sort().join(',') : ''), [post])
   const currentTargetsKey = useMemo(() => targetPlatforms.slice().sort().join(','), [targetPlatforms])
 
   const hasChanges = useMemo(() => {
@@ -361,14 +334,11 @@ export function PostEditorPanel({
     const initialTitle = post.title || ''
     const initialThreadText = parseThreadFromBlocks(post.blocks).map((item) => item.content)
     const currentThreadText = thread.map((item) => item.content)
-    const initialStatus = post.status
-    const initialAssignee = post.assigned_to || ''
-
     return (
       title !== initialTitle ||
       JSON.stringify(currentThreadText) !== JSON.stringify(initialThreadText) ||
-      status !== initialStatus ||
-      assignedTo !== initialAssignee ||
+      status !== post.status ||
+      assignedTo !== (post.assigned_to || '') ||
       currentTargetsKey !== initialTargetsKey
     )
   }, [post, title, thread, status, assignedTo, currentTargetsKey, initialTargetsKey])
@@ -378,38 +348,36 @@ export function PostEditorPanel({
     return Array.from(new Set(targets))
   }, [targetPlatforms, selectedPlatform])
 
-  const targetSummary = useMemo(
-    () => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '),
-    [publishTargets]
-  )
+  const targetSummary = useMemo(() => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '), [publishTargets])
 
-  const platformRows = useMemo(
-    () =>
-      (platformCatalog.length > 0
-        ? platformCatalog.filter((platform) => isSupportedPlatform(platform.id))
-        : (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
-            id: platform,
-            name: PLATFORMS[platform].name,
-            connected: connectedPlatforms.includes(platform),
-            accounts: [],
-          }))) as PlatformCatalogItem[],
-    [platformCatalog, connectedPlatforms]
-  )
+  const platformRows: ComposerPlatformRow[] = useMemo(() => {
+    if (platformCatalog.length > 0) {
+      return platformCatalog
+        .filter((platform) => isSupportedPlatform(platform.id))
+        .map((platform) => ({
+          id: platform.id as PlatformType,
+          name: platform.name,
+          connected: connectedPlatforms.includes(platform.id as PlatformType),
+          isPublishable: publishablePlatforms.has(platform.id as PlatformType),
+          accountLabel: platform.accounts[0]
+            ? `${platform.accounts[0].account_name}${platform.accounts[0].account_handle ? ` • ${platform.accounts[0].account_handle}` : ''}${platform.accounts[0].source === 'local_sandbox' ? ' • Sandbox' : ''}`
+            : undefined,
+        }))
+    }
 
-  const currentContent = thread[activeIndex]?.content || ''
-  const characterCount = currentContent.length
-  const maxChars = PLATFORMS[selectedPlatform].limit
+    return (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
+      id: platform,
+      name: PLATFORMS[platform].name,
+      connected: connectedPlatforms.includes(platform),
+      isPublishable: publishablePlatforms.has(platform),
+    }))
+  }, [platformCatalog, connectedPlatforms, publishablePlatforms])
+
   const hasContent = thread.some((item) => item.content.trim().length > 0)
-  const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
 
   const buildPayload = useCallback((override?: Partial<{ status: Content['status']; scheduled_at: string | null }>) => {
     const notes = thread.map((item) => item.content).join('\n\n').trim()
-    const normalizedTitle = resolvePostTitle({
-      currentTitle: title,
-      notes,
-      titleTouched,
-    })
-
+    const normalizedTitle = resolvePostTitle({ currentTitle: title, notes, titleTouched })
     return {
       title: normalizedTitle,
       blocks: serializeThreadToBlocks(thread),
@@ -431,14 +399,13 @@ export function PostEditorPanel({
     }
 
     try {
-      const payload = buildPayload(override)
       const response = await fetch(`/api/content/${post.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildPayload(override)),
       })
-
       const body = await response.json().catch(() => null)
+
       if (!response.ok) {
         const baseMessage = typeof body?.error === 'string' ? body.error : 'Failed to save post'
         const code = typeof body?.code === 'string' ? body.code : null
@@ -452,79 +419,28 @@ export function PostEditorPanel({
       }
       return true
     } catch (error) {
-      if (mode === 'manual') {
-        setSaveError(error instanceof Error ? error.message : 'Failed to save post')
-      } else {
-        setSaveError(error instanceof Error ? `Autosave failed: ${error.message}` : 'Autosave failed')
-      }
+      setSaveError(error instanceof Error ? (mode === 'manual' ? error.message : `Autosave failed: ${error.message}`) : (mode === 'manual' ? 'Failed to save post' : 'Autosave failed'))
       return false
     } finally {
-      if (mode === 'manual') {
-        setIsSaving(false)
-      } else {
-        setIsAutoSaving(false)
-      }
+      if (mode === 'manual') setIsSaving(false)
+      else setIsAutoSaving(false)
     }
   }, [post, buildPayload, onPostUpdated])
-
-  const handleSave = useCallback(async () => {
-    await persistPost('manual')
-  }, [persistPost])
 
   useEffect(() => {
     if (!open || !post || !hasChanges || isSaving || isAutoSaving) return
     const timer = setTimeout(() => {
       void persistPost('auto')
     }, 1200)
-
     return () => clearTimeout(timer)
   }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, targetPlatforms, persistPost])
 
-  const handleContentChange = (index: number, value: string) => {
-    setThread((prev) => prev.map((item, idx) => (idx === index ? { ...item, content: value } : item)))
-  }
-
-  const addThreadItem = () => {
-    const next = [...thread, { id: `thread-${Date.now()}`, content: '' }]
-    setThread(next)
-    setActiveIndex(next.length - 1)
-  }
-
-  const removeThreadItem = (index: number) => {
-    if (thread.length === 1) {
-      setThread([{ id: thread[0]?.id || 'thread-1', content: '' }])
-      setActiveIndex(0)
-      return
-    }
-    const next = thread.filter((_, idx) => idx !== index)
-    setThread(next)
-    setActiveIndex(Math.min(index, next.length - 1))
-  }
-
-  const toggleTargetPlatform = (platform: PlatformType) => {
-    if (!connectedPlatforms.includes(platform)) return
-
-    setTargetPlatforms((prev) => {
-      if (prev.includes(platform)) return prev.filter((item) => item !== platform)
-      return [...prev, platform]
-    })
-  }
-
   const handlePublish = useCallback(async () => {
     if (!post) return
-    if (!hasContent) {
-      toast.error('Add some content before publishing.')
-      return
-    }
+    if (!hasContent) return toast.error('Add some content before publishing.')
 
-    const eligibleTargets = publishTargets.filter(
-      (platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)
-    )
-
-    if (eligibleTargets.length === 0) {
-      toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
-      return
-    }
+    const eligibleTargets = publishTargets.filter((platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform))
+    if (eligibleTargets.length === 0) return toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
 
     setIsPublishing(true)
     try {
@@ -536,22 +452,14 @@ export function PostEditorPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platforms: eligibleTargets }),
       })
-
       const publishData = await publishResponse.json().catch(() => null)
-      if (!publishResponse.ok) {
-        throw new Error((publishData as { error?: string } | null)?.error || 'Publish request failed')
-      }
+      if (!publishResponse.ok) throw new Error((publishData as { error?: string } | null)?.error || 'Publish request failed')
 
       const successful = Number((publishData as { data?: { summary?: { successful?: number } } } | null)?.data?.summary?.successful || 0)
       const failed = Number((publishData as { data?: { summary?: { failed?: number } } } | null)?.data?.summary?.failed || 0)
-
       if (successful === 0) throw new Error('No platforms were published successfully')
-
-      if (failed > 0) {
-        toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check publish history for details.`)
-      } else {
-        toast.success(`Published to ${successful} platform${successful === 1 ? '' : 's'}.`)
-      }
+      if (failed > 0) toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check publish history for details.`)
+      else toast.success(`Published to ${successful} platform${successful === 1 ? '' : 's'}.`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to publish')
     } finally {
@@ -561,19 +469,12 @@ export function PostEditorPanel({
 
   const handleSchedule = useCallback(async () => {
     if (!post) return
-    if (!hasContent) {
-      toast.error('Add some content before scheduling.')
-      return
-    }
+    if (!hasContent) return toast.error('Add some content before scheduling.')
 
     setIsScheduling(true)
     try {
       const scheduledAt = new Date(Date.now() + 60 * 60 * 1000)
-      const saved = await persistPost('manual', {
-        status: 'SCHEDULED',
-        scheduled_at: scheduledAt.toISOString(),
-      })
-
+      const saved = await persistPost('manual', { status: 'SCHEDULED', scheduled_at: scheduledAt.toISOString() })
       if (!saved) throw new Error('Failed to schedule post')
       setStatus('SCHEDULED')
       toast.success(`Scheduled for ${scheduledAt.toLocaleString()}`)
@@ -592,10 +493,51 @@ export function PostEditorPanel({
         void handlePublish()
       }
     }
-
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, handlePublish])
+
+  const topSection = (
+    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="space-y-2">
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</label>
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as typeof status)}
+          className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
+        >
+          <option value="DRAFT">Draft</option>
+          <option value="IN_REVIEW">In Review</option>
+          <option value="APPROVED">Approved</option>
+          <option value="SCHEDULED">Scheduled</option>
+          <option value="PUBLISHED">Shared</option>
+          <option value="ARCHIVED">Archived</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Owner</label>
+        <select
+          value={assignedTo}
+          onChange={(e) => setAssignedTo(e.target.value)}
+          className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
+        >
+          <option value="">Unassigned</option>
+          {teamMembers
+            .filter((member) => member.user?.id)
+            .map((member) => (
+              <option key={member.id} value={member.user?.id || ''}>
+                {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
+              </option>
+            ))}
+        </select>
+      </div>
+    </div>
+  )
+
+  const footerSection = saveError ? (
+    <div className="mt-3 rounded-sm border border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">{saveError}</div>
+  ) : null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -606,9 +548,7 @@ export function PostEditorPanel({
       >
         <SheetHeader className="border-b border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
           <SheetTitle className="text-sm font-semibold text-foreground">Post</SheetTitle>
-          <SheetDescription className="text-xs text-muted-foreground">
-            Edit this post without leaving collaboration.
-          </SheetDescription>
+          <SheetDescription className="text-xs text-muted-foreground">Edit this post without leaving collaboration.</SheetDescription>
         </SheetHeader>
 
         {post ? (
@@ -617,12 +557,7 @@ export function PostEditorPanel({
               <div className="mb-3 flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{ticketKey || 'POST'}</div>
                 {hasLinkedIdeaContext ? (
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    className="h-6 px-2 text-[10px]"
-                    onClick={() => setShowIdeaContext((prev) => !prev)}
-                  >
+                  <Button size="xs" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => setShowIdeaContext((prev) => !prev)}>
                     {showIdeaContext ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                     {showIdeaContext ? 'Hide Context' : 'Show Context'}
                   </Button>
@@ -644,26 +579,13 @@ export function PostEditorPanel({
                       ) : linkedIdea ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                              {linkedIdeaTicket || 'IDEA'}
-                            </span>
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                              IDEA
-                            </span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">{linkedIdeaTicket || 'IDEA'}</span>
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">IDEA</span>
                           </div>
                           <p className="text-xs font-medium text-foreground">{linkedIdea.title || 'Untitled idea'}</p>
-                          <div className="max-h-[200px] overflow-y-auto rounded-[8px] border border-amber-200/60 bg-white p-2 text-[11px] leading-5 text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">
-                            {linkedIdeaNotes || 'No idea notes available.'}
-                          </div>
+                          <div className="max-h-[200px] overflow-y-auto rounded-[8px] border border-amber-200/60 bg-white p-2 text-[11px] leading-5 text-muted-foreground dark:border-amber-900/70 dark:bg-black/20">{linkedIdeaNotes || 'No idea notes available.'}</div>
                           {onOpenLinkedIdea ? (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              className="h-6 px-2 text-[10px]"
-                              onClick={() => onOpenLinkedIdea(linkedIdea.id)}
-                            >
-                              Open Idea
-                            </Button>
+                            <Button size="xs" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => onOpenLinkedIdea(linkedIdea.id)}>Open Idea</Button>
                           ) : null}
                         </div>
                       ) : (
@@ -674,249 +596,65 @@ export function PostEditorPanel({
                 ) : null}
 
                 <div className="flex-1">
-                  <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</label>
-                      <select
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as typeof status)}
-                        className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
-                      >
-                        <option value="DRAFT">Draft</option>
-                        <option value="IN_REVIEW">In Review</option>
-                        <option value="APPROVED">Approved</option>
-                        <option value="SCHEDULED">Scheduled</option>
-                        <option value="PUBLISHED">Shared</option>
-                        <option value="ARCHIVED">Archived</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Owner</label>
-                      <select
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
-                      >
-                        <option value="">Unassigned</option>
-                        {teamMembers
-                          .filter((member) => member.user?.id)
-                          .map((member) => (
-                            <option key={member.id} value={member.user?.id || ''}>
-                              {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPlatformPickerOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
-                    >
-                      <Settings2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Platform Scope</span>
-                      <span className="text-muted-foreground">{targetSummary}</span>
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    </button>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">Active: {PLATFORMS[selectedPlatform].name}</span>
-                    </div>
-                  </div>
-
-                  <div className="mb-5 rounded-[10px] border border-border bg-card/60 px-3 py-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Share to</p>
-                      <span className="text-xs text-muted-foreground">
-                        {publishTargets.length} target{publishTargets.length === 1 ? '' : 's'}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {publishTargets.map((platform) => (
-                        <button
-                          key={platform}
-                          type="button"
-                          onClick={() => toggleTargetPlatform(platform)}
-                          className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent"
-                        >
-                          <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
-                          <span>{PLATFORMS[platform].name}</span>
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        </button>
-                      ))}
-                      {publishTargets.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">No targets selected. Choose channels in Platform Scope.</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {!connectionsLoading && (!selectedPlatformConnected || !publishablePlatforms.has(selectedPlatform)) ? (
-                    <div className="mb-5 flex items-center justify-between rounded-[8px] border border-border bg-card px-3 py-2">
-                      <p className="text-[13px] text-muted-foreground">
-                        {publishablePlatforms.has(selectedPlatform)
-                          ? `Connect ${PLATFORMS[selectedPlatform].name} to publish without leaving the editor.`
-                          : `${PLATFORMS[selectedPlatform].name} is connect-only right now. Direct publishing is currently available for X and LinkedIn.`}
-                      </p>
-                      {!selectedPlatformConnected ? (
-                        <button
-                          onClick={() => handleConnectPlatform(selectedPlatform)}
-                          disabled={connectingPlatform === selectedPlatform}
-                          className="inline-flex items-center rounded-[6px] bg-foreground px-3 py-1.5 text-[12px] font-medium text-background hover:bg-hover disabled:opacity-70"
-                        >
-                          {connectingPlatform === selectedPlatform ? (
-                            <>
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                              Connecting
-                            </>
-                          ) : (
-                            'Connect'
-                          )}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div className="rounded-[10px] border border-border bg-card/50">
-                    <div className="border-b border-border px-4 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-foreground">Composer</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {thread.length} block{thread.length === 1 ? '' : 's'}
-                        </span>
-                      </div>
-                      <Input
-                        value={title}
-                        onChange={(e) => {
-                          setTitleTouched(true)
-                          setTitle(e.target.value)
-                        }}
-                        placeholder="Draft title (optional)"
-                        className="mt-2 h-10 rounded-[8px] border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-                      />
-                    </div>
-
-                    <div className="space-y-0 px-3 py-3">
-                      {thread.map((item, index) => {
-                        const isActive = activeIndex === index
-                        const itemCharCount = item.content.length
-                        const itemOverLimit = itemCharCount > maxChars
-
-                        return (
-                          <div key={item.id}>
-                            {index > 0 ? (
-                              <div className="flex">
-                                <div className="w-8 flex items-center justify-center">
-                                  <div className="h-5 w-0.5 bg-border" />
-                                </div>
-                                <div className="flex-1" />
-                              </div>
-                            ) : null}
-
-                            <div
-                              className={`relative rounded-[8px] transition-all ${isActive ? 'bg-background' : 'bg-transparent'}`}
-                              onClick={() => setActiveIndex(index)}
-                            >
-                              <div className="absolute left-0 top-3 w-8 flex items-center justify-center">
-                                <span className={`text-[13px] font-medium ${isActive ? 'text-muted-foreground' : 'text-border'}`}>
-                                  {index + 1}
-                                </span>
-                              </div>
-
-                              <div className="pl-12 pr-3">
-                                <textarea
-                                  value={item.content}
-                                  onChange={(e) => handleContentChange(index, e.target.value)}
-                                  onFocus={() => setActiveIndex(index)}
-                                  placeholder={index === 0 ? `What is happening on ${PLATFORMS[selectedPlatform].name}?` : 'Add another block...'}
-                                  className={`w-full resize-none border-none bg-transparent text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground ${isActive ? 'mt-2 min-h-[100px]' : 'min-h-[72px]'}`}
-                                  style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
-                                />
-
-                                {isActive ? (
-                                  <div className="flex items-center justify-between pb-2">
-                                    <div className="flex items-center gap-2">
-                                      {thread.length > 1 ? (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            removeThreadItem(index)
-                                          }}
-                                          className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
-                                          title="Remove block"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      ) : null}
-                                    </div>
-
-                                    <span
-                                      className={`text-[12px] tabular-nums ${itemOverLimit ? 'text-red-500' : itemCharCount > maxChars * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}
-                                    >
-                                      {itemCharCount} / {maxChars}
-                                    </span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    <div className="px-4 pb-3">
-                      <button
-                        type="button"
-                        onClick={addThreadItem}
-                        className="flex items-center gap-2 rounded-[6px] px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add block
-                      </button>
-                    </div>
-
-                    <div className="px-4 pb-3">
-                      <EditorToolbar
-                        characterCount={characterCount}
-                        maxCharacters={maxChars}
-                        isBookmarked={isBookmarked}
-                        onBookmark={() => setIsBookmarked((prev) => !prev)}
-                      />
-                    </div>
-                  </div>
-
-                  {saveError ? (
-                    <div className="mt-3 rounded-sm border border-red-950/50 bg-red-950/20 px-3 py-2 text-xs text-red-200">
-                      {saveError}
-                    </div>
-                  ) : null}
+                  <PostComposerWorkspace
+                    title={title}
+                    onTitleChange={(value) => {
+                      setTitleTouched(true)
+                      setTitle(value)
+                    }}
+                    thread={thread}
+                    activeIndex={activeIndex}
+                    onActiveIndexChange={setActiveIndex}
+                    onThreadItemChange={(index, value) => setThread((prev) => prev.map((item, idx) => idx === index ? { ...item, content: value } : item))}
+                    onAddThreadItem={() => {
+                      const next = [...thread, { id: `thread-${Date.now()}`, content: '' }]
+                      setThread(next)
+                      setActiveIndex(next.length - 1)
+                    }}
+                    onRemoveThreadItem={(index) => {
+                      if (thread.length === 1) {
+                        setThread([{ id: thread[0]?.id || 'thread-1', content: '' }])
+                        setActiveIndex(0)
+                        return
+                      }
+                      const next = thread.filter((_, idx) => idx !== index)
+                      setThread(next)
+                      setActiveIndex(Math.min(index, next.length - 1))
+                    }}
+                    isBookmarked={isBookmarked}
+                    onToggleBookmark={() => setIsBookmarked((prev) => !prev)}
+                    selectedPlatform={selectedPlatform}
+                    onSelectedPlatformChange={setSelectedPlatform}
+                    platformMeta={PLATFORMS}
+                    publishTargets={publishTargets}
+                    targetSummary={targetSummary}
+                    onToggleTargetPlatform={(platform) => {
+                      if (!connectedPlatforms.includes(platform)) return
+                      setTargetPlatforms((prev) => prev.includes(platform) ? prev.filter((item) => item !== platform) : [...prev, platform])
+                    }}
+                    selectedPlatformConnected={connectedPlatforms.includes(selectedPlatform)}
+                    selectedPlatformPublishable={publishablePlatforms.has(selectedPlatform)}
+                    connectionsLoading={connectionsLoading}
+                    connectingPlatform={connectingPlatform}
+                    onConnectPlatform={handleConnectPlatform}
+                    platformPickerOpen={platformPickerOpen}
+                    onPlatformPickerOpenChange={setPlatformPickerOpen}
+                    platformRows={platformRows}
+                    topSection={topSection}
+                    footerSection={footerSection}
+                  />
                 </div>
               </div>
             </div>
 
             <div className="sticky bottom-0 border-t border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" className="h-8" onClick={handleSave} disabled={isSaving || !hasChanges}>
-                  {isSaving ? 'Saving...' : 'Save Post'}
-                </Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => void handleSchedule()} disabled={isScheduling || isPublishing || !hasContent}>
-                  {isScheduling ? 'Scheduling...' : 'Schedule'}
-                </Button>
-                <Button size="sm" className="h-8" onClick={() => void handlePublish()} disabled={isPublishing || isScheduling || !hasContent}>
-                  {isPublishing ? 'Publishing...' : 'Publish'}
-                </Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => onOpenFullEditor(post.id)}>
-                  Open Page Editor
-                </Button>
+                <Button size="sm" className="h-8" onClick={() => void persistPost('manual')} disabled={isSaving || !hasChanges}>{isSaving ? 'Saving...' : 'Save Post'}</Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => void handleSchedule()} disabled={isScheduling || isPublishing || !hasContent}>{isScheduling ? 'Scheduling...' : 'Schedule'}</Button>
+                <Button size="sm" className="h-8" onClick={() => void handlePublish()} disabled={isPublishing || isScheduling || !hasContent}>{isPublishing ? 'Publishing...' : 'Publish'}</Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => onOpenFullEditor(post.id)}>Open Page Editor</Button>
                 <div className="ml-auto text-[10px] text-muted-foreground">
-                  {isAutoSaving
-                    ? 'Autosaving...'
-                    : lastSavedAt
-                      ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : 'Autosave on'}
+                  {isAutoSaving ? 'Autosaving...' : lastSavedAt ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosave on'}
                 </div>
               </div>
               <div className="mt-1 text-right text-[10px] text-muted-foreground">Press Ctrl/Cmd + Enter to publish</div>
@@ -926,111 +664,10 @@ export function PostEditorPanel({
           <div className="p-4 text-xs text-muted-foreground">No post selected</div>
         )}
 
-        <Dialog open={platformPickerOpen} onOpenChange={setPlatformPickerOpen}>
-          <DialogContent className="max-w-2xl border-border bg-card">
-            <DialogHeader>
-              <DialogTitle>Platform Scope</DialogTitle>
-              <DialogDescription>
-                Choose your active compose channel and manage connection state.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto custom-scrollbar pr-1">
-              {platformRows.map((platform) => {
-                const platformId = platform.id as PlatformType
-                const isActive = selectedPlatform === platformId
-                const isConnected = connectedPlatforms.includes(platformId)
-                const isTarget = publishTargets.includes(platformId)
-                const isPublishable = publishablePlatforms.has(platformId)
-                const primaryAccount = platform.accounts[0]
-
-                return (
-                  <div
-                    key={platform.id}
-                    className={cn(
-                      'flex items-center justify-between rounded-[10px] border px-3 py-2',
-                      isActive ? 'border-ring bg-accent/50' : 'border-border bg-background/60'
-                    )}
-                  >
-                    <div className="min-w-0 flex items-center gap-3">
-                      <PlatformIcon platform={platform.id} className="h-4 w-4" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{platform.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {isConnected
-                            ? (primaryAccount
-                              ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
-                              : 'Connected')
-                            : 'Not connected'}
-                          {isConnected && !isPublishable ? ' • Connect-only' : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleTargetPlatform(platformId)}
-                        disabled={!isConnected || !isPublishable}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
-                          isConnected && isPublishable
-                            ? (isTarget ? 'bg-emerald-500/15 text-emerald-300' : 'border border-border text-foreground hover:bg-accent')
-                            : 'cursor-not-allowed border border-border text-muted-foreground opacity-70'
-                        )}
-                      >
-                        {isTarget ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Target
-                          </>
-                        ) : isConnected ? 'Add target' : 'Connect first'}
-                      </button>
-
-                      {!isConnected ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleConnectPlatform(platformId)}
-                          disabled={connectingPlatform === platformId}
-                          className="inline-flex items-center rounded-[6px] border border-border px-2.5 py-1.5 text-xs text-foreground hover:bg-accent disabled:opacity-70"
-                        >
-                          {connectingPlatform === platformId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Connect'}
-                        </button>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlatform(platformId)}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
-                          isActive
-                            ? 'bg-foreground text-background'
-                            : 'border border-border text-foreground hover:bg-accent'
-                        )}
-                      >
-                        {isActive ? (
-                          <>
-                            <Check className="h-3.5 w-3.5" />
-                            Active
-                          </>
-                        ) : (
-                          'Use'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </DialogContent>
-        </Dialog>
-
         <SandboxConfirmDialog
           open={sandboxConnectPlatform !== null}
           platformName={sandboxConnectPlatform ? PLATFORMS[sandboxConnectPlatform].name : 'platform'}
-          onCancel={() => {
-            setSandboxConnectPlatform(null)
-          }}
+          onCancel={() => setSandboxConnectPlatform(null)}
           onConfirm={() => {
             if (!sandboxConnectPlatform) return
             const selected = sandboxConnectPlatform
