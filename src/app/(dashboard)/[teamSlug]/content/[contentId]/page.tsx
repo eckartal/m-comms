@@ -474,6 +474,20 @@ export default function EditContentPage() {
     }
   }
 
+  const diffBlocks = () => {
+    const fromBlocks = (diffData?.from?.blocks || []) as ContentBlock[]
+    const toBlocks = (diffData?.to?.blocks || []) as ContentBlock[]
+    const max = Math.max(fromBlocks.length, toBlocks.length)
+    const pairs = []
+    for (let i = 0; i < max; i += 1) {
+      pairs.push({
+        from: fromBlocks[i] || null,
+        to: toBlocks[i] || null,
+      })
+    }
+    return pairs
+  }
+
   const buildInlineComments = (blockId: string) => {
     return annotations
       .filter((a) => a.block_id === blockId)
@@ -823,15 +837,29 @@ export default function EditContentPage() {
           {diffLoading ? (
             <div className="text-sm text-muted-foreground">Loading diff...</div>
           ) : diffData ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border rounded p-3">
-                <h4 className="text-xs uppercase text-muted-foreground mb-2">Before</h4>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(diffData.from?.blocks, null, 2)}</pre>
-              </div>
-              <div className="border rounded p-3">
-                <h4 className="text-xs uppercase text-muted-foreground mb-2">After</h4>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(diffData.to?.blocks, null, 2)}</pre>
-              </div>
+            <div className="space-y-4">
+              {diffBlocks().map((pair, index) => {
+                const fromText = typeof pair.from?.content === 'string'
+                  ? pair.from?.content
+                  : pair.from?.content?.text || ''
+                const toText = typeof pair.to?.content === 'string'
+                  ? pair.to?.content
+                  : pair.to?.content?.text || ''
+                const changed = fromText !== toText
+
+                return (
+                  <div key={index} className="grid grid-cols-2 gap-4">
+                    <div className={`border rounded p-3 ${changed ? 'border-red-200 bg-red-50/30' : ''}`}>
+                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">Before</h4>
+                      <pre className="text-xs whitespace-pre-wrap">{fromText || '—'}</pre>
+                    </div>
+                    <div className={`border rounded p-3 ${changed ? 'border-green-200 bg-green-50/30' : ''}`}>
+                      <h4 className="text-[11px] uppercase text-muted-foreground mb-2">After</h4>
+                      <pre className="text-xs whitespace-pre-wrap">{toText || '—'}</pre>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">No diff available.</div>
