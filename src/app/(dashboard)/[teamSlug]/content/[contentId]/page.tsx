@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ContentBlock, PlatformConfig, ContentStatus, Content } from '@/types'
 import { useAppStore } from '@/stores'
 import { CommentList } from '@/components/comments/CommentList'
@@ -241,6 +242,8 @@ type ActivityItem = {
   to_assigned_to?: string | null
   changeNote?: Array<{ reason: string }> | null
   metadata?: Record<string, unknown> | null
+  from_version_id?: string | null
+  to_version_id?: string | null
   created_at: string
   user?: {
     id: string
@@ -309,6 +312,9 @@ export default function EditContentPage() {
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [annotationsLoading, setAnnotationsLoading] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
+  const [diffOpen, setDiffOpen] = useState(false)
+  const [diffData, setDiffData] = useState<any>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
 
   useEffect(() => {
     if (contentId) {
@@ -446,7 +452,26 @@ export default function EditContentPage() {
   const latestReason = (item: ActivityItem) => item.changeNote?.[0]?.reason || null
 
   const canShowDiff = (item: ActivityItem) => {
-    return item.action === 'CONTENT_UPDATED' && item.metadata?.['diff_available']
+    return item.action === 'CONTENT_UPDATED' && item.metadata?.['diff_available'] && item.from_version_id && item.to_version_id
+  }
+
+  const openDiff = async (item: ActivityItem) => {
+    if (!item.from_version_id || !item.to_version_id) return
+    try {
+      setDiffLoading(true)
+      setDiffOpen(true)
+      const response = await fetch(
+        `/api/content/${contentId}/diff?from=${item.from_version_id}&to=${item.to_version_id}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setDiffData(data.data || null)
+      }
+    } catch (error) {
+      console.error('Error loading diff:', error)
+    } finally {
+      setDiffLoading(false)
+    }
   }
 
   const buildInlineComments = (blockId: string) => {
@@ -684,7 +709,10 @@ export default function EditContentPage() {
                     <p className="text-xs text-[#6b7280] mt-1">Why: {latestReason(item)}</p>
                   )}
                   {canShowDiff(item) && (
-                    <button className="text-xs text-[#2383e2] mt-1 hover:underline">
+                    <button
+                      className="text-xs text-[#2383e2] mt-1 hover:underline"
+                      onClick={() => openDiff(item)}
+                    >
                       View diff
                     </button>
                   )}
@@ -785,6 +813,31 @@ export default function EditContentPage() {
           <CommentList contentId={contentId} />
         </SheetContent>
       </Sheet>
+
+      {/* Diff Modal */}
+      <Dialog open={diffOpen} onOpenChange={setDiffOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Content Diff</DialogTitle>
+          </DialogHeader>
+          {diffLoading ? (
+            <div className="text-sm text-muted-foreground">Loading diff...</div>
+          ) : diffData ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border rounded p-3">
+                <h4 className="text-xs uppercase text-muted-foreground mb-2">Before</h4>
+                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(diffData.from?.blocks, null, 2)}</pre>
+              </div>
+              <div className="border rounded p-3">
+                <h4 className="text-xs uppercase text-muted-foreground mb-2">After</h4>
+                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(diffData.to?.blocks, null, 2)}</pre>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No diff available.</div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

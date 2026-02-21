@@ -239,6 +239,37 @@ export async function PUT(
     if (scheduled_at !== undefined) updateData.scheduled_at = scheduled_at
     if (assigned_to !== undefined) updateData.assigned_to = assigned_to
 
+    const shouldVersion = blocks !== undefined
+    let fromVersionId: string | null = null
+    let toVersionId: string | null = null
+
+    if (shouldVersion) {
+      const { data: prevVersion } = await supabase
+        .from('content_versions')
+        .select('id')
+        .eq('content_id', contentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      fromVersionId = prevVersion?.id || null
+
+      const { data: newVersion, error: versionError } = await supabase
+        .from('content_versions')
+        .insert({
+          content_id: contentId,
+          blocks,
+          created_by: user.id,
+        })
+        .select()
+        .single()
+
+      if (versionError) {
+        console.error('Error creating content version:', versionError)
+      } else {
+        toVersionId = newVersion?.id || null
+      }
+    }
+
     const { data, error } = await supabase
       .from('content')
       .update(updateData)
@@ -264,6 +295,18 @@ export async function PUT(
         action: 'STATUS_CHANGED',
         from_status: currentContent.status,
         to_status: status,
+      })
+    }
+
+    if (blocks !== undefined) {
+      activityEntries.push({
+        content_id: contentId,
+        team_id: currentContent.team_id,
+        user_id: user.id,
+        action: 'CONTENT_UPDATED',
+        from_version_id: fromVersionId,
+        to_version_id: toVersionId,
+        metadata: { diff_available: true },
       })
     }
 
