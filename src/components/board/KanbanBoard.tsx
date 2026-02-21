@@ -5,14 +5,12 @@ import type { Content } from '@/types'
 import { ContentCard } from './ContentCard'
 import { Column } from './Column'
 import { Button } from '@/components/ui/button'
-import { Plus, LayoutKanban, List, Calendar } from 'lucide-react'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { LayoutKanban, List, Calendar } from 'lucide-react'
 
 interface KanbanBoardProps {
   content: Content[]
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onCardClick?: (content: Content) => void
-  teamId: string
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
   teamMembers?: Array<{
@@ -78,9 +76,7 @@ const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
 
 export function KanbanBoard({
   content,
-  onStatusChange,
   onCardClick,
-  teamId,
   view,
   onViewChange,
   teamMembers,
@@ -94,12 +90,6 @@ export function KanbanBoard({
   useEffect(() => {
     setGroupedContent(groupByStatus(content))
   }, [content])
-
-  const handleStatusChange = (contentId: string, newStatus: Content['status']) => {
-    if (onStatusChange) {
-      onStatusChange(contentId, newStatus)
-    }
-  }
 
   const handleCardClick = (content: Content) => {
     if (onCardClick) {

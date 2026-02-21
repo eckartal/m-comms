@@ -599,7 +599,6 @@ export default function CollaborationPage() {
                 content={filteredContent}
                 onStatusChange={handleStatusChange}
                 onCardClick={handleCardClick}
-                teamId={currentTeam.id}
                 view={view}
                 onViewChange={setView}
                 teamMembers={teamMembers}
