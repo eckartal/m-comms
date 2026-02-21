@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useParams } from 'next/navigation'
 import { useAppStore, useContentStore } from '@/stores'
 import { cn } from '@/lib/utils'
+import { getContentTitle } from '@/lib/contentText'
 import { Home, BarChart3, Calendar, Settings, Hash, Plus } from 'lucide-react'
 
 type SidebarProps = {
@@ -28,15 +29,17 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
     { icon: BarChart3, href: `/${teamSlug}/analytics`, label: "Analytics" },
   ]
 
-  const drafts = useMemo(
+  const recentItems = useMemo(
     () =>
       contents
-        .filter((content) => content.status === 'DRAFT')
+        .filter((content) => content.status !== 'ARCHIVED')
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
         .slice(0, 3)
         .map((content) => ({
           id: content.id,
-          title: content.title,
+          title: getContentTitle(content.title),
+          status: content.status,
+          itemType: content.item_type || 'POST',
           updatedAt: new Date(content.updated_at),
         })),
     [contents]
@@ -130,21 +133,21 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
             <div className="px-3 py-1">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Drafts ({drafts.length})
+                  Recent ({recentItems.length})
                 </span>
                 <Link href={`/${teamSlug}/content`} onClick={onNavigate} className="text-xs text-primary hover:text-primary/80">
                   Show all
                 </Link>
               </div>
               <div className="max-h-[200px] space-y-1 overflow-y-auto custom-scrollbar">
-                {contentLoading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading drafts...</p>}
-                {!contentLoading && drafts.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No drafts yet</p>}
-                {drafts.map((draft) => {
-                  const isActive = pathname === `/${teamSlug}/content/${draft.id}`
+                {contentLoading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading recent items...</p>}
+                {!contentLoading && recentItems.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">No recent items yet</p>}
+                {recentItems.map((item) => {
+                  const isActive = pathname === `/${teamSlug}/content/${item.id}`
                   return (
                     <Link
-                      key={draft.id}
-                      href={`/${teamSlug}/content/${draft.id}`}
+                      key={item.id}
+                      href={`/${teamSlug}/content/${item.id}`}
                       onClick={onNavigate}
                       className={cn(
                         'flex items-center gap-3 rounded-full px-3 py-2.5 transition-colors hover:bg-accent',
@@ -152,13 +155,15 @@ export function Sidebar({ className, collapsed = false, onNavigate }: SidebarPro
                       )}
                     >
                       <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
-                        <span className="text-[9px] font-semibold text-primary">P</span>
+                        <span className="text-[9px] font-semibold text-primary">{item.itemType === 'IDEA' ? 'I' : 'P'}</span>
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={cn('truncate text-sm', isActive ? 'font-medium text-foreground' : 'text-foreground')}>
-                          {draft.title}
+                          {item.title}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">{getRelativeTime(draft.updatedAt)}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.status.toLowerCase().replace('_', ' ')} · {getRelativeTime(item.updatedAt)}
+                        </p>
                       </div>
                     </Link>
                   )
