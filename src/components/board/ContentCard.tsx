@@ -145,7 +145,7 @@ export function ContentCard({
               <Button
                 variant="ghost"
                 aria-label="Item actions"
-                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                className="h-6 w-6 p-0 text-muted-foreground opacity-100 hover:text-foreground"
                 onClick={(event) => {
                   event.preventDefault()
                   event.stopPropagation()
@@ -154,7 +154,12 @@ export function ContentCard({
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuContent
+              align="end"
+              sideOffset={6}
+              className="z-[120] w-44 border-border bg-card text-foreground opacity-100 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={(event) => {
