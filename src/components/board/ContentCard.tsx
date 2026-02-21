@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,7 +56,6 @@ export function ContentCard({
   onOpenLinkedIdea,
   onOpenLinkedPost,
 }: ContentCardProps) {
-  const [showHover, setShowHover] = useState(false)
   const allContents = useContentStore((state) => state.contents)
 
   const itemType = content.item_type || 'POST'
@@ -111,8 +110,6 @@ export function ContentCard({
       className={cn(
         'collab-card group relative cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 transition-colors hover:border-border hover:bg-accent/20'
       )}
-      onMouseEnter={() => setShowHover(true)}
-      onMouseLeave={() => setShowHover(false)}
       onClick={onClick}
     >
       <div className="space-y-3">
@@ -317,7 +314,7 @@ export function ContentCard({
           )}
         </div>
 
-        <div className={cn('flex items-center justify-between gap-1 border-t border-border/80 pt-1', showHover ? 'opacity-100' : 'opacity-70 transition-opacity')}>
+        <div className="flex items-center justify-between gap-1 border-t border-border/80 pt-1">
           <div className="flex items-center gap-2">
             {renderRole('O', ownerUser)}
             {renderRole('C', creatorUser)}
