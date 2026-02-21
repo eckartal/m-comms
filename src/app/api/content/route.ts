@@ -72,6 +72,15 @@ function isMissingIdeaColumnsError(error: unknown) {
   )
 }
 
+function isMissingScheduledColumnError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+
+  return message.includes('scheduled_at')
+}
+
 // GET /api/content - List content (optionally filtered by team_id)
 export async function GET(request: Request) {
   try {
@@ -116,11 +125,53 @@ export async function GET(request: Request) {
       query = query.eq('team_id', teamId)
     }
 
-    const { data, error } = await query
+    let { data, error } = await query
+
+    if (error && isMissingScheduledColumnError(error)) {
+      // Compatibility fallback for older schemas missing scheduled_at/published_at.
+      const fallbackQuery = supabase
+        .from('content')
+        .select(`
+          id,
+          team_id,
+          item_type,
+          idea_state,
+          source_idea_id,
+          converted_post_id,
+          converted_at,
+          converted_by,
+          title,
+          blocks,
+          status,
+          platforms,
+          created_by,
+          assigned_to,
+          created_at,
+          updated_at,
+          createdBy:created_by(id, full_name, email, avatar_url),
+          assignedTo:assigned_to(id, full_name, email, avatar_url),
+          comments:comments(id),
+          comment_count:comments(count)
+        `)
+        .order('created_at', { ascending: false })
+
+      const fallbackResult = teamId ? fallbackQuery.eq('team_id', teamId) : fallbackQuery
+      const fallbackResponse = await fallbackResult
+      data = fallbackResponse.data
+      error = fallbackResponse.error
+    }
 
     if (error) {
       console.error('Error fetching content:', error)
-      return apiError('Failed to fetch content', 500, 'content_fetch_failed', true)
+      if (isMissingScheduledColumnError(error)) {
+        return apiError(
+          'Database core schema migration required. Apply migration 20260221_core_schema_bootstrap.sql',
+          500,
+          'migration_required',
+          false
+        )
+      }
+      return apiError(error.message || 'Failed to fetch content', 500, 'content_fetch_failed', true)
     }
 
     if (!data || data.length === 0) {
