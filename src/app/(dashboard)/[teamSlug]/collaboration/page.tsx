@@ -13,6 +13,7 @@ import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
 import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
 import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
 import { PipelineSummary } from '@/components/collaboration/PipelineSummary'
+import { CollabRightRail } from '@/components/collaboration/CollabRightRail'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
 type TeamMemberItem = {
@@ -553,16 +554,21 @@ export default function CollaborationPage() {
         ) : null}
 
         {viewState === 'ready' ? (
-          <KanbanBoard
-            content={filteredContent}
-            onStatusChange={handleStatusChange}
-            onCardClick={handleCardClick}
-            teamId={currentTeam.id}
-            view={view}
-            onViewChange={setView}
-            teamMembers={teamMembers}
-            onAssign={handleAssign}
-          />
+          <div className="flex h-full">
+            <div className="min-w-0 flex-1">
+              <KanbanBoard
+                content={filteredContent}
+                onStatusChange={handleStatusChange}
+                onCardClick={handleCardClick}
+                teamId={currentTeam.id}
+                view={view}
+                onViewChange={setView}
+                teamMembers={teamMembers}
+                onAssign={handleAssign}
+              />
+            </div>
+            <CollabRightRail content={content} onOpenContent={handleCardClick} />
+          </div>
         ) : null}
       </div>
     </DashboardContainer>
