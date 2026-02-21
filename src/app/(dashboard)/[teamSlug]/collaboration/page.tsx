@@ -29,6 +29,8 @@ export default function CollaborationPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
+  const [changeReason, setChangeReason] = useState('')
+  const [showReasonPrompt, setShowReasonPrompt] = useState(false)
 
   useEffect(() => {
     if (currentTeam) {
@@ -78,7 +80,10 @@ export default function CollaborationPage() {
       const response = await fetch(`/api/content/${contentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          change_reason: changeReason.trim() || null,
+        }),
       })
 
       if (!response.ok) {
@@ -91,6 +96,8 @@ export default function CollaborationPage() {
           prev.map((item) => (item.id === contentId ? { ...item, ...data } : item))
         )
       }
+      setChangeReason('')
+      setShowReasonPrompt(false)
     } catch (err) {
       console.error(err)
       setError('Failed to update status')
@@ -242,6 +249,28 @@ export default function CollaborationPage() {
             New Post
           </Button>
         </div>
+      </div>
+
+      {/* Change Reason */}
+      <div className="px-6 py-2 border-b border-gray-900">
+        <button
+          type="button"
+          onClick={() => setShowReasonPrompt((prev) => !prev)}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {showReasonPrompt ? 'Hide reason' : 'Add reason for changes (optional)'}
+        </button>
+        {showReasonPrompt && (
+          <div className="mt-2 max-w-xl">
+            <Input
+              type="text"
+              placeholder="Why are you changing the status?"
+              value={changeReason}
+              onChange={(e) => setChangeReason(e.target.value)}
+              className="h-8 bg-[#0a0a0a] border-gray-900 text-xs"
+            />
+          </div>
+        )}
       </div>
 
       {/* Content */}
