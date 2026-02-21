@@ -51,6 +51,7 @@ type ViewState =
   | 'ready'
 
 type QuickFilter = 'all' | 'mine' | 'unassigned' | 'needs_review' | 'overdue' | 'approved'
+type ItemTypeFilter = 'all' | 'IDEA' | 'POST'
 
 function isOverdue(item: Content) {
   if (!item.scheduled_at) return false
@@ -84,6 +85,7 @@ export default function CollaborationPage() {
   const [errorRetryable, setErrorRetryable] = useState(true)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
+  const [itemTypeFilter, setItemTypeFilter] = useState<ItemTypeFilter>('all')
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
   const hasTrackedViewLoaded = useRef(false)
@@ -233,8 +235,12 @@ export default function CollaborationPage() {
                       name: member.user.name || member.user.full_name || null,
                       email: member.user.email || '',
                       avatar_url: member.user.avatar_url || null,
+                      created_at:
+                        item.assignedTo?.created_at ||
+                        item.createdBy?.created_at ||
+                        new Date().toISOString(),
                     }
-                  : null,
+                  : undefined,
               }
             : item
         )
@@ -252,13 +258,17 @@ export default function CollaborationPage() {
   }
 
   const hasActiveFilters =
-    searchQuery.trim().length > 0 || assigneeFilter !== 'all' || quickFilter !== 'all'
+    searchQuery.trim().length > 0 ||
+    assigneeFilter !== 'all' ||
+    quickFilter !== 'all' ||
+    itemTypeFilter !== 'all'
 
   const filteredContent = useMemo(
     () =>
       content.filter((item) => {
         const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
         if (!matchesSearch) return false
+        if (itemTypeFilter !== 'all' && (item.item_type || 'POST') !== itemTypeFilter) return false
 
         if (quickFilter === 'mine') {
           const ownerId = item.assigned_to || item.assignedTo?.id
@@ -273,7 +283,7 @@ export default function CollaborationPage() {
         const assignedId = item.assigned_to || item.assignedTo?.id
         return assignedId === assigneeFilter
       }),
-    [content, searchQuery, assigneeFilter, quickFilter, currentUser?.id]
+    [content, searchQuery, assigneeFilter, quickFilter, itemTypeFilter, currentUser?.id]
   )
 
   const quickFilterMeta = useMemo(
@@ -362,6 +372,85 @@ export default function CollaborationPage() {
     }
   }
 
+  const createIdea = async () => {
+    if (!currentTeam?.id) return
+
+    try {
+      const response = await fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_id: currentTeam.id,
+          title: 'Untitled idea',
+          blocks: [],
+          platforms: [],
+          item_type: 'IDEA',
+          idea_state: 'INBOX',
+        }),
+      })
+
+      if (!response.ok) {
+        await parseRequestError(response, 'Failed to create idea')
+      }
+
+      const body = await response.json()
+      const idea = body?.data as Content | undefined
+      if (!idea) return
+
+      setContent((prev) => [idea, ...prev])
+      setItemTypeFilter('IDEA')
+      trackCollabEvent('idea_created', {
+        team_id: currentTeam.id,
+        idea_id: idea.id,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create idea')
+    }
+  }
+
+  const handleConvertIdea = async (ideaId: string) => {
+    if (!currentTeam?.slug) return
+
+    try {
+      const response = await fetch(`/api/ideas/${ideaId}/convert`, { method: 'POST' })
+      if (!response.ok) {
+        await parseRequestError(response, 'Failed to convert idea')
+      }
+
+      const body = await response.json()
+      const updatedIdea = body?.data?.idea as Content | undefined
+      const post = body?.data?.post as Content | undefined
+      const alreadyConverted = Boolean(body?.data?.already_converted)
+
+      if (updatedIdea) {
+        setContent((prev) =>
+          prev.map((item) => (item.id === updatedIdea.id ? { ...item, ...updatedIdea } : item))
+        )
+      }
+
+      if (post) {
+        setContent((prev) => {
+          const exists = prev.some((item) => item.id === post.id)
+          if (exists) return prev
+          return [post, ...prev]
+        })
+        trackCollabEvent('idea_converted_to_post', {
+          idea_id: ideaId,
+          post_id: post.id,
+          already_converted: alreadyConverted,
+          team_id: currentTeam.id,
+        })
+        router.push(`/${currentTeam.slug}/content/${post.id}`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to convert idea')
+      trackCollabEvent('idea_conversion_failed', {
+        idea_id: ideaId,
+        team_id: currentTeam.id,
+      })
+    }
+  }
+
   if (!currentTeam) {
     return (
       <div className="flex min-h-full items-center justify-center text-muted-foreground">
@@ -391,6 +480,16 @@ export default function CollaborationPage() {
               className="h-8 pl-9 bg-[#0a0a0a] border-gray-900 text-xs"
             />
           </div>
+
+          <select
+            value={itemTypeFilter}
+            onChange={(e) => setItemTypeFilter(e.target.value as ItemTypeFilter)}
+            className="h-8 px-2 bg-[#0a0a0a] border border-gray-900 text-xs text-foreground rounded"
+          >
+            <option value="all">All types</option>
+            <option value="IDEA">Ideas</option>
+            <option value="POST">Posts</option>
+          </select>
 
           <select
             value={assigneeFilter}
@@ -454,6 +553,10 @@ export default function CollaborationPage() {
             </Button>
           </div>
 
+          <Button className="h-8 bg-amber-300 text-black hover:bg-amber-200 text-xs" onClick={createIdea}>
+            <Plus className="h-3.5 w-3.5 mr-2" />
+            New Idea
+          </Button>
           <Button className="h-8 bg-white text-black hover:bg-gray-200 text-xs" onClick={goToNewPost}>
             <Plus className="h-3.5 w-3.5 mr-2" />
             New Post
@@ -507,6 +610,7 @@ export default function CollaborationPage() {
               setSearchQuery('')
               setAssigneeFilter('all')
               setQuickFilter('all')
+              setItemTypeFilter('all')
             }}
           >
             Clear filters
@@ -561,6 +665,7 @@ export default function CollaborationPage() {
               setSearchQuery('')
               setAssigneeFilter('all')
               setQuickFilter('all')
+              setItemTypeFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
@@ -574,6 +679,7 @@ export default function CollaborationPage() {
               setSearchQuery('')
               setAssigneeFilter('all')
               setQuickFilter('all')
+              setItemTypeFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
@@ -587,6 +693,7 @@ export default function CollaborationPage() {
               setSearchQuery('')
               setAssigneeFilter('all')
               setQuickFilter('all')
+              setItemTypeFilter('all')
             }}
             onGoToTeam={goToTeam}
           />
@@ -603,6 +710,7 @@ export default function CollaborationPage() {
                 onViewChange={setView}
                 teamMembers={teamMembers}
                 onAssign={handleAssign}
+                onConvertIdea={handleConvertIdea}
               />
             </div>
             <CollabRightRail teamId={currentTeam.id} content={content} onOpenContent={handleCardClick} />

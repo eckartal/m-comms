@@ -11,14 +11,13 @@ import {
   MessageSquare,
   Eye,
   Clock,
-  User,
   MoreHorizontal,
-  Calendar,
   CheckCircle,
   FileText,
   Share2,
   Edit,
-  ChevronRight,
+  Lightbulb,
+  type LucideIcon,
 } from 'lucide-react'
 import { formatDistanceToNow } from '@/lib/utils'
 import type { Content } from '@/types'
@@ -26,9 +25,10 @@ import type { Content } from '@/types'
 interface ContentCardProps {
   content: Content
   onClick?: () => void
+  onConvertIdea?: (contentId: string) => void
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: FileText },
   IN_REVIEW: { label: 'In Review', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Eye },
   APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle },
@@ -44,18 +44,18 @@ const PLATFORM_ICONS: Record<string, string> = {
   blog: '📝',
 }
 
-export function ContentCard({ content, onClick }: ContentCardProps) {
+export function ContentCard({ content, onClick, onConvertIdea }: ContentCardProps) {
   const [showHover, setShowHover] = useState(false)
 
+  const itemType = content.item_type || 'POST'
+  const isIdea = itemType === 'IDEA'
+  const isConvertedIdea = isIdea && content.idea_state === 'CONVERTED'
   const statusConfig = STATUS_CONFIG[content.status] || STATUS_CONFIG.DRAFT
   const assignedUser = content.assignedTo || content.createdBy
   const ownerName = assignedUser?.name || assignedUser?.email || null
   const createdAt = formatDistanceToNow(content.created_at)
-  const latestUpdater =
-    (content as any).latest_activity?.user?.name ||
-    (content as any).latest_activity?.user?.email ||
-    null
-  const activityCount = (content as any).activity_count || 0
+  const latestUpdater = content.latest_activity?.user?.name || content.latest_activity?.user?.email || null
+  const activityCount = content.activity_count || 0
 
   return (
     <Card
@@ -69,6 +69,14 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide',
+                  isIdea ? 'bg-amber-950/50 text-amber-300' : 'bg-blue-950/50 text-blue-300'
+                )}
+              >
+                {isIdea ? 'Idea' : 'Post'}
+              </span>
               <h4 className="text-sm font-medium text-foreground truncate pr-2">{content.title}</h4>
               {ownerName && (
                 <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[120px]">
@@ -117,10 +125,17 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2">
             {/* Status Badge */}
-            <Badge variant="outline" className={cn(statusConfig.color, 'border-0 text-[10px]')}>
-              <statusConfig.icon className="h-2.5 w-2.5 mr-1" />
-              {statusConfig.label}
-            </Badge>
+            {isIdea ? (
+              <Badge variant="outline" className="border-0 text-[10px] bg-amber-950/40 text-amber-300">
+                <Lightbulb className="h-2.5 w-2.5 mr-1" />
+                {content.idea_state || 'INBOX'}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn(statusConfig.color, 'border-0 text-[10px]')}>
+                <statusConfig.icon className="h-2.5 w-2.5 mr-1" />
+                {statusConfig.label}
+              </Badge>
+            )}
 
             {/* Date */}
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -161,6 +176,19 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
             {content.views_count || 0}
           </Button>
           <div className="flex-1" />
+          {isIdea && !isConvertedIdea && onConvertIdea ? (
+            <Button
+              variant="ghost"
+              className="h-7 px-2 text-xs text-amber-300 hover:text-amber-200"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onConvertIdea(content.id)
+              }}
+            >
+              Convert
+            </Button>
+          ) : null}
           <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
             <Share2 className="h-3.5 w-3.5 mr-1" />
             Share

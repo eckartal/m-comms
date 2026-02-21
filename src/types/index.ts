@@ -44,6 +44,9 @@ export type ContentStatus =
   | 'PUBLISHED'
   | 'ARCHIVED'
 
+export type ContentItemType = 'IDEA' | 'POST'
+export type IdeaState = 'INBOX' | 'SHAPING' | 'READY' | 'CONVERTED' | 'ARCHIVED'
+
 export interface ContentBlock {
   id: string
   type: 'text' | 'heading' | 'bullet_list' | 'numbered_list' | 'image' | 'code' | 'quote' | 'divider'
@@ -54,6 +57,12 @@ export interface ContentBlock {
 export interface Content {
   id: string
   team_id: string
+  item_type?: ContentItemType
+  idea_state?: IdeaState | null
+  source_idea_id?: string | null
+  converted_post_id?: string | null
+  converted_at?: string | null
+  converted_by?: string | null
   title: string
   blocks: ContentBlock[]
   status: ContentStatus
@@ -68,6 +77,15 @@ export interface Content {
   share_settings?: ShareSettings | null
   createdBy?: User
   assignedTo?: User
+  comments_count?: number
+  views_count?: number
+  activity_count?: number
+  latest_activity?: {
+    user?: {
+      name?: string | null
+      email?: string | null
+    } | null
+  } | null
 }
 
 export interface ShareSettings {

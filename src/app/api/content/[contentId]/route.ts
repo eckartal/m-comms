@@ -76,7 +76,7 @@ export async function PUT(
 
     const { contentId } = await params
     const body = await request.json()
-    const { title, blocks, platforms, status, scheduled_at, assigned_to, change_reason } = body
+    const { title, blocks, platforms, status, scheduled_at, assigned_to, change_reason, idea_state } = body
 
     const { data: currentContent, error: currentError } = await supabase
       .from('content')
@@ -98,6 +98,7 @@ export async function PUT(
     if (status !== undefined) updateData.status = status
     if (scheduled_at !== undefined) updateData.scheduled_at = scheduled_at
     if (assigned_to !== undefined) updateData.assigned_to = assigned_to
+    if (idea_state !== undefined) updateData.idea_state = idea_state
 
     const shouldVersion = blocks !== undefined
     let fromVersionId: string | null = null

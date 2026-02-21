@@ -5,11 +5,12 @@ import type { Content } from '@/types'
 import { ContentCard } from './ContentCard'
 import { Column } from './Column'
 import { Button } from '@/components/ui/button'
-import { LayoutKanban, List, Calendar } from 'lucide-react'
+import { LayoutGrid, List, Calendar } from 'lucide-react'
 
 interface KanbanBoardProps {
   content: Content[]
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
+  onConvertIdea?: (contentId: string) => void
   onCardClick?: (content: Content) => void
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
@@ -39,6 +40,10 @@ type ContentWithActivity = Content & {
 // Group content by status
 function groupByStatus(content: Content[]): Record<string, Content[]> {
   const grouped: Record<string, Content[]> = {
+    IDEA_INBOX: [],
+    IDEA_SHAPING: [],
+    IDEA_READY: [],
+    IDEA_CONVERTED: [],
     DRAFT: [],
     IN_REVIEW: [],
     APPROVED: [],
@@ -48,6 +53,16 @@ function groupByStatus(content: Content[]): Record<string, Content[]> {
   }
 
   content.forEach((item) => {
+    const itemType = item.item_type || 'POST'
+    if (itemType === 'IDEA') {
+      const ideaState = item.idea_state || 'INBOX'
+      const key = `IDEA_${ideaState}`
+      if (grouped[key]) {
+        grouped[key].push(item)
+      }
+      return
+    }
+
     if (grouped[item.status]) {
       grouped[item.status].push(item)
     }
@@ -65,6 +80,13 @@ const STATUS_COLUMNS: { id: Content['status']; label: string; color: string }[] 
   { id: 'ARCHIVED', label: 'Archived', color: 'bg-gray-900' },
 ]
 
+const IDEA_COLUMNS = [
+  { id: 'IDEA_INBOX', label: 'Ideas Inbox', color: 'bg-amber-950/20' },
+  { id: 'IDEA_SHAPING', label: 'Shaping', color: 'bg-amber-950/20' },
+  { id: 'IDEA_READY', label: 'Ready', color: 'bg-amber-950/20' },
+  { id: 'IDEA_CONVERTED', label: 'Converted', color: 'bg-amber-950/10' },
+] as const
+
 const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
   DRAFT: 'No drafts yet',
   IN_REVIEW: 'Nothing in review yet',
@@ -77,6 +99,7 @@ const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
 export function KanbanBoard({
   content,
   onCardClick,
+  onConvertIdea,
   view,
   onViewChange,
   teamMembers,
@@ -103,6 +126,9 @@ export function KanbanBoard({
     }
   }
 
+  const hasIdeas = content.some((item) => (item.item_type || 'POST') === 'IDEA')
+  const kanbanColumns = hasIdeas ? [...IDEA_COLUMNS, ...STATUS_COLUMNS] : STATUS_COLUMNS
+
   if (activeView === 'list') {
     return (
       <div className="flex flex-col h-full overflow-hidden">
@@ -110,7 +136,7 @@ export function KanbanBoard({
           <h2 className="text-sm font-medium text-foreground">All Content</h2>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setView('kanban')} className="h-8 px-2">
-              <LayoutKanban className="h-4 w-4 mr-2" />
+              <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setView('list')} className="h-8 px-2 text-primary">
@@ -163,6 +189,10 @@ export function KanbanBoard({
                             minute: '2-digit',
                           })
                         : '—'
+                      const statusLabel =
+                        (item.item_type || 'POST') === 'IDEA'
+                          ? `IDEA ${(item.idea_state || 'INBOX').replace('_', ' ')}`
+                          : item.status.replace('_', ' ')
                   return (
                     <button
                       key={item.id}
@@ -179,7 +209,7 @@ export function KanbanBoard({
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">{item.status.replace('_', ' ')}</span>
+                      <span className="text-xs text-muted-foreground">{statusLabel}</span>
                       {teamMembers && onAssign ? (
                         <select
                           className="text-xs text-muted-foreground bg-[#0a0a0a] border border-[#262626] rounded px-2 py-1"
@@ -242,7 +272,7 @@ export function KanbanBoard({
           <h2 className="text-sm font-medium text-foreground">Content Calendar</h2>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setView('kanban')} className="h-8 px-2">
-              <LayoutKanban className="h-4 w-4 mr-2" />
+              <LayoutGrid className="h-4 w-4 mr-2" />
               Kanban
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setView('list')} className="h-8 px-2">
@@ -299,7 +329,11 @@ export function KanbanBoard({
                               )}
                             </div>
                             <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                              {item.status === 'PUBLISHED' ? 'Shared' : 'Scheduled'}
+                              {(item.item_type || 'POST') === 'IDEA'
+                                ? item.idea_state || 'INBOX'
+                                : item.status === 'PUBLISHED'
+                                  ? 'Shared'
+                                  : 'Scheduled'}
                             </span>
                           </div>
                         </button>
@@ -319,24 +353,29 @@ export function KanbanBoard({
     <div className="flex flex-1 h-full overflow-x-auto overflow-y-hidden">
       {/* Kanban View */}
       <div className="flex flex-1 gap-4 p-4 custom-scrollbar">
-        {STATUS_COLUMNS.map((column) => (
+        {kanbanColumns.map((column) => (
           <Column
             key={column.id}
             title={column.label}
-            count={groupedContent[column.id]?.length || 0}
+            count={groupedContent[String(column.id)]?.length || 0}
             color={column.color}
             className="bg-[#050505] border border-[#262626] rounded-xl"
           >
-            {groupedContent[column.id]?.map((item) => (
+            {groupedContent[String(column.id)]?.map((item) => (
               <ContentCard
                 key={item.id}
                 content={item}
                 onClick={() => handleCardClick(item)}
+                onConvertIdea={onConvertIdea}
               />
             ))}
-            {groupedContent[column.id]?.length === 0 && (
+            {groupedContent[String(column.id)]?.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border-2 border-dashed border-gray-800 rounded-lg">
-                <p className="text-xs">{EMPTY_COLUMN_COPY[column.id]}</p>
+                <p className="text-xs">
+                  {'id' in column && String(column.id).startsWith('IDEA_')
+                    ? 'No ideas'
+                    : EMPTY_COLUMN_COPY[column.id as Content['status']]}
+                </p>
               </div>
             )}
           </Column>

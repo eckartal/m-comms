@@ -6,6 +6,7 @@ type ApiErrorCode =
   | 'forbidden'
   | 'content_fetch_failed'
   | 'content_create_failed'
+  | 'invalid_item_type'
   | 'internal_server_error'
   | 'validation_error'
 
@@ -163,11 +164,41 @@ export async function POST(request: Request) {
     if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
     const body = await request.json()
-    const { title, blocks, platforms, status, scheduled_at, team_id } = body
+    const { title, blocks, platforms, status, scheduled_at, team_id, item_type, idea_state, assigned_to } = body
 
     if (!title || !team_id) {
       return apiError('Title and team_id are required', 400, 'validation_error', false)
     }
+
+    const normalizedItemType = item_type === 'IDEA' ? 'IDEA' : item_type === 'POST' || !item_type ? 'POST' : null
+    if (!normalizedItemType) {
+      return apiError('item_type must be IDEA or POST', 400, 'invalid_item_type', false)
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('team_id', team_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (membershipError) {
+      console.error('Error verifying team membership:', membershipError)
+      return apiError('Failed to verify team access', 500, 'internal_server_error', true)
+    }
+
+    if (!membership) {
+      return apiError('Forbidden', 403, 'forbidden', false)
+    }
+
+    const normalizedIdeaState =
+      normalizedItemType === 'IDEA'
+        ? ['INBOX', 'SHAPING', 'READY', 'CONVERTED', 'ARCHIVED'].includes(idea_state)
+          ? idea_state
+          : 'INBOX'
+        : null
+
+    const normalizedStatus = normalizedItemType === 'IDEA' ? 'DRAFT' : status || 'DRAFT'
 
     const { data, error } = await supabase
       .from('content')
@@ -175,8 +206,11 @@ export async function POST(request: Request) {
         title,
         blocks: blocks || [],
         platforms: platforms || [],
-        status: status || 'DRAFT',
+        status: normalizedStatus,
         scheduled_at: scheduled_at || null,
+        assigned_to: assigned_to || null,
+        item_type: normalizedItemType,
+        idea_state: normalizedIdeaState,
         team_id,
         created_by: user.id,
       })

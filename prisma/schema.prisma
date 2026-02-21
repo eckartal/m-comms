@@ -72,6 +72,12 @@ enum TeamRole {
 model Content {
   id            String        @id @default(cuid())
   team_id       String
+  item_type     String        @default("POST")
+  idea_state    String?
+  source_idea_id String?
+  converted_post_id String?
+  converted_at  DateTime?
+  converted_by  String?
   title         String
   blocks        Json          @default("[]") // Block-based content
   status        ContentStatus @default(DRAFT)
@@ -95,6 +101,8 @@ model Content {
   changeNotes ContentChangeNote[]
 
   @@index([team_id])
+  @@index([team_id, item_type])
+  @@index([item_type, idea_state])
   @@index([status])
   @@index([scheduled_at])
   @@map("content")
