@@ -871,6 +871,7 @@ export default function CollaborationPage() {
               content={filteredContent}
               onStatusChange={handleStatusChange}
               onCardClick={handleCardClick}
+              onOpenFullEditor={openPost}
               view={view}
               onViewChange={setView}
               teamMembers={teamMembers}

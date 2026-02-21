@@ -4,6 +4,14 @@ import { useMemo, useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { getBlockPreview } from '@/lib/contentText'
 import { getTicketKey, inferTitleFromContent } from '@/lib/ticketPresentation'
@@ -23,6 +31,7 @@ import type { Content } from '@/types'
 interface ContentCardProps {
   content: Content
   onClick?: () => void
+  onOpenFullEditor?: (contentId: string) => void
   onStatusChange?: (contentId: string, newStatus: Content['status']) => void
   onConvertIdea?: (contentId: string) => void
   onOpenLinkedIdea?: (ideaId: string) => void
@@ -41,6 +50,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: Lucide
 export function ContentCard({
   content,
   onClick,
+  onOpenFullEditor,
   onStatusChange,
   onConvertIdea,
   onOpenLinkedIdea,
@@ -79,12 +89,6 @@ export function ContentCard({
     if (!content.platforms?.length) return null
     return content.platforms.slice(0, 2).map((p) => p.platform).join(' · ')
   }, [content.platforms])
-
-  const handlePrimaryOpen = (event?: { preventDefault: () => void; stopPropagation: () => void }) => {
-    event?.preventDefault()
-    event?.stopPropagation()
-    onClick?.()
-  }
 
   const renderRole = (label: 'O' | 'C' | 'W', user: typeof ownerUser) => (
     <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -139,15 +143,109 @@ export function ContentCard({
               </p>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 opacity-70">
-            <Button
-              variant="ghost"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              onClick={handlePrimaryOpen}
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                aria-label="Item actions"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44" onClick={(event) => event.stopPropagation()}>
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onClick?.()
+                }}
+              >
+                Open
+              </DropdownMenuItem>
+              {!isIdea && onOpenFullEditor ? (
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onOpenFullEditor(content.id)
+                  }}
+                >
+                  Open Full Editor
+                </DropdownMenuItem>
+              ) : null}
+              {isIdea && !isConvertedIdea && onConvertIdea ? (
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onConvertIdea(content.id)
+                  }}
+                >
+                  Convert to Post
+                </DropdownMenuItem>
+              ) : null}
+              {isIdea && isConvertedIdea && content.converted_post_id && onOpenLinkedPost ? (
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onOpenLinkedPost(content.converted_post_id as string)
+                  }}
+                >
+                  Open Linked Post
+                </DropdownMenuItem>
+              ) : null}
+              {hasSourceIdea && content.source_idea_id && onOpenLinkedIdea ? (
+                <DropdownMenuItem
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onOpenLinkedIdea(content.source_idea_id as string)
+                  }}
+                >
+                  Open Source Idea
+                </DropdownMenuItem>
+              ) : null}
+              {!isIdea && onStatusChange ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onStatusChange(content.id, 'IN_REVIEW')
+                    }}
+                  >
+                    Move to In Review
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onStatusChange(content.id, 'APPROVED')
+                    }}
+                  >
+                    Move to Approved
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      onStatusChange(content.id, 'ARCHIVED')
+                    }}
+                  >
+                    Archive
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Content Preview */}

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { KeyboardEvent, useEffect, useState } from 'react'
 import type { Content } from '@/types'
 import { ContentCard } from './ContentCard'
 import { Column } from './Column'
-import { getContentTitle } from '@/lib/contentText'
+import { inferTitleFromContent, getTicketKey } from '@/lib/ticketPresentation'
+import { useContentStore } from '@/stores'
 import { List, Calendar } from 'lucide-react'
 
 interface KanbanBoardProps {
@@ -13,8 +14,8 @@ interface KanbanBoardProps {
   onConvertIdea?: (contentId: string) => void
   onOpenLinkedIdea?: (ideaId: string) => void
   onOpenLinkedPost?: (postId: string) => void
+  onOpenFullEditor?: (postId: string) => void
   onCardClick?: (content: Content) => void
-  teamSlug?: string
   view?: 'kanban' | 'list' | 'calendar'
   onViewChange?: (view: 'kanban' | 'list' | 'calendar') => void
   teamMembers?: Array<{
@@ -73,16 +74,16 @@ function groupByStatus(content: Content[]): Record<string, Content[]> {
 }
 
 const STATUS_COLUMNS: { id: Content['status']; label: string; color: string }[] = [
-  { id: 'DRAFT', label: 'Drafts', color: 'bg-muted' },
-  { id: 'IN_REVIEW', label: 'In Review', color: 'bg-amber-100 dark:bg-amber-950/30' },
-  { id: 'APPROVED', label: 'Approved', color: 'bg-emerald-100 dark:bg-emerald-950/30' },
-  { id: 'SCHEDULED', label: 'Scheduled', color: 'bg-indigo-100 dark:bg-indigo-950/30' },
-  { id: 'PUBLISHED', label: 'Shared', color: 'bg-blue-100 dark:bg-blue-950/30' },
-  { id: 'ARCHIVED', label: 'Archived', color: 'bg-muted' },
+  { id: 'DRAFT', label: 'Drafts', color: 'bg-zinc-400/80' },
+  { id: 'IN_REVIEW', label: 'In Review', color: 'bg-amber-500/80' },
+  { id: 'APPROVED', label: 'Approved', color: 'bg-emerald-500/80' },
+  { id: 'SCHEDULED', label: 'Scheduled', color: 'bg-indigo-500/80' },
+  { id: 'PUBLISHED', label: 'Shared', color: 'bg-blue-500/80' },
+  { id: 'ARCHIVED', label: 'Archived', color: 'bg-zinc-500/70' },
 ]
 
 const IDEA_COLUMNS = [
-  { id: 'IDEA_INBOX', label: 'Ideas Inbox', color: 'bg-amber-100 dark:bg-amber-950/20' },
+  { id: 'IDEA_INBOX', label: 'Ideas Inbox', color: 'bg-amber-400/80' },
 ] as const
 
 const EMPTY_COLUMN_COPY: Record<Content['status'], string> = {
@@ -110,12 +111,13 @@ export function KanbanBoard({
   onConvertIdea,
   onOpenLinkedIdea,
   onOpenLinkedPost,
-  teamSlug,
+  onOpenFullEditor,
   view,
   teamMembers,
   onAssign,
 }: KanbanBoardProps) {
   const [groupedContent, setGroupedContent] = useState<Record<string, Content[]>>({})
+  const allContents = useContentStore((state) => state.contents)
   const activeView = view ?? 'kanban'
 
   useEffect(() => {
@@ -131,6 +133,13 @@ export function KanbanBoard({
   const handleAssign = (contentId: string, userId: string | null) => {
     if (onAssign) {
       onAssign(contentId, userId)
+    }
+  }
+
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLElement>, item: Content) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleCardClick(item)
     }
   }
 
@@ -190,13 +199,19 @@ export function KanbanBoard({
                             : 'IDEA INBOX'
                           : item.status.replace('_', ' ')
                   return (
-                    <button
+                    <div
                       key={item.id}
-                      className="grid w-full grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+                      role="button"
+                      tabIndex={0}
+                      className="grid w-full grid-cols-[2fr,1fr,1fr,1fr] gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       onClick={() => handleCardClick(item)}
+                      onKeyDown={(event) => handleRowKeyDown(event, item)}
                     >
                       <div className="min-w-0">
-                        <span className="block text-sm text-foreground truncate">{getContentTitle(item.title)}</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                          {getTicketKey(item.id, allContents)}
+                        </span>
+                        <span className="block text-sm text-foreground truncate">{inferTitleFromContent(item)}</span>
                         {(latestUpdater || activityCount > 0) && (
                           <span className="block text-[10px] text-muted-foreground truncate">
                             {latestUpdater ? `Updated by ${latestUpdater}` : ''}
@@ -211,6 +226,7 @@ export function KanbanBoard({
                         <select
                           className="rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
                           value={item.status}
+                          onMouseDown={(event) => event.stopPropagation()}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) =>
                             onStatusChange(item.id, event.target.value as Content['status'])
@@ -227,6 +243,7 @@ export function KanbanBoard({
                         <select
                           className="rounded border border-border bg-card px-2 py-1 text-xs text-muted-foreground"
                           value={ownerId || ''}
+                          onMouseDown={(event) => event.stopPropagation()}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => handleAssign(item.id, event.target.value || null)}
                         >
@@ -250,7 +267,7 @@ export function KanbanBoard({
                         <span className="text-xs text-muted-foreground truncate">{ownerName}</span>
                       )}
                       <span className="text-xs text-muted-foreground">{dateLabel}</span>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -322,7 +339,10 @@ export function KanbanBoard({
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{getContentTitle(item.title)}</p>
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                {getTicketKey(item.id, allContents)}
+                              </p>
+                              <p className="text-sm font-medium text-foreground truncate">{inferTitleFromContent(item)}</p>
                               <p className="text-xs text-muted-foreground">{time}</p>
                               {ownerName && (
                                 <p className="text-[10px] text-muted-foreground truncate">Owner {ownerName}</p>
@@ -354,21 +374,29 @@ export function KanbanBoard({
   return (
     <div className="flex h-full flex-1 overflow-x-auto overflow-y-hidden">
       {/* Kanban View */}
-      <div className="flex flex-1 gap-5 p-4 custom-scrollbar">
-        {kanbanColumns.map((column) => (
+      <div className="flex flex-1 gap-3 p-3 custom-scrollbar">
+        {kanbanColumns.map((column) => {
+          const isIdeasColumn = String(column.id).startsWith('IDEA_')
+          return (
           <Column
             key={column.id}
             title={column.label}
             count={groupedContent[String(column.id)]?.length || 0}
             color={column.color}
-            className="rounded-xl border border-border/80 bg-card"
+            className={
+              isIdeasColumn
+                ? 'rounded-xl border border-zinc-300/70 bg-zinc-100/45 dark:border-zinc-800/80 dark:bg-zinc-900/45'
+                : 'rounded-xl border border-border/80 bg-card'
+            }
+            headerClassName={isIdeasColumn ? 'bg-zinc-100/60 dark:bg-zinc-900/60' : undefined}
+            bodyClassName={isIdeasColumn ? 'bg-zinc-100/35 dark:bg-zinc-900/40' : undefined}
           >
             {groupedContent[String(column.id)]?.map((item) => (
               <ContentCard
                 key={item.id}
                 content={item}
-                teamSlug={teamSlug}
                 onClick={() => handleCardClick(item)}
+                onOpenFullEditor={onOpenFullEditor}
                 onStatusChange={onStatusChange}
                 onConvertIdea={onConvertIdea}
                 onOpenLinkedIdea={onOpenLinkedIdea}
@@ -385,7 +413,8 @@ export function KanbanBoard({
               </div>
             )}
           </Column>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
