@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PublishControls } from '@/components/publish/PublishControls'
@@ -81,6 +81,7 @@ export default function NewContentPage() {
   const [thread, setThread] = useState<ThreadItem[]>([{ id: '1', content: '' }])
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
+  const [targetPlatforms, setTargetPlatforms] = useState<PlatformType[]>(['twitter'])
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
@@ -92,13 +93,30 @@ export default function NewContentPage() {
   const maxChars = PLATFORMS[selectedPlatform].limit
   const currentContent = thread[activeIndex]?.content || ''
   const characterCount = currentContent.length
-  const isOverLimit = characterCount > maxChars
-  const isNearLimit = characterCount > maxChars * 0.8
   const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
   const isSaved = !saving
   const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
   const activePlatformMeta = PLATFORMS[selectedPlatform]
-  const connectedCount = connectedPlatforms.length
+  const publishTargets = useMemo(() => {
+    const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
+    return Array.from(new Set(targets))
+  }, [targetPlatforms, selectedPlatform])
+  const targetSummary = useMemo(
+    () => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '),
+    [publishTargets]
+  )
+  const platformRows = useMemo(
+    () => (platformCatalog.length > 0
+      ? platformCatalog.filter((platform) => isSupportedPlatform(platform.id))
+      : (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
+          id: platform,
+          name: PLATFORMS[platform].name,
+          connected: connectedPlatforms.includes(platform),
+          accounts: [],
+        }))
+    ) as PlatformCatalogItem[],
+    [platformCatalog, connectedPlatforms]
+  )
 
   const fetchConnectedPlatforms = useCallback(async () => {
     try {
@@ -164,6 +182,10 @@ export default function NewContentPage() {
           setActiveIndex(data.thread.length - 1)
         }
         setSelectedPlatform((data.platform as PlatformType) || 'twitter')
+        if (Array.isArray(data.targets)) {
+          const savedTargets = data.targets.filter((id: string) => isSupportedPlatform(id)) as PlatformType[]
+          setTargetPlatforms(savedTargets.length > 0 ? savedTargets : ['twitter'])
+        }
         setIsBookmarked(data.bookmarked || false)
       } catch (e) {
         console.error('Failed to load draft', e)
@@ -174,6 +196,12 @@ export default function NewContentPage() {
   useEffect(() => {
     fetchConnectedPlatforms()
   }, [fetchConnectedPlatforms])
+
+  useEffect(() => {
+    if (connectedPlatforms.includes(selectedPlatform) && !targetPlatforms.includes(selectedPlatform)) {
+      setTargetPlatforms((prev) => [...prev, selectedPlatform])
+    }
+  }, [selectedPlatform, connectedPlatforms, targetPlatforms])
 
   useEffect(() => {
     const connected = searchParams.get('connected')
@@ -199,7 +227,7 @@ export default function NewContentPage() {
   // Auto-save to Supabase and localStorage
   useEffect(() => {
     const timer = setTimeout(async () => {
-      const blocks = thread.map((item, index) => ({
+      const blocks = thread.map((item) => ({
         id: item.id,
         type: 'text' as const,
         content: { text: item.content }
@@ -208,6 +236,7 @@ export default function NewContentPage() {
       const draftData = {
         thread,
         platform: selectedPlatform,
+        targets: targetPlatforms,
         bookmarked: isBookmarked,
         savedAt: new Date().toISOString()
       }
@@ -221,13 +250,13 @@ export default function NewContentPage() {
         await updateContent(contentId, {
           title: title || 'Untitled',
           blocks,
-          platforms: [{ type: selectedPlatform }],
+          platforms: publishTargets.map((platform) => ({ type: platform })),
         })
         setSaving(false)
       }
     }, 1000)
     return () => clearTimeout(timer)
-  }, [thread, selectedPlatform, isBookmarked, teamSlug, contentId, currentTeam, title, setSaving])
+  }, [thread, selectedPlatform, targetPlatforms, isBookmarked, teamSlug, contentId, currentTeam, title, setSaving, publishTargets])
 
   // Handle text change
   const handleContentChange = (index: number, value: string) => {
@@ -262,13 +291,24 @@ export default function NewContentPage() {
     localStorage.removeItem(`draft_${teamSlug}`)
   }
 
+  const toggleTargetPlatform = (platform: PlatformType) => {
+    if (!connectedPlatforms.includes(platform)) return
+
+    setTargetPlatforms((prev) => {
+      if (prev.includes(platform)) {
+        return prev.filter((item) => item !== platform)
+      }
+      return [...prev, platform]
+    })
+  }
+
   const handlePublish = async () => {
     const hasContent = thread.some(t => t.content.trim().length > 0)
     if (!hasContent) return
     setIsPublishing(true)
 
     try {
-      const blocks = thread.map((item, index) => ({
+      const blocks = thread.map((item) => ({
         id: item.id,
         type: 'thread' as const,
         content: { tweets: thread.map(t => ({ text: t.content })) }
@@ -283,12 +323,16 @@ export default function NewContentPage() {
         })
         if (newContent) {
           setContentId(newContent.id)
+          await updateContent(newContent.id, {
+            platforms: publishTargets.map((platform) => ({ type: platform })),
+          })
         }
       } else if (contentId) {
         await updateContent(contentId, {
           title: title || 'Untitled',
           blocks,
-          status: 'PUBLISHED'
+          status: 'PUBLISHED',
+          platforms: publishTargets.map((platform) => ({ type: platform })),
         })
       }
 
@@ -320,12 +364,16 @@ export default function NewContentPage() {
         })
         if (newContent) {
           setContentId(newContent.id)
+          await updateContent(newContent.id, {
+            platforms: publishTargets.map((platform) => ({ type: platform })),
+          })
         }
       } else if (contentId) {
         await updateContent(contentId, {
           title: title || 'Untitled',
           blocks,
           status: 'SCHEDULED',
+          platforms: publishTargets.map((platform) => ({ type: platform })),
           scheduled_at: scheduledAt.toISOString()
         })
       }
@@ -358,9 +406,9 @@ export default function NewContentPage() {
   // Merge tweets indicator
   const canMerge = thread.length > 1 && activeIndex < thread.length - 1
 
-  const platformSummary = connectedCount > 0
-    ? `${activePlatformMeta.name} +${Math.max(connectedCount - 1, 0)}`
-    : activePlatformMeta.name
+  const platformSummary = publishTargets.length > 1
+    ? `${PLATFORMS[publishTargets[0]].name} +${publishTargets.length - 1}`
+    : PLATFORMS[publishTargets[0]].name
 
   return (
     <div className="flex min-h-full flex-col bg-background">
@@ -429,6 +477,32 @@ export default function NewContentPage() {
                 >
                   Clear
                 </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-5 rounded-[10px] border border-border bg-card/60 px-3 py-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Share to</p>
+              <span className="text-xs text-muted-foreground">
+                {publishTargets.length} target{publishTargets.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {publishTargets.map((platform) => (
+                <button
+                  key={platform}
+                  type="button"
+                  onClick={() => toggleTargetPlatform(platform)}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground hover:bg-accent transition-colors"
+                >
+                  <PlatformIcon platform={platform} className="h-3.5 w-3.5" />
+                  <span>{PLATFORMS[platform].name}</span>
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              ))}
+              {publishTargets.length === 0 && (
+                <span className="text-xs text-muted-foreground">No targets selected. Choose channels in Platform Scope.</span>
               )}
             </div>
           </div>
@@ -581,8 +655,7 @@ export default function NewContentPage() {
           <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Target: {activePlatformMeta.name}
-                {connectedCount > 1 ? ` • ${connectedCount - 1} more connected` : ''}
+                Targets: {targetSummary}
               </span>
               {thread.length > 1 && (
                 <span>{totalCharacters.toLocaleString()} chars • {thread.length} tweets</span>
@@ -609,12 +682,11 @@ export default function NewContentPage() {
           </DialogHeader>
 
           <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2 pr-1">
-            {platformCatalog
-              .filter((platform) => isSupportedPlatform(platform.id))
-              .map((platform) => {
+            {platformRows.map((platform) => {
                 const platformId = platform.id as PlatformType
                 const isActive = selectedPlatform === platformId
                 const isConnected = connectedPlatforms.includes(platformId)
+                const isTarget = publishTargets.includes(platformId)
                 const primaryAccount = platform.accounts[0]?.account_name
                 return (
                   <div
@@ -635,6 +707,27 @@ export default function NewContentPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleTargetPlatform(platformId)}
+                        disabled={!isConnected}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-[6px] px-2.5 py-1.5 text-xs font-medium',
+                          isConnected
+                            ? (isTarget
+                              ? 'bg-emerald-500/15 text-emerald-300'
+                              : 'border border-border text-foreground hover:bg-accent')
+                            : 'border border-border text-muted-foreground opacity-70 cursor-not-allowed'
+                        )}
+                      >
+                        {isTarget ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            Target
+                          </>
+                        ) : isConnected ? 'Add target' : 'Connect first'}
+                      </button>
+
                       {!isConnected ? (
                         <button
                           type="button"
