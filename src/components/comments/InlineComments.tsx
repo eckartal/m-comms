@@ -10,6 +10,7 @@ import type { Comment } from '@/types'
 
 interface InlineComment {
   id: string
+  annotationId?: string
   text: string
   startPos: number
   endPos: number
@@ -257,8 +258,8 @@ export function InlineComments({
             key={comment.id}
             comment={comment}
             currentUserId={currentUserId}
-            onResolve={() => onResolveComment(comment.id)}
-            onReply={(text) => onReplyComment(comment.id, text)}
+            onResolve={() => onResolveComment(comment.annotationId || comment.id)}
+            onReply={(text) => onReplyComment(comment.annotationId || comment.id, text)}
             onEdit={(text) => onEditComment(comment.id, text)}
             onDelete={() => onDeleteComment(comment.id)}
           />

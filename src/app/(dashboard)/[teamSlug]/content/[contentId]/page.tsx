@@ -25,6 +25,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ContentBlock, PlatformConfig, ContentStatus, Content } from '@/types'
 import { useAppStore } from '@/stores'
 import { CommentList } from '@/components/comments/CommentList'
+import { InlineComments } from '@/components/comments/InlineComments'
 import { ShareModal } from '@/components/share/ShareModal'
 import { PublishModal } from '@/components/publish/PublishModal'
 
@@ -213,6 +214,30 @@ type ActivityItem = {
   } | null
 }
 
+type AnnotationComment = {
+  id: string
+  text: string
+  created_at: string
+  user?: {
+    id: string
+    name: string | null
+    email: string
+    avatar_url?: string | null
+  }
+}
+
+type Annotation = {
+  id: string
+  content_id: string
+  block_id: string
+  start_offset: number
+  end_offset: number
+  text_snapshot: string
+  status: string
+  created_at: string
+  created_by: string
+  comments: AnnotationComment[]
+}
 type TeamMemberItem = {
   id: string
   role: string
@@ -245,12 +270,15 @@ export default function EditContentPage() {
   const [activityLoading, setActivityLoading] = useState(true)
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
+  const [annotations, setAnnotations] = useState<Annotation[]>([])
+  const [annotationsLoading, setAnnotationsLoading] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
 
   useEffect(() => {
     if (contentId) {
       fetchContent()
       fetchActivity()
+      fetchAnnotations()
     }
   }, [contentId])
 
@@ -296,6 +324,21 @@ export default function EditContentPage() {
     }
   }
 
+  const fetchAnnotations = async () => {
+    try {
+      setAnnotationsLoading(true)
+      const response = await fetch(`/api/content/${contentId}/annotations`)
+      if (response.ok) {
+        const data = await response.json()
+        setAnnotations(Array.isArray(data.data) ? data.data : [])
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error)
+    } finally {
+      setAnnotationsLoading(false)
+    }
+  }
+
   const fetchTeamMembers = async () => {
     try {
       const response = await fetch(`/api/teams/${currentTeam?.id}/members`)
@@ -329,6 +372,7 @@ export default function EditContentPage() {
       } else {
         await fetchContent()
         await fetchActivity()
+        await fetchAnnotations()
         setChangeReason('')
         setShowReasonPrompt(false)
       }
@@ -364,6 +408,125 @@ export default function EditContentPage() {
   }
 
   const latestReason = (item: ActivityItem) => item.changeNote?.[0]?.reason || null
+
+  const buildInlineComments = (blockId: string) => {
+    return annotations
+      .filter((a) => a.block_id === blockId)
+      .map((a) => {
+        const root = a.comments?.[0]
+        const replies = (a.comments || []).slice(1).map((c) => ({
+          id: c.id,
+          text: c.text,
+          startPos: a.start_offset,
+          endPos: a.end_offset,
+          user_id: c.user?.id || '',
+          created_at: c.created_at,
+          user: c.user ? { name: c.user.name, email: c.user.email, avatar_url: c.user.avatar_url || null } : undefined,
+          resolved: a.status === 'RESOLVED',
+        }))
+
+        return {
+          id: root?.id || a.id,
+          annotationId: a.id,
+          text: root?.text || a.text_snapshot,
+          startPos: a.start_offset,
+          endPos: a.end_offset,
+          user_id: root?.user?.id || a.created_by,
+          created_at: root?.created_at || a.created_at,
+          user: root?.user ? { name: root.user.name, email: root.user.email, avatar_url: root.user.avatar_url || null } : undefined,
+          replies,
+          resolved: a.status === 'RESOLVED',
+        }
+      })
+  }
+
+  const addAnnotation = async (
+    blockId: string,
+    commentText: string,
+    startPos: number,
+    endPos: number,
+    blockText: string
+  ) => {
+    const snapshot = blockText.slice(startPos, endPos)
+    try {
+      const response = await fetch(`/api/content/${contentId}/annotations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          block_id: blockId,
+          start_offset: startPos,
+          end_offset: endPos,
+          text_snapshot: snapshot,
+          comment_text: commentText,
+        }),
+      })
+      if (response.ok) {
+        await fetchAnnotations()
+      }
+    } catch (error) {
+      console.error('Error creating annotation:', error)
+    }
+  }
+
+  const resolveAnnotation = async (annotationId: string) => {
+    const current = annotations.find((a) => a.id === annotationId)
+    const nextStatus = current?.status === 'RESOLVED' ? 'OPEN' : 'RESOLVED'
+    try {
+      const response = await fetch(`/api/annotations/${annotationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      if (response.ok) {
+        await fetchAnnotations()
+      }
+    } catch (error) {
+      console.error('Error updating annotation:', error)
+    }
+  }
+
+  const replyAnnotation = async (annotationId: string, text: string) => {
+    try {
+      const response = await fetch(`/api/annotations/${annotationId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_id: contentId, text }),
+      })
+      if (response.ok) {
+        await fetchAnnotations()
+      }
+    } catch (error) {
+      console.error('Error replying to annotation:', error)
+    }
+  }
+
+  const editAnnotationComment = async (commentId: string, text: string) => {
+    try {
+      const response = await fetch(`/api/annotation-comments/${commentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (response.ok) {
+        await fetchAnnotations()
+      }
+    } catch (error) {
+      console.error('Error editing annotation comment:', error)
+    }
+  }
+
+  const deleteAnnotationComment = async (commentId: string) => {
+    try {
+      const response = await fetch(`/api/annotation-comments/${commentId}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        await fetchAnnotations()
+      }
+    } catch (error) {
+      console.error('Error deleting annotation comment:', error)
+    }
+  }
 
   if (isLoading) {
     return <div className="max-w-4xl mx-auto py-8 text-[#9ca3af]">Loading...</div>
@@ -410,6 +573,38 @@ export default function EditContentPage() {
       {/* Editor */}
       <div className="mb-12">
         <BlockEditor blocks={blocks} onChange={setBlocks} />
+      </div>
+
+      {/* Inline Comments (Text Blocks) */}
+      <div className="mb-12">
+        <h2 className="text-sm font-medium text-[#9ca3af] uppercase tracking-wide mb-4">Inline Comments</h2>
+        {annotationsLoading ? (
+          <div className="text-sm text-[#9ca3af]">Loading annotations...</div>
+        ) : (
+          <div className="space-y-6">
+            {blocks
+              .filter((b) => b.type === 'text')
+              .map((block) => {
+                const textContent = typeof block.content === 'string' ? block.content : block.content?.text || ''
+                return (
+                  <div key={block.id} className="border border-[#e5e5e5] rounded-lg p-3">
+                    <InlineComments
+                      content={textContent}
+                      comments={buildInlineComments(block.id)}
+                      currentUserId={currentUser?.id || ''}
+                      onAddComment={(text, startPos, endPos) =>
+                        addAnnotation(block.id, text, startPos, endPos, textContent)
+                      }
+                      onResolveComment={(id) => resolveAnnotation(id)}
+                      onReplyComment={(id, text) => replyAnnotation(id, text)}
+                      onEditComment={(id, text) => editAnnotationComment(id, text)}
+                      onDeleteComment={(id) => deleteAnnotationComment(id)}
+                    />
+                  </div>
+                )
+              })}
+          </div>
+        )}
       </div>
 
       {/* Platforms */}
