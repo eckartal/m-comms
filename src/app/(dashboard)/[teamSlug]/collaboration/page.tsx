@@ -114,6 +114,9 @@ export default function CollaborationPage() {
   const [isIdeaPanelOpen, setIsIdeaPanelOpen] = useState(false)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
   const [isPostPanelOpen, setIsPostPanelOpen] = useState(false)
+  const [linkedIdeasById, setLinkedIdeasById] = useState<Record<string, Content>>({})
+  const [linkedIdeaLoading, setLinkedIdeaLoading] = useState(false)
+  const [linkedIdeaError, setLinkedIdeaError] = useState<string | null>(null)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
   const quickFilterFromQuery = parseQuickFilter(searchParams.get('quickFilter'))
@@ -122,7 +125,7 @@ export default function CollaborationPage() {
     setQuickFilter(quickFilterFromQuery)
   }, [quickFilterFromQuery])
 
-  const parseRequestError = async (response: Response, fallbackMessage: string) => {
+  const parseRequestError = useCallback(async (response: Response, fallbackMessage: string) => {
     let message = fallbackMessage
     let code: string | undefined
     let retryable = response.status >= 500
@@ -142,7 +145,7 @@ export default function CollaborationPage() {
     }
 
     throw new RequestError(message, response.status, code, retryable)
-  }
+  }, [])
 
   const fetchContentData = useCallback(async (teamId: string) => {
     const response = await fetch(`/api/content?team_id=${encodeURIComponent(teamId)}`, { cache: 'no-store' })
@@ -152,7 +155,7 @@ export default function CollaborationPage() {
 
     const data = await response.json()
     return Array.isArray(data.data) ? (data.data as Content[]) : []
-  }, [])
+  }, [parseRequestError])
 
   const fetchTeamMembersData = useCallback(async (teamId: string) => {
     const response = await fetch(`/api/teams/${teamId}/members`, { cache: 'no-store' })
@@ -162,7 +165,7 @@ export default function CollaborationPage() {
 
     const data = await response.json()
     return Array.isArray(data.data) ? (data.data as TeamMemberItem[]) : []
-  }, [])
+  }, [parseRequestError])
 
   const loadData = useCallback(async () => {
     if (!currentTeam?.id) return
@@ -647,6 +650,75 @@ export default function CollaborationPage() {
     }
   }
 
+  const selectedIdea = content.find(
+    (item) => item.id === selectedIdeaId && (item.item_type || 'POST') === 'IDEA'
+  ) || null
+  const selectedPost = content.find(
+    (item) => item.id === selectedPostId && (item.item_type || 'POST') === 'POST'
+  ) || null
+  const selectedPostLinkedIdeaId = selectedPost?.source_idea_id || null
+  const selectedPostLinkedIdea = selectedPostLinkedIdeaId
+    ? linkedIdeasById[selectedPostLinkedIdeaId] ||
+      content.find(
+        (item) => item.id === selectedPostLinkedIdeaId && (item.item_type || 'POST') === 'IDEA'
+      ) ||
+      null
+    : null
+
+  useEffect(() => {
+    if (!isPostPanelOpen || !selectedPostLinkedIdeaId) {
+      setLinkedIdeaLoading(false)
+      setLinkedIdeaError(null)
+      return
+    }
+
+    if (selectedPostLinkedIdea) {
+      if (!linkedIdeasById[selectedPostLinkedIdea.id]) {
+        setLinkedIdeasById((prev) => ({ ...prev, [selectedPostLinkedIdea.id]: selectedPostLinkedIdea }))
+      }
+      setLinkedIdeaLoading(false)
+      setLinkedIdeaError(null)
+      return
+    }
+
+    let cancelled = false
+    const fetchLinkedIdea = async () => {
+      try {
+        setLinkedIdeaLoading(true)
+        setLinkedIdeaError(null)
+        const response = await fetch(`/api/content/${selectedPostLinkedIdeaId}`, { cache: 'no-store' })
+        if (!response.ok) {
+          await parseRequestError(response, 'Failed to load linked idea')
+        }
+        const body = await response.json()
+        const linkedIdea = (body?.data as Content | undefined) || null
+        if (!linkedIdea) return
+        if ((linkedIdea.item_type || 'POST') !== 'IDEA') return
+        if (cancelled) return
+        setLinkedIdeasById((prev) => ({ ...prev, [linkedIdea.id]: linkedIdea }))
+      } catch (err) {
+        if (cancelled) return
+        setLinkedIdeaError(err instanceof Error ? err.message : 'Failed to load linked idea')
+      } finally {
+        if (!cancelled) {
+          setLinkedIdeaLoading(false)
+        }
+      }
+    }
+
+    fetchLinkedIdea()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    isPostPanelOpen,
+    selectedPostLinkedIdeaId,
+    selectedPostLinkedIdea,
+    linkedIdeasById,
+    parseRequestError,
+  ])
+
   if (!currentTeam) {
     return (
       <div className="flex min-h-full items-center justify-center text-muted-foreground">
@@ -654,13 +726,6 @@ export default function CollaborationPage() {
       </div>
     )
   }
-
-  const selectedIdea = content.find(
-    (item) => item.id === selectedIdeaId && (item.item_type || 'POST') === 'IDEA'
-  ) || null
-  const selectedPost = content.find(
-    (item) => item.id === selectedPostId && (item.item_type || 'POST') === 'POST'
-  ) || null
 
   return (
     <DashboardContainer className="flex h-full flex-1 flex-col py-3 md:py-4">
@@ -914,7 +979,7 @@ export default function CollaborationPage() {
               content={filteredContent}
               onStatusChange={handleStatusChange}
               onCardClick={handleCardClick}
-              onOpenFullEditor={openPost}
+              onOpenFullEditor={openPostPanelById}
               onRemoveContent={handleRemoveContent}
               view={view}
               onViewChange={setView}
@@ -958,6 +1023,10 @@ export default function CollaborationPage() {
             return next
           })
         }}
+        linkedIdea={selectedPostLinkedIdea}
+        linkedIdeaLoading={linkedIdeaLoading}
+        linkedIdeaError={linkedIdeaError}
+        onOpenLinkedIdea={(ideaId) => openIdeaById(ideaId)}
         onOpenFullEditor={openPost}
       />
     </DashboardContainer>

@@ -175,7 +175,7 @@ export function ContentCard({
                     onOpenFullEditor(content.id)
                   }}
                 >
-                  Open Post
+                  Open Editor
                 </DropdownMenuItem>
               ) : null}
               {isIdea && onClick ? (
