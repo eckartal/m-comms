@@ -155,7 +155,33 @@ export async function GET() {
       return NextResponse.json({ data: [] })
     }
 
-    return NextResponse.json({ data })
+    const contentIds = data.map((item: { id: string }) => item.id)
+    const { data: activities } = await supabase
+      .from('content_activity')
+      .select(`
+        content_id,
+        created_at,
+        user:user_id(id, name, email, avatar_url)
+      `)
+      .in('content_id', contentIds)
+      .order('created_at', { ascending: false })
+
+    const activityCount: Record<string, number> = {}
+    const latestActivity: Record<string, unknown> = {}
+    ;(activities || []).forEach((activity: any) => {
+      activityCount[activity.content_id] = (activityCount[activity.content_id] || 0) + 1
+      if (!latestActivity[activity.content_id]) {
+        latestActivity[activity.content_id] = activity
+      }
+    })
+
+    const enriched = data.map((item: any) => ({
+      ...item,
+      latest_activity: latestActivity[item.id] || null,
+      activity_count: activityCount[item.id] || 0,
+    }))
+
+    return NextResponse.json({ data: enriched })
   } catch (error) {
     console.error('Error in GET /api/content:', error)
     const demoMode = process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'

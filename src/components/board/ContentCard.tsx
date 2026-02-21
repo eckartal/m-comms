@@ -51,6 +51,11 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
   const assignedUser = content.assignedTo || content.createdBy
   const ownerName = assignedUser?.name || assignedUser?.email || null
   const createdAt = formatDistanceToNow(content.created_at)
+  const latestUpdater =
+    (content as any).latest_activity?.user?.name ||
+    (content as any).latest_activity?.user?.email ||
+    null
+  const activityCount = (content as any).activity_count || 0
 
   return (
     <Card
@@ -68,6 +73,11 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
               {ownerName && (
                 <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[120px]">
                   Owner {ownerName}
+                </span>
+              )}
+              {latestUpdater && (
+                <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full truncate max-w-[140px]">
+                  Updated by {latestUpdater}
                 </span>
               )}
             </div>
@@ -141,6 +151,11 @@ export function ContentCard({ content, onClick }: ContentCardProps) {
             <MessageSquare className="h-3.5 w-3.5 mr-1" />
             {content.comments_count || 0}
           </Button>
+          {activityCount > 0 && (
+            <span className="text-[10px] text-muted-foreground bg-gray-900 px-2 py-0.5 rounded-full">
+              {activityCount} updates
+            </span>
+          )}
           <Button variant="ghost" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground">
             <Eye className="h-3.5 w-3.5 mr-1" />
             {content.views_count || 0}
