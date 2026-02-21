@@ -60,6 +60,14 @@ function isMissingNameColumnError(error: unknown) {
   return message.includes('full_name') || message.includes('name')
 }
 
+function isMissingScheduledColumnError(error: unknown) {
+  const message =
+    typeof error === 'object' && error && 'message' in error
+      ? String((error as { message?: unknown }).message || '')
+      : ''
+  return message.includes('scheduled_at')
+}
+
 // GET /api/content/[id] - Get single content
 export async function GET(
   request: Request,
@@ -197,21 +205,41 @@ export async function PUT(
       .from('content')
       .select('status, scheduled_at, assigned_to, writer_id, team_id')
       .eq('id', contentId)
-      .single()
+      .maybeSingle()
 
-    if (currentError && isMissingWriterColumnError(currentError)) {
+    if (
+      currentError &&
+      (isMissingWriterColumnError(currentError) || isMissingScheduledColumnError(currentError))
+    ) {
+      const needsScheduledFallback = isMissingScheduledColumnError(currentError)
       const fallbackCurrent = await supabase
         .from('content')
-        .select('status, scheduled_at, assigned_to, team_id')
+        .select(
+          needsScheduledFallback
+            ? 'status, assigned_to, team_id'
+            : 'status, scheduled_at, assigned_to, team_id'
+        )
         .eq('id', contentId)
-        .single()
+        .maybeSingle()
       currentContent = fallbackCurrent.data
-        ? { ...fallbackCurrent.data, writer_id: null }
+        ? {
+            ...fallbackCurrent.data,
+            writer_id: null,
+            scheduled_at:
+              'scheduled_at' in (fallbackCurrent.data as Record<string, unknown>)
+                ? (fallbackCurrent.data as { scheduled_at?: string | null }).scheduled_at ?? null
+                : null,
+          }
         : null
       currentError = fallbackCurrent.error
     }
 
-    if (currentError || !currentContent) {
+    if (currentError) {
+      console.error('Error loading current content before update:', currentError)
+      return NextResponse.json({ error: 'Failed to load content for update' }, { status: 500 })
+    }
+
+    if (!currentContent) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 })
     }
 
