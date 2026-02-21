@@ -14,8 +14,7 @@ import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
-  const setCurrentUser = useAppStore((state) => state.setCurrentUser)
-  const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
+  const currentTeam = useAppStore((state) => state.currentTeam)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,7 +36,8 @@ export default function LoginPage() {
 
       await syncUserWithStore()
       await syncTeamsWithStore()
-      router.push('/demo-team')
+      const teamSlug = useAppStore.getState().currentTeam?.slug || currentTeam?.slug
+      router.push(teamSlug ? `/${teamSlug}` : '/')
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to sign in'

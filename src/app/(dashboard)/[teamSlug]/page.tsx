@@ -51,29 +51,9 @@ const STATUS_CONFIG: Record<ContentStatus, { label: string; color: string; icon:
 }
 
 export default function DashboardPage() {
-  const { currentTeam, setCurrentTeam, setCurrentUser, onboarded, markOnboardingComplete } = useAppStore()
+  const { currentTeam, onboarded, markOnboardingComplete } = useAppStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
-
-  useEffect(() => {
-    if (!currentTeam) {
-      setCurrentTeam({
-        id: '1',
-        name: 'Demo Team',
-        slug: 'demo',
-        logo: null,
-        settings: {},
-        created_at: new Date().toISOString(),
-      })
-      setCurrentUser({
-        id: '1',
-        email: 'demo@example.com',
-        name: 'Demo User',
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-      })
-    }
-  }, [currentTeam, setCurrentTeam, setCurrentUser])
 
   // Check if welcome banner should be shown
   useEffect(() => {

@@ -37,7 +37,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const params = useParams()
   const teamSlug = params.teamSlug as string
-  const { currentTeam, setCurrentTeam, setCurrentUser } = useAppStore()
+  const { currentTeam } = useAppStore()
   const [timezone, setTimezone] = useState('America/New_York')
   const [workingHourStart, setWorkingHourStart] = useState('09:00-17:00')
   const [notifications, setNotifications] = useState({
@@ -50,27 +50,6 @@ export default function SettingsPage() {
     statusChanges: true,
   })
   const [saved, setSaved] = useState(false)
-
-  // Initialize demo team if no team is set
-  useEffect(() => {
-    if (!currentTeam) {
-      setCurrentTeam({
-        id: '1',
-        name: 'Demo Team',
-        slug: 'demo',
-        logo: null,
-        settings: {},
-        created_at: new Date().toISOString(),
-      })
-      setCurrentUser({
-        id: '1',
-        email: 'demo@example.com',
-        name: 'Demo User',
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-      })
-    }
-  }, [currentTeam, setCurrentTeam, setCurrentUser])
 
   useEffect(() => {
     // Load settings from team settings or use defaults
