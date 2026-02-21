@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { KanbanBoard } from '@/components/board/KanbanBoard'
 import { Button } from '@/components/ui/button'
 import { Plus, LayoutGrid, List, Calendar, Search } from 'lucide-react'
@@ -8,19 +9,43 @@ import { useAppStore } from '@/stores'
 import { Input } from '@/components/ui/input'
 import type { Content } from '@/types'
 import { cn } from '@/lib/utils'
+import { CollabSkeleton } from '@/components/collaboration/CollabSkeleton'
+import { CollabErrorState } from '@/components/collaboration/CollabErrorState'
+import { CollabEmptyState } from '@/components/collaboration/CollabEmptyState'
+import { PipelineSummary } from '@/components/collaboration/PipelineSummary'
 
 type TeamMemberItem = {
   id: string
   role: string
   user: {
     id: string
-    email: string
-    full_name: string | null
+    email: string | null
+    name: string | null
+    full_name?: string | null
     avatar_url?: string | null
   } | null
 }
 
+class RequestError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'RequestError'
+    this.status = status
+  }
+}
+
+type ViewState =
+  | 'loading'
+  | 'error'
+  | 'empty_permission'
+  | 'empty_first_use'
+  | 'empty_filtered'
+  | 'ready'
+
 export default function CollaborationPage() {
+  const router = useRouter()
   const { currentTeam } = useAppStore()
   const [content, setContent] = useState<Content[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -28,54 +53,90 @@ export default function CollaborationPage() {
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [teamMembers, setTeamMembers] = useState<TeamMemberItem[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [view, setView] = useState<'kanban' | 'list' | 'calendar'>('kanban')
   const [changeReason, setChangeReason] = useState('')
   const [showReasonPrompt, setShowReasonPrompt] = useState(false)
 
+  const parseRequestError = async (response: Response, fallbackMessage: string) => {
+    let message = fallbackMessage
+    try {
+      const body = await response.json()
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        message = body.error
+      }
+    } catch {
+      // Ignore JSON parsing errors and use fallback message.
+    }
+
+    throw new RequestError(message, response.status)
+  }
+
+  const fetchContentData = useCallback(async () => {
+    const response = await fetch('/api/content', { cache: 'no-store' })
+    if (!response.ok) {
+      await parseRequestError(response, 'Failed to fetch content')
+    }
+
+    const data = await response.json()
+    return Array.isArray(data.data) ? (data.data as Content[]) : []
+  }, [])
+
+  const fetchTeamMembersData = useCallback(async (teamId: string) => {
+    const response = await fetch(`/api/teams/${teamId}/members`, { cache: 'no-store' })
+    if (!response.ok) {
+      await parseRequestError(response, 'Failed to fetch team members')
+    }
+
+    const data = await response.json()
+    return Array.isArray(data.data) ? (data.data as TeamMemberItem[]) : []
+  }, [])
+
+  const loadData = useCallback(async () => {
+    if (!currentTeam?.id) return
+
+    setIsLoading(true)
+    setError(null)
+    setErrorStatus(null)
+
+    const [contentResult, teamMembersResult] = await Promise.allSettled([
+      fetchContentData(),
+      fetchTeamMembersData(currentTeam.id),
+    ])
+
+    if (contentResult.status === 'fulfilled') {
+      setContent(contentResult.value)
+    } else {
+      const reason = contentResult.reason
+      const isRequestError = reason instanceof RequestError
+      setContent([])
+      setError(isRequestError ? reason.message : 'Failed to load content')
+      setErrorStatus(isRequestError ? reason.status : 500)
+      console.error('Failed to load collaboration content:', reason)
+    }
+
+    if (teamMembersResult.status === 'fulfilled') {
+      setTeamMembers(teamMembersResult.value)
+    } else {
+      setTeamMembers([])
+      console.error('Failed to load team members:', teamMembersResult.reason)
+    }
+
+    setIsLoading(false)
+  }, [currentTeam?.id, fetchContentData, fetchTeamMembersData])
+
   useEffect(() => {
-    if (currentTeam) {
-      fetchContent()
-      fetchTeamMembers()
+    if (currentTeam?.id) {
+      loadData()
     }
-  }, [currentTeam])
-
-  const fetchContent = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const response = await fetch('/api/content')
-      if (!response.ok) {
-        throw new Error('Failed to fetch content')
-      }
-
-      const data = await response.json()
-      setContent(data.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load content')
-      console.error(err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchTeamMembers = async () => {
-    try {
-      const response = await fetch(`/api/teams/${currentTeam?.id}/members`)
-      if (response.ok) {
-        const data = await response.json()
-        setTeamMembers(Array.isArray(data.data) ? data.data : [])
-      }
-    } catch (err) {
-      console.error(err)
-    }
-  }
+  }, [currentTeam?.id, loadData])
 
   const handleStatusChange = async (contentId: string, newStatus: Content['status']) => {
     const previous = content
     setContent((prev) =>
       prev.map((item) => (item.id === contentId ? { ...item, status: newStatus } : item))
     )
+
     try {
       const response = await fetch(`/api/content/${contentId}`, {
         method: 'PUT',
@@ -87,7 +148,7 @@ export default function CollaborationPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update status')
+        await parseRequestError(response, 'Failed to update status')
       }
 
       const { data } = await response.json()
@@ -96,11 +157,12 @@ export default function CollaborationPage() {
           prev.map((item) => (item.id === contentId ? { ...item, ...data } : item))
         )
       }
+
       setChangeReason('')
       setShowReasonPrompt(false)
     } catch (err) {
       console.error(err)
-      setError('Failed to update status')
+      setError(err instanceof Error ? err.message : 'Failed to update status')
       setContent(previous)
     }
   }
@@ -114,7 +176,7 @@ export default function CollaborationPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update owner')
+        await parseRequestError(response, 'Failed to update owner')
       }
 
       const member = teamMembers.find((m) => m.user?.id === userId) || null
@@ -127,8 +189,8 @@ export default function CollaborationPage() {
                 assignedTo: member?.user
                   ? {
                       id: member.user.id,
-                      name: member.user.full_name || null,
-                      email: member.user.email,
+                      name: member.user.name || member.user.full_name || null,
+                      email: member.user.email || '',
                       avatar_url: member.user.avatar_url || null,
                     }
                   : null,
@@ -138,24 +200,50 @@ export default function CollaborationPage() {
       )
     } catch (err) {
       console.error(err)
-      setError('Failed to update owner')
+      setError(err instanceof Error ? err.message : 'Failed to update owner')
     }
   }
 
   const handleCardClick = (contentItem: Content) => {
-    // Navigate to content detail page
     if (currentTeam?.slug) {
       window.location.href = `/${currentTeam.slug}/content/${contentItem.id}`
     }
   }
 
-  const filteredContent = content.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
-    if (!matchesSearch) return false
-    if (assigneeFilter === 'all') return true
-    const assignedId = (item as any).assigned_to || (item as any).assignedTo?.id
-    return assignedId === assigneeFilter
-  })
+  const hasActiveFilters = searchQuery.trim().length > 0 || assigneeFilter !== 'all'
+
+  const filteredContent = useMemo(
+    () =>
+      content.filter((item) => {
+        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
+        if (!matchesSearch) return false
+        if (assigneeFilter === 'all') return true
+        const assignedId = item.assigned_to || item.assignedTo?.id
+        return assignedId === assigneeFilter
+      }),
+    [content, searchQuery, assigneeFilter]
+  )
+
+  const viewState: ViewState = useMemo(() => {
+    if (isLoading) return 'loading'
+    if (errorStatus === 401 || errorStatus === 403) return 'empty_permission'
+    if (error) return 'error'
+    if (content.length === 0) return 'empty_first_use'
+    if (filteredContent.length === 0 && hasActiveFilters) return 'empty_filtered'
+    return 'ready'
+  }, [isLoading, errorStatus, error, content.length, filteredContent.length, hasActiveFilters])
+
+  const goToTeam = () => {
+    if (currentTeam?.slug) {
+      router.push(`/${currentTeam.slug}/team`)
+    }
+  }
+
+  const goToNewPost = () => {
+    if (currentTeam?.slug) {
+      router.push(`/${currentTeam.slug}/content/new`)
+    }
+  }
 
   if (!currentTeam) {
     return (
@@ -167,7 +255,6 @@ export default function CollaborationPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-black">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-900">
         <div className="flex items-center gap-4">
           <div>
@@ -177,7 +264,6 @@ export default function CollaborationPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -189,7 +275,6 @@ export default function CollaborationPage() {
             />
           </div>
 
-          {/* Assignee Filter */}
           <select
             value={assigneeFilter}
             onChange={(e) => setAssigneeFilter(e.target.value)}
@@ -200,14 +285,13 @@ export default function CollaborationPage() {
               .filter((member) => member.user?.id)
               .map((member) => (
                 <option key={member.id} value={member.user?.id}>
-                  {member.user?.full_name || member.user?.email || 'Unknown'}
+                  {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
                 </option>
               ))}
           </select>
 
           <div className="h-6 w-px bg-gray-900" />
 
-          {/* View Toggle */}
           <div className="flex bg-[#0a0a0a] rounded-lg p-0.5 border border-gray-900">
             <Button
               variant="ghost"
@@ -244,14 +328,15 @@ export default function CollaborationPage() {
             </Button>
           </div>
 
-          <Button className="h-8 bg-white text-black hover:bg-gray-200 text-xs">
+          <Button className="h-8 bg-white text-black hover:bg-gray-200 text-xs" onClick={goToNewPost}>
             <Plus className="h-3.5 w-3.5 mr-2" />
             New Post
           </Button>
         </div>
       </div>
 
-      {/* Change Reason */}
+      <PipelineSummary content={content} />
+
       <div className="px-6 py-2 border-b border-gray-900">
         <button
           type="button"
@@ -273,20 +358,54 @@ export default function CollaborationPage() {
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm">Loading content...</span>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-full text-red-500">
-            {error}
-          </div>
-        ) : (
+        {viewState === 'loading' ? <CollabSkeleton view={view} /> : null}
+
+        {viewState === 'error' ? (
+          <CollabErrorState
+            message={error || 'Failed to load collaboration data'}
+            onRetry={loadData}
+            onGoToTeam={goToTeam}
+          />
+        ) : null}
+
+        {viewState === 'empty_permission' ? (
+          <CollabEmptyState
+            variant="permission"
+            onCreatePost={goToNewPost}
+            onClearFilters={() => {
+              setSearchQuery('')
+              setAssigneeFilter('all')
+            }}
+            onGoToTeam={goToTeam}
+          />
+        ) : null}
+
+        {viewState === 'empty_first_use' ? (
+          <CollabEmptyState
+            variant="first_use"
+            onCreatePost={goToNewPost}
+            onClearFilters={() => {
+              setSearchQuery('')
+              setAssigneeFilter('all')
+            }}
+            onGoToTeam={goToTeam}
+          />
+        ) : null}
+
+        {viewState === 'empty_filtered' ? (
+          <CollabEmptyState
+            variant="filtered"
+            onCreatePost={goToNewPost}
+            onClearFilters={() => {
+              setSearchQuery('')
+              setAssigneeFilter('all')
+            }}
+            onGoToTeam={goToTeam}
+          />
+        ) : null}
+
+        {viewState === 'ready' ? (
           <KanbanBoard
             content={filteredContent}
             onStatusChange={handleStatusChange}
@@ -297,7 +416,7 @@ export default function CollaborationPage() {
             teamMembers={teamMembers}
             onAssign={handleAssign}
           />
-        )}
+        ) : null}
       </div>
     </div>
   )

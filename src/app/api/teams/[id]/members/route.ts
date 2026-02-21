@@ -1,6 +1,35 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+type MemberUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+}
+
+type TeamMemberRow = {
+  id: string
+  role: string
+  joined_at: string
+  user?: MemberUser | MemberUser[] | null
+  [key: string]: unknown
+}
+
+function normalizeMemberUser(user: MemberUser | MemberUser[] | null | undefined) {
+  const source = Array.isArray(user) ? user[0] : user
+  if (!source) return null
+  const name = source.full_name ?? source.name ?? null
+  return {
+    id: source.id,
+    email: source.email ?? null,
+    name,
+    full_name: source.full_name ?? name,
+    avatar_url: source.avatar_url ?? null,
+  }
+}
+
 // GET /api/teams/[id]/members - List team members
 export async function GET(
   request: Request,
@@ -11,9 +40,7 @@ export async function GET(
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
 
     // Get team members with user details
     const { data, error } = await supabase
@@ -21,7 +48,7 @@ export async function GET(
       .select(`
         id,
         role,
-        joined_at,
+        joined_at:created_at,
         user:users(
           id,
           email,
@@ -33,13 +60,21 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching team members:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json(
+        { error: error.message || 'Failed to fetch team members', code: 'members_fetch_failed' },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ data })
+    const normalized = ((data as TeamMemberRow[] | null) || []).map((member) => ({
+      ...member,
+      user: normalizeMemberUser(member.user),
+    }))
+
+    return NextResponse.json({ data: normalized })
   } catch (error) {
     console.error('Error in GET /api/teams/[id]/members:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error', code: 'internal_server_error' }, { status: 500 })
   }
 }
 

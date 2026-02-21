@@ -1,6 +1,58 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+type ApiErrorCode =
+  | 'unauthorized'
+  | 'content_fetch_failed'
+  | 'content_create_failed'
+  | 'internal_server_error'
+  | 'validation_error'
+
+type RawUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+}
+
+type ContentRow = {
+  id: string
+  createdBy?: RawUser | RawUser[] | null
+  assignedTo?: RawUser | RawUser[] | null
+  [key: string]: unknown
+}
+
+type ActivityRow = {
+  content_id: string
+  created_at: string
+  user?: RawUser | RawUser[] | null
+  [key: string]: unknown
+}
+
+function apiError(
+  error: string,
+  status: number,
+  code: ApiErrorCode,
+  retryable: boolean
+) {
+  return NextResponse.json({ error, code, retryable }, { status })
+}
+
+function normalizeUser(user: RawUser | RawUser[] | null | undefined) {
+  const source = Array.isArray(user) ? user[0] : user
+  if (!source) return null
+
+  const name = source.full_name ?? source.name ?? null
+  return {
+    id: source.id,
+    email: source.email ?? null,
+    name,
+    full_name: source.full_name ?? name,
+    avatar_url: source.avatar_url ?? null,
+  }
+}
+
 // GET /api/content - List all content
 export async function GET() {
   try {
@@ -9,16 +61,14 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
     const { data, error } = await supabase
       .from('content')
       .select(`
         *,
-        createdBy:created_by(id, name, email, avatar_url),
-        assignedTo:assigned_to(id, name, email, avatar_url),
+        createdBy:created_by(id, full_name, email, avatar_url),
+        assignedTo:assigned_to(id, full_name, email, avatar_url),
         comments:comments(id),
         comment_count:comments(count)
       `)
@@ -26,7 +76,7 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching content:', error)
-      return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 })
+      return apiError('Failed to fetch content', 500, 'content_fetch_failed', true)
     }
 
     if (!data || data.length === 0) {
@@ -39,30 +89,40 @@ export async function GET() {
       .select(`
         content_id,
         created_at,
-        user:user_id(id, name, email, avatar_url)
+        user:user_id(id, full_name, email, avatar_url)
       `)
       .in('content_id', contentIds)
       .order('created_at', { ascending: false })
 
     const activityCount: Record<string, number> = {}
-    const latestActivity: Record<string, unknown> = {}
-    ;(activities || []).forEach((activity: any) => {
+    const latestActivity: Record<string, ActivityRow> = {}
+    ;((activities as ActivityRow[] | null) || []).forEach((activity) => {
       activityCount[activity.content_id] = (activityCount[activity.content_id] || 0) + 1
       if (!latestActivity[activity.content_id]) {
         latestActivity[activity.content_id] = activity
       }
     })
 
-    const enriched = data.map((item: any) => ({
-      ...item,
-      latest_activity: latestActivity[item.id] || null,
-      activity_count: activityCount[item.id] || 0,
-    }))
+    const enriched = (data as ContentRow[]).map((item) => {
+      const latest = latestActivity[item.id]
+      return {
+        ...item,
+        createdBy: normalizeUser(item.createdBy),
+        assignedTo: normalizeUser(item.assignedTo),
+        latest_activity: latest
+          ? {
+              ...latest,
+              user: normalizeUser(latest.user),
+            }
+          : null,
+        activity_count: activityCount[item.id] || 0,
+      }
+    })
 
     return NextResponse.json({ data: enriched })
   } catch (error) {
     console.error('Error in GET /api/content:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500, 'internal_server_error', true)
   }
 }
 
@@ -74,15 +134,13 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return apiError('Unauthorized', 401, 'unauthorized', false)
 
     const body = await request.json()
     const { title, blocks, platforms, status, scheduled_at, team_id } = body
 
     if (!title || !team_id) {
-      return NextResponse.json({ error: 'Title and team_id are required' }, { status: 400 })
+      return apiError('Title and team_id are required', 400, 'validation_error', false)
     }
 
     const { data, error } = await supabase
@@ -98,18 +156,26 @@ export async function POST(request: Request) {
       })
       .select(`
         *,
-        createdBy:created_by(id, name, email, avatar_url)
+        createdBy:created_by(id, full_name, email, avatar_url)
       `)
       .single()
 
     if (error) {
       console.error('Error creating content:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return apiError(error.message || 'Failed to create content', 500, 'content_create_failed', true)
     }
 
-    return NextResponse.json({ data }, { status: 201 })
+    return NextResponse.json(
+      {
+        data: {
+          ...data,
+          createdBy: normalizeUser((data as ContentRow).createdBy),
+        },
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error in POST /api/content:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return apiError('Internal server error', 500, 'internal_server_error', true)
   }
 }
