@@ -70,8 +70,26 @@ export async function POST(request: Request) {
 
     if (teamError) {
       console.error('Error creating team:', teamError)
-      const status = teamError.code === '23505' ? 409 : 500
-      return NextResponse.json({ error: teamError.message }, { status })
+      const message = teamError.message || 'Failed to create team'
+      const isUniqueViolation = teamError.code === '23505'
+      const isMissingTable =
+        teamError.code === '42P01' ||
+        message.includes("Could not find the table 'public.teams'") ||
+        message.includes('relation "public.teams" does not exist')
+
+      if (isMissingTable) {
+        return NextResponse.json(
+          {
+            error:
+              'Database schema is not initialized (missing public.teams). Apply Supabase migrations before onboarding.',
+            code: 'schema_not_initialized',
+          },
+          { status: 500 }
+        )
+      }
+
+      const status = isUniqueViolation ? 409 : 500
+      return NextResponse.json({ error: message }, { status })
     }
 
     // Add user as owner
