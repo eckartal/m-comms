@@ -1,412 +1,356 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
-import { PublishControls } from '@/components/publish/PublishControls'
-import { useAppStore, useContentStore } from '@/stores'
-import { createContent, updateContent } from '@/stores'
-import type { PlatformType } from '@/types'
-import {
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { connectPlatform, getConnectErrorMessage } from '@/lib/oauth/connectPlatform'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import type { Content, PlatformType } from '@/types'
+import { cn } from '@/lib/utils'
+import { useAppStore, useContentStore } from '@/stores'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
-import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
-import { useConnectionMode } from '@/hooks/useConnectionMode'
-import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
 import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
+import { PublishControls } from '@/components/publish/PublishControls'
+import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import {
+  COMPOSER_PLATFORMS,
+  isSupportedPlatform,
+  serializeThreadToBlocks,
+  type ThreadItem,
+} from '@/components/composer/composerShared'
+import { useComposerPlatforms } from '@/components/composer/useComposerPlatforms'
 
-// Platform configurations with character limits
-const PLATFORMS: Record<PlatformType, { name: string; limit: number; icon: string }> = {
-  twitter: { name: 'X (Twitter)', limit: 280, icon: '𝕏' },
-  linkedin: { name: 'LinkedIn', limit: 3000, icon: 'in' },
-  instagram: { name: 'Instagram', limit: 2200, icon: '📷' },
-  tiktok: { name: 'TikTok', limit: 2200, icon: '🎵' },
-  youtube: { name: 'YouTube', limit: 5000, icon: '▶️' },
-  threads: { name: 'Threads', limit: 500, icon: '💬' },
-  bluesky: { name: 'Bluesky', limit: 300, icon: '🔵' },
-  mastodon: { name: 'Mastodon', limit: 500, icon: '🐘' },
-  facebook: { name: 'Facebook', limit: 63000, icon: 'f' },
+async function parseRequestError(response: Response, fallbackMessage: string) {
+  const body = await response.json().catch(() => null)
+  const message = typeof body?.error === 'string' ? body.error : fallbackMessage
+  throw new Error(message)
 }
 
-
-// Thread item type
-interface ThreadItem {
-  id: string
-  content: string
+type ContentMutationPayload = {
+  title: string
+  blocks: Content['blocks']
+  platforms: Content['platforms']
+  status?: Content['status']
+  scheduled_at?: string | null
 }
 
-type PlatformAccountItem = {
-  id: string
-  account_name: string
-  account_handle?: string | null
-  source?: 'real_oauth' | 'local_sandbox' | 'unknown'
-}
-
-type PlatformCatalogItem = {
-  id: string
-  name: string
-  connected: boolean
-  accounts: PlatformAccountItem[]
-  publishable?: boolean
-  support_status?: 'publish_ready' | 'connect_only' | 'internal'
-  oauth_configured?: boolean
-}
-
-const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
-
-function isSupportedPlatform(id: string): id is PlatformType {
-  return SUPPORTED_PLATFORM_KEYS.has(id)
+function emitContentUpdated(content: Content, teamId?: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent('content:updated', {
+      detail: {
+        content,
+        team_id: teamId,
+      },
+    })
+  )
 }
 
 export default function NewContentPage() {
   const router = useRouter()
-  const pathname = usePathname()
   const params = useParams()
-  const searchParams = useSearchParams()
   const teamSlug = params.teamSlug as string
   const { currentUser, currentTeam } = useAppStore()
   const { saving, setSaving } = useContentStore()
 
   const [contentId, setContentId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
-  const [thread, setThread] = useState<ThreadItem[]>([{ id: '1', content: '' }])
+  const [thread, setThread] = useState<ThreadItem[]>([{ id: 'thread-1', content: '' }])
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformType[]>(['twitter'])
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
-  const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
-  const [platformCatalog, setPlatformCatalog] = useState<PlatformCatalogItem[]>([])
-  const [publishablePlatforms, setPublishablePlatforms] = useState<Set<PlatformType>>(new Set(['twitter', 'linkedin']))
-  const [connectionsLoading, setConnectionsLoading] = useState(true)
-  const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
+  const [isScheduling, setIsScheduling] = useState(false)
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null)
   const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
-  const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<PlatformType | null>(null)
-  const { mode: connectionMode } = useConnectionMode(teamSlug)
+  const [hasHydratedDraft, setHasHydratedDraft] = useState(false)
+  const isCreatingInitialRecord = useRef(false)
+
+  const {
+    connectedPlatforms,
+    publishablePlatforms,
+    connectionsLoading,
+    connectingPlatform,
+    sandboxConnectPlatform,
+    setSandboxConnectPlatform,
+    fetchConnectedPlatforms,
+    connectFromComposer,
+    confirmSandboxConnect,
+    composerPlatformRows,
+  } = useComposerPlatforms({
+    teamSlug,
+    returnTo: `/${teamSlug}/content/new`,
+  })
 
   const currentContent = thread[activeIndex]?.content || ''
   const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
+  const hasContent = thread.some((item) => item.content.trim().length > 0)
+  const hasDraftInput = hasContent || title.trim().length > 0
   const isSaved = !saving
   const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
+
   const publishTargets = useMemo(() => {
     const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
     return Array.from(new Set(targets))
   }, [targetPlatforms, selectedPlatform])
+
   const targetSummary = useMemo(
-    () => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '),
+    () => publishTargets.map((platform) => COMPOSER_PLATFORMS[platform].name).join(', '),
     [publishTargets]
   )
-  const platformRows = useMemo(
-    () => (platformCatalog.length > 0
-      ? platformCatalog.filter((platform) => isSupportedPlatform(platform.id))
-      : (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
-          id: platform,
-          name: PLATFORMS[platform].name,
-          connected: connectedPlatforms.includes(platform),
-          accounts: [],
-        }))
-    ) as PlatformCatalogItem[],
-    [platformCatalog, connectedPlatforms]
-  )
-  const composerPlatformRows = useMemo<ComposerPlatformRow[]>(
-    () =>
-      platformRows.map((platform) => {
-        const platformId = platform.id as PlatformType
-        const primaryAccount = platform.accounts[0]
-        return {
-          id: platformId,
-          name: platform.name,
-          connected: connectedPlatforms.includes(platformId),
-          isPublishable: publishablePlatforms.has(platformId),
-          accountLabel: primaryAccount
-            ? `${primaryAccount.account_name}${primaryAccount.account_handle ? ` • ${primaryAccount.account_handle}` : ''}${primaryAccount.source === 'local_sandbox' ? ' • Sandbox' : ''}`
-            : undefined,
-        }
-      }),
-    [platformRows, connectedPlatforms, publishablePlatforms]
+  const hasPublishReadyTarget = useMemo(
+    () => publishTargets.some((platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)),
+    [publishTargets, connectedPlatforms, publishablePlatforms]
   )
 
-  const fetchConnectedPlatforms = useCallback(async () => {
-    try {
-      setConnectionsLoading(true)
-      const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
-      const data = await res.json()
-      const localConnected = getLocalConnectedPlatforms(teamSlug, currentTeam?.id)
-      const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
-      if (!res.ok) {
-        setConnectedPlatforms(localConnected as PlatformType[])
-        setPlatformCatalog([])
-        setPublishablePlatforms(new Set(['twitter', 'linkedin']))
-        return
+  const buildMutationPayload = useCallback(
+    (override?: Partial<Pick<ContentMutationPayload, 'status' | 'scheduled_at'>>): ContentMutationPayload => ({
+      title: title.trim() || 'Untitled post',
+      blocks: serializeThreadToBlocks(thread),
+      platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
+      status: override?.status,
+      scheduled_at: override?.scheduled_at,
+    }),
+    [title, thread, publishTargets]
+  )
+
+  const createContentRecord = useCallback(
+    async (payload: ContentMutationPayload) => {
+      if (!currentTeam?.id) throw new Error('Please select a team first.')
+
+      const response = await fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_id: currentTeam.id,
+          item_type: 'POST',
+          title: payload.title,
+          blocks: payload.blocks,
+          platforms: payload.platforms,
+          status: payload.status || 'DRAFT',
+          scheduled_at: payload.scheduled_at,
+        }),
+      })
+
+      if (!response.ok) {
+        await parseRequestError(response, 'Failed to create post')
       }
 
-      const catalog = ((data.data || []) as PlatformCatalogItem[])
-        .filter((platform) => isSupportedPlatform(platform.id))
-        .map((platform) => {
-          const localAccount = localConnections[platform.id]
-          if (!localAccount || platform.accounts.length > 0) return platform
-          return {
-            ...platform,
-            connected: true,
-            accounts: [
-              {
-                id: `local:${platform.id}`,
-                account_name: localAccount.account_name,
-                account_handle: localAccount.account_handle,
-                source: localAccount.source,
-              },
-            ],
+      const body = await response.json()
+      const created = body?.data as Content | undefined
+      if (!created) throw new Error('Post draft was not returned by server')
+      setContentId(created.id)
+      emitContentUpdated(created, currentTeam.id)
+      return created.id
+    },
+    [currentTeam?.id]
+  )
+
+  const updateContentRecord = useCallback(async (id: string, payload: ContentMutationPayload) => {
+    const response = await fetch(`/api/content/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      await parseRequestError(response, 'Failed to update post')
+    }
+
+    const body = await response.json().catch(() => null)
+    const updated = (body?.data as Content | undefined) || null
+    if (updated) {
+      emitContentUpdated(updated, currentTeam?.id)
+    }
+    return updated
+  }, [currentTeam?.id])
+
+  const persistDraft = useCallback(
+    async (override?: Partial<Pick<ContentMutationPayload, 'status' | 'scheduled_at'>>) => {
+      const payload = buildMutationPayload(override)
+      if (contentId) {
+        try {
+          await updateContentRecord(contentId, payload)
+          return contentId
+        } catch (error) {
+          if (error instanceof Error && /not found/i.test(error.message)) {
+            setContentId(null)
+            return createContentRecord(payload)
           }
-        })
-      setPlatformCatalog(catalog)
-      const publishableFromApi = ((data?.meta?.publishable_platforms || []) as string[])
-        .filter((id) => isSupportedPlatform(id))
-      setPublishablePlatforms(
-        publishableFromApi.length > 0
-          ? new Set(publishableFromApi as PlatformType[])
-          : new Set(['twitter', 'linkedin'])
-      )
+          throw error
+        }
+      }
+      return createContentRecord(payload)
+    },
+    [buildMutationPayload, contentId, createContentRecord, updateContentRecord]
+  )
 
-      const connected = catalog
-        .filter((platform) => platform.connected)
-        .map((platform) => platform.id as PlatformType)
-      const merged = Array.from(new Set([...connected, ...localConnected])) as PlatformType[]
-      setConnectedPlatforms(merged)
-    } catch (error) {
-      console.error('Failed to fetch connected platforms for composer:', error)
-      setConnectedPlatforms(getLocalConnectedPlatforms(teamSlug, currentTeam?.id) as PlatformType[])
-      setPlatformCatalog([])
-      setPublishablePlatforms(new Set(['twitter', 'linkedin']))
-    } finally {
-      setConnectionsLoading(false)
-    }
-  }, [teamSlug, currentTeam?.id])
-
-  const runConnectPlatform = async (platform: PlatformType, skipSandboxConfirmation = false) => {
-    setConnectingPlatform(platform)
-
-    try {
-      await connectPlatform({
-        platform,
-        teamId: currentTeam?.id,
-        teamSlug,
-        returnTo: `/${teamSlug}/content/new`,
-        mode: 'popup',
-        source: 'composer',
-        skipSandboxConfirmation,
-        onSuccess: async () => {
-          await fetchConnectedPlatforms()
-        },
-      })
-    } catch (error) {
-      console.error('Failed to connect from composer:', error)
-    } finally {
-      setConnectingPlatform(null)
-    }
-  }
-
-  const handleConnectPlatform = async (platform: PlatformType) => {
-    const selected = platformCatalog.find((item) => item.id === platform)
-    const requiresConfiguration = connectionMode === 'real_oauth' && selected?.oauth_configured === false
-    if (requiresConfiguration) {
-      toast.error(`${selected?.name || platform} is not configured. Add client credentials first.`)
-      return
-    }
-
-    if (connectionMode === 'local_sandbox') {
-      setSandboxConnectPlatform(platform)
-      return
-    }
-    await runConnectPlatform(platform)
-  }
-
-  // Load saved draft from localStorage on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(`draft_${teamSlug}`)
-    if (savedDraft) {
-      try {
-        const data = JSON.parse(savedDraft)
-        if (data.thread && Array.isArray(data.thread) && data.thread.length > 0) {
-          setThread(data.thread)
-          setActiveIndex(data.thread.length - 1)
-        }
-        setSelectedPlatform((data.platform as PlatformType) || 'twitter')
-        if (Array.isArray(data.targets)) {
-          const savedTargets = data.targets.filter((id: string) => isSupportedPlatform(id)) as PlatformType[]
-          setTargetPlatforms(savedTargets.length > 0 ? savedTargets : ['twitter'])
-        }
-        setIsBookmarked(data.bookmarked || false)
-      } catch (e) {
-        console.error('Failed to load draft', e)
+    if (!savedDraft) {
+      setHasHydratedDraft(true)
+      return
+    }
+
+    try {
+      const data = JSON.parse(savedDraft)
+      if (typeof data.contentId === 'string' && data.contentId.trim().length > 0) {
+        setContentId(data.contentId)
       }
+      if (Array.isArray(data.thread) && data.thread.length > 0) {
+        setThread(data.thread)
+        setActiveIndex(data.thread.length - 1)
+      }
+      if (typeof data.platform === 'string' && isSupportedPlatform(data.platform)) {
+        setSelectedPlatform(data.platform)
+      }
+      if (Array.isArray(data.targets)) {
+        const savedTargets = data.targets.filter((id: string) => isSupportedPlatform(id)) as PlatformType[]
+        setTargetPlatforms(savedTargets.length > 0 ? savedTargets : ['twitter'])
+      }
+      setIsBookmarked(Boolean(data.bookmarked))
+    } catch (error) {
+      console.error('Failed to load draft', error)
+    } finally {
+      setHasHydratedDraft(true)
     }
   }, [teamSlug])
 
   useEffect(() => {
-    fetchConnectedPlatforms()
+    void fetchConnectedPlatforms()
   }, [fetchConnectedPlatforms])
 
   useEffect(() => {
-    if (connectedPlatforms.includes(selectedPlatform) && !targetPlatforms.includes(selectedPlatform)) {
-      setTargetPlatforms((prev) => [...prev, selectedPlatform])
-    }
+    if (!connectedPlatforms.includes(selectedPlatform)) return
+    if (targetPlatforms.includes(selectedPlatform)) return
+    setTargetPlatforms((prev) => [...prev, selectedPlatform])
   }, [selectedPlatform, connectedPlatforms, targetPlatforms])
 
   useEffect(() => {
-    const connected = searchParams.get('connected')
-    const error = searchParams.get('error')
+    if (!hasHydratedDraft || !currentTeam?.id || contentId) return
+    if (isCreatingInitialRecord.current) return
 
-    if (connected) {
-      toast.success(`${connected.charAt(0).toUpperCase() + connected.slice(1)} connected.`)
-      if (Object.keys(PLATFORMS).includes(connected)) {
-        setSelectedPlatform(connected as PlatformType)
-      }
-      fetchConnectedPlatforms()
-    }
+    isCreatingInitialRecord.current = true
+    setSaving(true)
 
-    if (error) {
-      toast.error(`Connection failed: ${getConnectErrorMessage(decodeURIComponent(error))}`)
-    }
+    void createContentRecord(buildMutationPayload({ status: 'DRAFT', scheduled_at: null }))
+      .catch((error) => {
+        console.error('Failed to initialize post draft:', error)
+      })
+      .finally(() => {
+        isCreatingInitialRecord.current = false
+        setSaving(false)
+      })
+  }, [
+    hasHydratedDraft,
+    currentTeam?.id,
+    contentId,
+    setSaving,
+    createContentRecord,
+    buildMutationPayload,
+  ])
 
-    if (connected || error) {
-      router.replace(pathname)
-    }
-  }, [searchParams, fetchConnectedPlatforms, router, pathname])
-
-  // Auto-save to Supabase and localStorage
   useEffect(() => {
     const timer = setTimeout(async () => {
-      const blocks = thread.map((item) => ({
-        id: item.id,
-        type: 'text' as const,
-        content: { text: item.content }
-      }))
-
       const draftData = {
+        contentId,
         thread,
         platform: selectedPlatform,
         targets: targetPlatforms,
         bookmarked: isBookmarked,
-        savedAt: new Date().toISOString()
+        savedAt: new Date().toISOString(),
       }
-
-      // Save to localStorage
       localStorage.setItem(`draft_${teamSlug}`, JSON.stringify(draftData))
 
-      // If we have a contentId, sync to Supabase
-      if (contentId && currentTeam) {
-        setSaving(true)
-        await updateContent(contentId, {
-          title: title || 'Untitled',
-          blocks,
-          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-        })
+      if (!currentTeam?.id || !contentId || !hasDraftInput) return
+
+      setSaving(true)
+      try {
+        await updateContentRecord(contentId, buildMutationPayload({ status: 'DRAFT', scheduled_at: null }))
+      } catch (error) {
+        console.error('Failed to autosave post draft:', error)
+        if (error instanceof Error && /not found/i.test(error.message)) {
+          setContentId(null)
+        }
+      } finally {
         setSaving(false)
       }
     }, 1000)
+
     return () => clearTimeout(timer)
-  }, [thread, selectedPlatform, targetPlatforms, isBookmarked, teamSlug, contentId, currentTeam, title, setSaving, publishTargets])
+  }, [
+    thread,
+    selectedPlatform,
+    targetPlatforms,
+    isBookmarked,
+    teamSlug,
+    contentId,
+    hasDraftInput,
+    currentTeam?.id,
+    setSaving,
+    updateContentRecord,
+    buildMutationPayload,
+  ])
 
-  // Handle text change
   const handleContentChange = (index: number, value: string) => {
-    const newThread = [...thread]
-    newThread[index] = { ...newThread[index], content: value }
-    setThread(newThread)
+    setThread((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, content: value } : item)))
   }
 
-  // Add new tweet
-  const addTweet = () => {
-    const newId = Date.now().toString()
-    setThread([...thread, { id: newId, content: '' }])
+  const addThreadItem = useCallback(() => {
+    const newId = `thread-${Date.now()}`
+    setThread((prev) => [...prev, { id: newId, content: '' }])
     setActiveIndex(thread.length)
-  }
+  }, [thread.length])
 
-  // Remove tweet
-  const removeTweet = (index: number) => {
+  const removeThreadItem = (index: number) => {
     if (thread.length === 1) {
-      setThread([{ id: '1', content: '' }])
+      setThread([{ id: thread[0]?.id || 'thread-1', content: '' }])
       setActiveIndex(0)
       return
     }
-    const newThread = thread.filter((_, i) => i !== index)
-    setThread(newThread)
-    setActiveIndex(Math.min(index, newThread.length - 1))
+    const next = thread.filter((_, itemIndex) => itemIndex !== index)
+    setThread(next)
+    setActiveIndex(Math.min(index, next.length - 1))
   }
 
   const toggleTargetPlatform = (platform: PlatformType) => {
     if (!connectedPlatforms.includes(platform)) return
-
-    setTargetPlatforms((prev) => {
-      if (prev.includes(platform)) {
-        return prev.filter((item) => item !== platform)
-      }
-      return [...prev, platform]
-    })
+    setTargetPlatforms((prev) =>
+      prev.includes(platform) ? prev.filter((item) => item !== platform) : [...prev, platform]
+    )
   }
 
-  const handlePublish = async () => {
-    const hasContent = thread.some(t => t.content.trim().length > 0)
-    if (!hasContent || !currentTeam) return
+  const handlePublish = useCallback(async () => {
+    if (!hasContent) return
 
     const eligibleTargets = publishTargets.filter(
       (platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)
     )
 
     if (eligibleTargets.length === 0) {
-      toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
+      toast.error('Select at least one publish-ready channel.')
       return
     }
 
     setIsPublishing(true)
-
     try {
-      const blocks = thread.map((item) => ({
-        id: item.id || Date.now().toString(),
-        type: 'text' as const,
-        content: { text: item.content }
-      }))
-
-      let resolvedContentId = contentId
-
-      // Create content in Supabase if not exists.
-      if (!resolvedContentId) {
-        const newContent = await createContent(currentTeam.id, {
-          title: title || 'Untitled',
-          blocks,
-          status: 'DRAFT',
-        })
-        if (!newContent) throw new Error('Failed to create content before publishing')
-        resolvedContentId = newContent.id
-        setContentId(newContent.id)
-      }
-
-      if (!resolvedContentId) throw new Error('Missing content id after create')
-      const finalContentId = resolvedContentId
-
-      const updateOk = await updateContent(finalContentId, {
-        title: title || 'Untitled',
-        blocks,
-        status: 'DRAFT',
-        platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-      })
-      if (!updateOk) throw new Error('Failed to save latest changes before publishing')
-
-      const publishResponse = await fetch(`/api/content/${finalContentId}/publish`, {
+      const resolvedContentId = await persistDraft({ status: 'DRAFT', scheduled_at: null })
+      const publishResponse = await fetch(`/api/content/${resolvedContentId}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platforms: eligibleTargets }),
       })
 
-      const publishData = await publishResponse.json()
+      const publishData = await publishResponse.json().catch(() => null)
       if (!publishResponse.ok) {
-        throw new Error(publishData?.error || 'Publish request failed')
+        throw new Error((publishData as { error?: string } | null)?.error || 'Publish request failed')
       }
 
-      const successful = Number(publishData?.data?.summary?.successful || 0)
-      const failed = Number(publishData?.data?.summary?.failed || 0)
-
+      const successful = Number(
+        (publishData as { data?: { summary?: { successful?: number } } } | null)?.data?.summary?.successful || 0
+      )
+      const failed = Number(
+        (publishData as { data?: { summary?: { failed?: number } } } | null)?.data?.summary?.failed || 0
+      )
       if (successful === 0) {
         throw new Error('No platforms were published successfully')
       }
@@ -425,109 +369,107 @@ export default function NewContentPage() {
     } finally {
       setIsPublishing(false)
     }
-  }
+  }, [
+    connectedPlatforms,
+    hasContent,
+    persistDraft,
+    publishTargets,
+    publishablePlatforms,
+    router,
+    teamSlug,
+  ])
 
-  const handleSchedule = async (scheduledAt: Date = new Date()) => {
-    const hasContent = thread.some(t => t.content.trim().length > 0)
+  const handleSchedule = useCallback(async (scheduledAt: Date = new Date(Date.now() + 60 * 60 * 1000)) => {
     if (!hasContent) return
 
-    const blocks = thread.map((item) => ({
-      id: item.id,
-      type: 'thread' as const,
-      content: { tweets: thread.map(t => ({ text: t.content })) }
-    }))
-
+    setIsScheduling(true)
     try {
-      if (!contentId && currentTeam) {
-        const newContent = await createContent(currentTeam.id, {
-          title: title || 'Untitled',
-          blocks,
-          status: 'SCHEDULED'
-        })
-        if (newContent) {
-          setContentId(newContent.id)
-          await updateContent(newContent.id, {
-            platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-          })
-        }
-      } else if (contentId) {
-        await updateContent(contentId, {
-          title: title || 'Untitled',
-          blocks,
-          status: 'SCHEDULED',
-          platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
-          scheduled_at: scheduledAt.toISOString()
-        })
-      }
-
+      await persistDraft({ status: 'SCHEDULED', scheduled_at: scheduledAt.toISOString() })
+      setScheduledDate(scheduledAt)
       localStorage.removeItem(`draft_${teamSlug}`)
       router.push(`/${teamSlug}/content`)
     } catch (error) {
       console.error('Error scheduling:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to schedule')
+    } finally {
+      setIsScheduling(false)
     }
-  }
+  }, [hasContent, persistDraft, router, teamSlug])
 
-  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault()
-        handlePublish()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault()
+        void handlePublish()
       }
-      // Cmd+Enter to add new tweet when in last tweet
-      if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown' && activeIndex === thread.length - 1 && currentContent.length > 0) {
-        e.preventDefault()
-        addTweet()
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key === 'ArrowDown' &&
+        activeIndex === thread.length - 1 &&
+        currentContent.length > 0
+      ) {
+        event.preventDefault()
+        addThreadItem()
       }
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [activeIndex, thread.length, currentContent, addTweet, handlePublish])
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [activeIndex, thread.length, currentContent, addThreadItem, handlePublish])
 
   return (
     <div className="flex min-h-full flex-col bg-background">
-      {/* Account Header */}
       <header className="border-b border-border">
         <DashboardContainer className="max-w-[680px] py-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[14px] font-medium text-foreground">
-                Logged in as @{currentUser?.email?.split('@')[0] || 'user'}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h1 className="text-[15px] font-semibold text-foreground">New Post</h1>
+              <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Draft
               </span>
-              <div className="flex items-center gap-4">
-                {/* Thread count */}
-                {thread.length > 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    {thread.length} tweets
-                  </span>
-                )}
-                {/* Auto-save indicator */}
-                <span className={cn(
-                  'text-xs flex items-center gap-1',
-                  isSaved ? 'text-muted-foreground' : 'text-primary'
-                )}>
-                  <span className={cn(
-                    'w-2 h-2 rounded-full',
-                    isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
-                  )} />
-                  {isSaved ? 'Saved' : 'Saving...'}
-                </span>
-              </div>
+              {contentId ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/${teamSlug}/collaboration?focus=${encodeURIComponent(contentId)}`)
+                  }
+                  className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-foreground transition-colors hover:bg-accent"
+                >
+                  In Collaboration
+                </button>
+              ) : null}
             </div>
-
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Draft title (optional)"
-              className="w-full bg-transparent border border-border rounded-[8px] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Targets {publishTargets.length}
+              </span>
+              {thread.length > 1 ? (
+                <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {thread.length} blocks
+                </span>
+              ) : null}
+              <span
+                className={cn(
+                  'rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide flex items-center gap-1',
+                  isSaved ? 'text-muted-foreground' : 'text-primary'
+                )}
+              >
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
+                  )}
+                />
+                {isSaved ? 'Saved' : 'Saving...'}
+              </span>
+            </div>
           </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            @{currentUser?.email?.split('@')[0] || 'user'}
+          </p>
         </DashboardContainer>
       </header>
 
-      {/* Composition Area */}
       <div className="flex-1 overflow-y-auto">
         <DashboardContainer className="max-w-[680px] py-6">
           <PostComposerWorkspace
@@ -537,13 +479,13 @@ export default function NewContentPage() {
             activeIndex={activeIndex}
             onActiveIndexChange={setActiveIndex}
             onThreadItemChange={handleContentChange}
-            onAddThreadItem={addTweet}
-            onRemoveThreadItem={removeTweet}
+            onAddThreadItem={addThreadItem}
+            onRemoveThreadItem={removeThreadItem}
             isBookmarked={isBookmarked}
-            onToggleBookmark={() => setIsBookmarked(!isBookmarked)}
+            onToggleBookmark={() => setIsBookmarked((prev) => !prev)}
             selectedPlatform={selectedPlatform}
             onSelectedPlatformChange={setSelectedPlatform}
-            platformMeta={PLATFORMS}
+            platformMeta={COMPOSER_PLATFORMS}
             publishTargets={publishTargets}
             targetSummary={targetSummary}
             onToggleTargetPlatform={toggleTargetPlatform}
@@ -551,26 +493,27 @@ export default function NewContentPage() {
             selectedPlatformPublishable={publishablePlatforms.has(selectedPlatform)}
             connectionsLoading={connectionsLoading}
             connectingPlatform={connectingPlatform}
-            onConnectPlatform={handleConnectPlatform}
+            onConnectPlatform={connectFromComposer}
             platformPickerOpen={platformPickerOpen}
             onPlatformPickerOpenChange={setPlatformPickerOpen}
-            platformRows={composerPlatformRows}
+            platformRows={composerPlatformRows as ComposerPlatformRow[]}
             footerSection={
               <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
                 <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    Targets: {targetSummary}
-                  </span>
+                  <span>Targets: {targetSummary}</span>
                   {thread.length > 1 ? (
-                    <span>{totalCharacters.toLocaleString()} chars • {thread.length} tweets</span>
+                    <span>{totalCharacters.toLocaleString()} chars • {thread.length} blocks</span>
                   ) : null}
                 </div>
                 <PublishControls
-                  onPublish={handlePublish}
-                  onSchedule={handleSchedule}
+                  onPublish={() => void handlePublish()}
+                  onSchedule={(date) => handleSchedule(date)}
                   isPublishing={isPublishing}
-                  disabled={totalCharacters === 0}
-                  scheduledDate={null}
+                  isScheduling={isScheduling}
+                  scheduleDisabled={!hasContent}
+                  publishDisabled={!hasContent || !hasPublishReadyTarget}
+                  publishHint={hasContent && !hasPublishReadyTarget ? 'Select a publish-ready target.' : null}
+                  scheduledDate={scheduledDate}
                 />
               </div>
             }
@@ -580,13 +523,9 @@ export default function NewContentPage() {
 
       <SandboxConfirmDialog
         open={Boolean(sandboxConnectPlatform)}
-        platformName={sandboxConnectPlatform ? PLATFORMS[sandboxConnectPlatform].name : 'platform'}
+        platformName={sandboxConnectPlatform ? COMPOSER_PLATFORMS[sandboxConnectPlatform].name : 'platform'}
         onCancel={() => setSandboxConnectPlatform(null)}
-        onConfirm={async () => {
-          const platform = sandboxConnectPlatform
-          setSandboxConnectPlatform(null)
-          if (platform) await runConnectPlatform(platform, true)
-        }}
+        onConfirm={() => void confirmSandboxConnect()}
       />
     </div>
   )

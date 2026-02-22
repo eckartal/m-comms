@@ -119,7 +119,9 @@ export default function CollaborationPage() {
   const [linkedIdeaError, setLinkedIdeaError] = useState<string | null>(null)
   const hasTrackedViewLoaded = useRef(false)
   const lastTrackedEmptyState = useRef<string | null>(null)
+  const handledFocusContentId = useRef<string | null>(null)
   const quickFilterFromQuery = parseQuickFilter(searchParams.get('quickFilter'))
+  const focusContentId = searchParams.get('focus')
 
   useEffect(() => {
     setQuickFilter(quickFilterFromQuery)
@@ -249,6 +251,46 @@ export default function CollaborationPage() {
       window.removeEventListener('content:updated', onContentUpdated as EventListener)
     }
   }, [currentTeam?.id, loadData, setContents])
+
+  useEffect(() => {
+    if (!focusContentId || !routeTeamSlug || isLoading) return
+    if (handledFocusContentId.current === focusContentId) return
+
+    const focusedItem = content.find((item) => item.id === focusContentId)
+    if (!focusedItem) return
+
+    setSearchQuery('')
+    setAssigneeFilter('all')
+    setQuickFilter('all')
+    setItemTypeFilter('all')
+    setView('kanban')
+    setActionError(null)
+
+    if ((focusedItem.item_type || 'POST') === 'IDEA') {
+      setSelectedIdeaId(focusedItem.id)
+      setIsIdeaPanelOpen(true)
+      setIsPostPanelOpen(false)
+      setSelectedPostId(null)
+    } else {
+      setSelectedPostId(focusedItem.id)
+      setIsPostPanelOpen(true)
+      setIsIdeaPanelOpen(false)
+      setSelectedIdeaId(null)
+    }
+
+    handledFocusContentId.current = focusContentId
+
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete('focus')
+    const queryString = nextParams.toString()
+    router.replace(queryString ? `/${routeTeamSlug}/collaboration?${queryString}` : `/${routeTeamSlug}/collaboration`)
+  }, [focusContentId, routeTeamSlug, isLoading, content, router, searchParams])
+
+  useEffect(() => {
+    if (!focusContentId) {
+      handledFocusContentId.current = null
+    }
+  }, [focusContentId])
 
   const handleStatusChange = async (contentId: string, newStatus: Content['status']) => {
     const previous = content
