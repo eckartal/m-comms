@@ -472,8 +472,6 @@ export function PostComposerWorkspace({
             <div className="space-y-0 px-3 py-2">
               {thread.map((item, index) => {
                 const isActive = activeIndex === index
-                const itemCharCount = item.content.length
-                const itemOverLimit = itemCharCount > maxChars
                 const showThreadIndex = thread.length > 1
 
                 return (
@@ -528,12 +526,6 @@ export function PostComposerWorkspace({
                                 </button>
                               ) : null}
                             </div>
-
-                            <span
-                              className={`text-[12px] tabular-nums ${itemOverLimit ? 'text-red-500' : itemCharCount > maxChars * 0.8 ? 'text-amber-500' : 'text-muted-foreground'}`}
-                            >
-                              {itemCharCount} / {maxChars}
-                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -580,7 +572,7 @@ export function PostComposerWorkspace({
                       fileInputRef.current?.click()
                     }}
                     className={cn(
-                      'inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors',
+                      'inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors',
                       isSyncedReadOnlyEditor
                         ? 'cursor-not-allowed text-muted-foreground/50'
                         : 'text-sky-500 hover:bg-sky-500/10 hover:text-sky-400'
@@ -589,7 +581,7 @@ export function PostComposerWorkspace({
                     aria-label="Add image or video"
                     disabled={isSyncedReadOnlyEditor}
                   >
-                    <ImageIcon className="h-4 w-4" />
+                    <ImageIcon className="h-5 w-5" />
                   </button>
                 </div>
                 <span
@@ -604,7 +596,6 @@ export function PostComposerWorkspace({
                   {characterCount} / {maxChars}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Cmd/Ctrl + Enter to publish</p>
             </div>
           </>
         )}
