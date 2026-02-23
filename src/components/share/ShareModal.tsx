@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -30,9 +30,10 @@ export function ShareModal({
   const [permission, setPermission] = useState<SharePermission>('comment')
   const [copied, setCopied] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const isOpen = open ?? internalOpen
+  const isControlled = typeof open === 'boolean'
+  const isOpen = isControlled ? Boolean(open) : internalOpen
 
-  const fetchShareStatus = async () => {
+  const fetchShareStatus = useCallback(async () => {
     const response = await fetch(`/api/content/${contentId}/share`)
     if (response.ok) {
       const { data } = await response.json()
@@ -40,18 +41,21 @@ export function ShareModal({
       setShareUrl(data.shareUrl)
       setPermission((data.permission || 'comment') as SharePermission)
     }
-  }
+  }, [contentId])
 
-  const handleOpenChange = async (open: boolean) => {
+  const handleOpenChange = (open: boolean) => {
     if (onOpenChange) {
       onOpenChange(open)
-    } else {
+    }
+    if (!isControlled) {
       setInternalOpen(open)
     }
-    if (open) {
-      await fetchShareStatus()
-    }
   }
+
+  useEffect(() => {
+    if (!isOpen) return
+    void fetchShareStatus()
+  }, [isOpen, fetchShareStatus])
 
   const updateSettings = async (nextPermission: SharePermission) => {
     setIsLoading(true)
