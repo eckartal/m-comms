@@ -449,7 +449,7 @@ export function PostComposerWorkspace({
             onChange={(e) => onTitleChange(e.target.value)}
             aria-label="Post title"
             placeholder="Post title"
-            className="h-12 rounded-xl border-transparent bg-transparent px-0 text-[22px] font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+            className="h-12 rounded-xl border-transparent bg-transparent px-0 text-[22px] font-semibold text-zinc-900 placeholder:text-zinc-500 focus-visible:ring-0 dark:text-foreground dark:placeholder:text-muted-foreground"
           />
         </div>
 
