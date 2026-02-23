@@ -2,18 +2,28 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, usePathname } from 'next/navigation'
-import type { Content, ContentBlock, PlatformType } from '@/types'
+import type { Content, PlatformType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { getTicketKey, inferTitleFromNotes } from '@/lib/ticketPresentation'
-import { useAppStore, useContentStore } from '@/stores'
-import { connectPlatform } from '@/lib/oauth/connectPlatform'
-import { getLocalConnectedPlatforms, getLocalConnectionAccounts } from '@/lib/oauth/localConnections'
-import { useConnectionMode } from '@/hooks/useConnectionMode'
+import { useContentStore } from '@/stores'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Link2 } from 'lucide-react'
+import { Link2 } from 'lucide-react'
 import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
+import {
+  buildPlatformConfigs,
+  COMPOSER_PLATFORMS,
+  getEnabledTargets,
+  parsePlatformCopyConfig,
+  parseThreadFromBlocks,
+  serializeThreadToBlocks,
+  type PlatformCopyModeMap,
+  type PlatformCopyTextMap,
+  type ThreadItem,
+} from '@/components/composer/composerShared'
+import { useComposerPlatforms } from '@/components/composer/useComposerPlatforms'
+import { PublishControls } from '@/components/publish/PublishControls'
 
 type TeamMemberItem = {
   id: string
@@ -40,104 +50,9 @@ interface PostEditorPanelProps {
   onOpenFullEditor: (postId: string) => void
 }
 
-type ThreadItem = {
-  id: string
-  content: string
-}
-
-type PlatformAccountItem = {
-  id: string
-  account_name: string
-  account_handle?: string | null
-  source?: 'real_oauth' | 'local_sandbox' | 'unknown'
-}
-
-type PlatformCatalogItem = {
-  id: string
-  name: string
-  connected: boolean
-  accounts: PlatformAccountItem[]
-  oauth_configured?: boolean
-}
-
-const PLATFORMS: Record<PlatformType, { name: string; limit: number }> = {
-  twitter: { name: 'X (Twitter)', limit: 280 },
-  linkedin: { name: 'LinkedIn', limit: 3000 },
-  instagram: { name: 'Instagram', limit: 2200 },
-  tiktok: { name: 'TikTok', limit: 2200 },
-  youtube: { name: 'YouTube', limit: 5000 },
-  threads: { name: 'Threads', limit: 500 },
-  bluesky: { name: 'Bluesky', limit: 300 },
-  mastodon: { name: 'Mastodon', limit: 500 },
-  facebook: { name: 'Facebook', limit: 63000 },
-}
-
-const SUPPORTED_PLATFORM_KEYS = new Set(Object.keys(PLATFORMS))
-
-function isSupportedPlatform(id: string): id is PlatformType {
-  return SUPPORTED_PLATFORM_KEYS.has(id)
-}
-
-function extractBlockText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (content && typeof content === 'object') {
-    const value = (content as { text?: unknown }).text
-    if (typeof value === 'string') return value
-  }
-  return ''
-}
-
-function parseThreadFromBlocks(blocks: unknown): ThreadItem[] {
-  if (!Array.isArray(blocks) || blocks.length === 0) return [{ id: 'thread-1', content: '' }]
-
-  const items: ThreadItem[] = []
-  for (const rawBlock of blocks) {
-    const block = rawBlock as { id?: unknown; type?: unknown; content?: unknown } | null
-    if (!block || typeof block !== 'object') continue
-    const blockId = typeof block.id === 'string' ? block.id : `thread-${items.length + 1}`
-
-    if (block.type === 'thread' && block.content && typeof block.content === 'object') {
-      const tweets = (block.content as { tweets?: unknown }).tweets
-      if (Array.isArray(tweets)) {
-        for (const tweet of tweets) {
-          if (!tweet || typeof tweet !== 'object') continue
-          const tweetText = (tweet as { text?: unknown }).text
-          if (typeof tweetText === 'string') {
-            items.push({ id: `${blockId}-${items.length + 1}`, content: tweetText })
-          }
-        }
-      }
-      continue
-    }
-
-    const text = extractBlockText(block.content)
-    if (text.length > 0 || items.length === 0) items.push({ id: blockId, content: text })
-  }
-
-  return items.length > 0 ? items : [{ id: 'thread-1', content: '' }]
-}
-
-function serializeThreadToBlocks(thread: ThreadItem[]): ContentBlock[] {
-  return thread
-    .map((item, index) => ({
-      id: item.id || `thread-${index + 1}`,
-      type: 'text' as const,
-      content: { text: item.content },
-    }))
-    .filter((block) => extractBlockText(block.content).trim().length > 0)
-}
-
 function extractIdeaNotes(blocks: unknown): string {
   const [first] = parseThreadFromBlocks(blocks)
   return first?.content || ''
-}
-
-function getEnabledTargets(platforms: Content['platforms'] | undefined): PlatformType[] {
-  if (!Array.isArray(platforms)) return ['twitter']
-  const enabled = platforms
-    .map((item) => item?.platform)
-    .filter((platform): platform is PlatformType => typeof platform === 'string' && isSupportedPlatform(platform))
-  return enabled.length > 0 ? Array.from(new Set(enabled)) : ['twitter']
 }
 
 const UNTITLED_TITLE_RE = /^untitled(\s+idea|\s+post)?$/i
@@ -168,27 +83,20 @@ export function PostEditorPanel({
   onOpenFullEditor,
 }: PostEditorPanelProps) {
   const allContents = useContentStore((state) => state.contents)
-  const { currentTeam } = useAppStore()
   const params = useParams<{ teamSlug?: string }>()
   const pathname = usePathname()
   const teamSlug = typeof params?.teamSlug === 'string' ? params.teamSlug : undefined
-  const { mode: connectionMode } = useConnectionMode(teamSlug)
 
   const [title, setTitle] = useState('')
   const [thread, setThread] = useState<ThreadItem[]>([{ id: 'thread-1', content: '' }])
   const [activeIndex, setActiveIndex] = useState(0)
-  const [isBookmarked, setIsBookmarked] = useState(false)
   const [status, setStatus] = useState<'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'SCHEDULED' | 'PUBLISHED' | 'ARCHIVED'>('DRAFT')
   const [assignedTo, setAssignedTo] = useState('')
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformType[]>(['twitter'])
-  const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformType[]>([])
-  const [platformCatalog, setPlatformCatalog] = useState<PlatformCatalogItem[]>([])
-  const [publishablePlatforms, setPublishablePlatforms] = useState<Set<PlatformType>>(new Set(['twitter', 'linkedin']))
-  const [connectionsLoading, setConnectionsLoading] = useState(true)
-  const [connectingPlatform, setConnectingPlatform] = useState<PlatformType | null>(null)
+  const [platformCopyMode, setPlatformCopyMode] = useState<PlatformCopyModeMap>({})
+  const [platformCopyText, setPlatformCopyText] = useState<PlatformCopyTextMap>({})
   const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
-  const [sandboxConnectPlatform, setSandboxConnectPlatform] = useState<PlatformType | null>(null)
   const [showIdeaContext, setShowIdeaContext] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -197,6 +105,22 @@ export function PostEditorPanel({
   const [titleTouched, setTitleTouched] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isScheduling, setIsScheduling] = useState(false)
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null)
+
+  const {
+    connectedPlatforms,
+    publishablePlatforms,
+    connectingPlatform,
+    sandboxConnectPlatform,
+    setSandboxConnectPlatform,
+    fetchConnectedPlatforms,
+    connectFromComposer,
+    confirmSandboxConnect,
+    composerPlatformRows,
+  } = useComposerPlatforms({
+    teamSlug,
+    returnTo: pathname || `/${teamSlug}/collaboration`,
+  })
 
   useEffect(() => {
     if (!post) return
@@ -205,10 +129,14 @@ export function PostEditorPanel({
     setActiveIndex(0)
     setStatus(post.status)
     setAssignedTo(post.assigned_to || '')
+    setScheduledDate(post.scheduled_at ? new Date(post.scheduled_at) : null)
 
     const initialTargets = getEnabledTargets(post.platforms)
+    const initialPlatformCopy = parsePlatformCopyConfig(post.platforms)
     setTargetPlatforms(initialTargets)
     setSelectedPlatform(initialTargets[0] || 'twitter')
+    setPlatformCopyMode(initialPlatformCopy.modeByPlatform)
+    setPlatformCopyText(initialPlatformCopy.textByPlatform)
 
     setSaveError(null)
     setLastSavedAt(null)
@@ -220,106 +148,35 @@ export function PostEditorPanel({
     setShowIdeaContext(true)
   }, [post?.id])
 
-  const fetchConnectedPlatforms = useCallback(async () => {
-    if (!teamSlug) return
-
-    try {
-      setConnectionsLoading(true)
-      const res = await fetch(`/api/platforms?teamSlug=${encodeURIComponent(teamSlug)}`)
-      const data = await res.json()
-      const localConnected = getLocalConnectedPlatforms(teamSlug, currentTeam?.id)
-      const localConnections = getLocalConnectionAccounts(teamSlug, currentTeam?.id)
-
-      if (!res.ok) {
-        setConnectedPlatforms(localConnected.filter((id) => isSupportedPlatform(id)) as PlatformType[])
-        setPlatformCatalog([])
-        setPublishablePlatforms(new Set(['twitter', 'linkedin']))
-        return
-      }
-
-      const catalog = ((data.data || []) as PlatformCatalogItem[])
-        .filter((platform) => isSupportedPlatform(platform.id))
-        .map((platform) => {
-          const localAccount = localConnections[platform.id]
-          if (!localAccount || platform.accounts.length > 0) return platform
-          return {
-            ...platform,
-            connected: true,
-            accounts: [{
-              id: `local:${platform.id}`,
-              account_name: localAccount.account_name,
-              account_handle: localAccount.account_handle,
-              source: localAccount.source,
-            }],
-          }
-        })
-
-      setPlatformCatalog(catalog)
-
-      const publishableFromApi = ((data?.meta?.publishable_platforms || []) as string[])
-        .filter((id) => isSupportedPlatform(id))
-      setPublishablePlatforms(
-        publishableFromApi.length > 0 ? new Set(publishableFromApi as PlatformType[]) : new Set(['twitter', 'linkedin'])
-      )
-
-      const connected = catalog.filter((platform) => platform.connected).map((platform) => platform.id as PlatformType)
-      const merged = Array.from(new Set([...connected, ...localConnected]))
-        .filter((id) => isSupportedPlatform(id)) as PlatformType[]
-      setConnectedPlatforms(merged)
-    } catch {
-      setConnectedPlatforms(
-        getLocalConnectedPlatforms(teamSlug, currentTeam?.id).filter((id) => isSupportedPlatform(id)) as PlatformType[]
-      )
-      setPlatformCatalog([])
-      setPublishablePlatforms(new Set(['twitter', 'linkedin']))
-    } finally {
-      setConnectionsLoading(false)
-    }
-  }, [teamSlug, currentTeam?.id])
-
   useEffect(() => {
     if (!open) return
     void fetchConnectedPlatforms()
   }, [open, fetchConnectedPlatforms])
 
-  const runConnectPlatform = async (platform: PlatformType, skipSandboxConfirmation = false) => {
-    setConnectingPlatform(platform)
-    try {
-      await connectPlatform({
-        platform,
-        teamId: currentTeam?.id,
-        teamSlug,
-        returnTo: pathname || `/${teamSlug}/collaboration`,
-        mode: 'popup',
-        source: 'composer',
-        skipSandboxConfirmation,
-        onSuccess: async () => {
-          await fetchConnectedPlatforms()
-          toast.success(`${PLATFORMS[platform].name} connected.`)
-        },
-      })
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to connect')
-    } finally {
-      setConnectingPlatform(null)
-    }
-  }
+  const publishReadyPlatformSet = useMemo(
+    () => new Set(composerPlatformRows.filter((row) => row.isPublishable).map((row) => row.id)),
+    [composerPlatformRows]
+  )
 
-  const handleConnectPlatform = async (platform: PlatformType) => {
-    const selected = platformCatalog.find((item) => item.id === platform)
-    const requiresConfiguration = connectionMode === 'real_oauth' && selected?.oauth_configured === false
-    if (requiresConfiguration) {
-      toast.error(`${selected?.name || platform} is not configured. Add client credentials first.`)
+  useEffect(() => {
+    setTargetPlatforms((prev) => {
+      const filtered = prev.filter((platform) => publishReadyPlatformSet.has(platform))
+      if (filtered.length > 0) return filtered
+      return publishReadyPlatformSet.has('twitter') ? ['twitter'] : prev
+    })
+  }, [publishReadyPlatformSet])
+
+  useEffect(() => {
+    if (publishReadyPlatformSet.has(selectedPlatform)) return
+    if (publishReadyPlatformSet.has('twitter')) {
+      setSelectedPlatform('twitter')
       return
     }
-
-    if (connectionMode === 'local_sandbox') {
-      setSandboxConnectPlatform(platform)
-      return
+    const nextPlatform = targetPlatforms.find((platform) => publishReadyPlatformSet.has(platform))
+    if (nextPlatform) {
+      setSelectedPlatform(nextPlatform)
     }
-
-    await runConnectPlatform(platform)
-  }
+  }, [publishReadyPlatformSet, selectedPlatform, targetPlatforms])
 
   const ticketKey = useMemo(() => (post ? getTicketKey(post.id, allContents) : null), [post, allContents])
   const linkedIdeaTicket = useMemo(() => (linkedIdea?.id ? getTicketKey(linkedIdea.id, allContents) : null), [linkedIdea?.id, allContents])
@@ -328,6 +185,22 @@ export function PostEditorPanel({
 
   const initialTargetsKey = useMemo(() => (post ? getEnabledTargets(post.platforms).slice().sort().join(',') : ''), [post])
   const currentTargetsKey = useMemo(() => targetPlatforms.slice().sort().join(','), [targetPlatforms])
+  const initialPlatformVariantsKey = useMemo(() => {
+    if (!post) return ''
+    const { modeByPlatform, textByPlatform } = parsePlatformCopyConfig(post.platforms)
+    return JSON.stringify({
+      modeByPlatform,
+      textByPlatform,
+    })
+  }, [post])
+  const currentPlatformVariantsKey = useMemo(
+    () =>
+      JSON.stringify({
+        modeByPlatform: platformCopyMode,
+        textByPlatform: platformCopyText,
+      }),
+    [platformCopyMode, platformCopyText]
+  )
 
   const hasChanges = useMemo(() => {
     if (!post) return false
@@ -339,41 +212,25 @@ export function PostEditorPanel({
       JSON.stringify(currentThreadText) !== JSON.stringify(initialThreadText) ||
       status !== post.status ||
       assignedTo !== (post.assigned_to || '') ||
-      currentTargetsKey !== initialTargetsKey
+      currentTargetsKey !== initialTargetsKey ||
+      currentPlatformVariantsKey !== initialPlatformVariantsKey
     )
-  }, [post, title, thread, status, assignedTo, currentTargetsKey, initialTargetsKey])
+  }, [post, title, thread, status, assignedTo, currentTargetsKey, initialTargetsKey, currentPlatformVariantsKey, initialPlatformVariantsKey])
 
   const publishTargets = useMemo(() => {
     const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
     return Array.from(new Set(targets))
   }, [targetPlatforms, selectedPlatform])
-
-  const targetSummary = useMemo(() => publishTargets.map((platform) => PLATFORMS[platform].name).join(', '), [publishTargets])
-
-  const platformRows: ComposerPlatformRow[] = useMemo(() => {
-    if (platformCatalog.length > 0) {
-      return platformCatalog
-        .filter((platform) => isSupportedPlatform(platform.id))
-        .map((platform) => ({
-          id: platform.id as PlatformType,
-          name: platform.name,
-          connected: connectedPlatforms.includes(platform.id as PlatformType),
-          isPublishable: publishablePlatforms.has(platform.id as PlatformType),
-          accountLabel: platform.accounts[0]
-            ? `${platform.accounts[0].account_name}${platform.accounts[0].account_handle ? ` • ${platform.accounts[0].account_handle}` : ''}${platform.accounts[0].source === 'local_sandbox' ? ' • Sandbox' : ''}`
-            : undefined,
-        }))
-    }
-
-    return (Object.keys(PLATFORMS) as PlatformType[]).map((platform) => ({
-      id: platform,
-      name: PLATFORMS[platform].name,
-      connected: connectedPlatforms.includes(platform),
-      isPublishable: publishablePlatforms.has(platform),
-    }))
-  }, [platformCatalog, connectedPlatforms, publishablePlatforms])
+  const sourcePlatform = useMemo<PlatformType>(() => {
+    if (publishTargets.includes('twitter')) return 'twitter'
+    return publishTargets[0] || selectedPlatform
+  }, [publishTargets, selectedPlatform])
 
   const hasContent = thread.some((item) => item.content.trim().length > 0)
+  const hasPublishReadyTarget = useMemo(
+    () => publishTargets.some((platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)),
+    [publishTargets, connectedPlatforms, publishablePlatforms]
+  )
 
   const buildPayload = useCallback((override?: Partial<{ status: Content['status']; scheduled_at: string | null }>) => {
     const notes = thread.map((item) => item.content).join('\n\n').trim()
@@ -384,9 +241,13 @@ export function PostEditorPanel({
       status: override?.status || status,
       scheduled_at: override?.scheduled_at,
       assigned_to: assignedTo || null,
-      platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
+      platforms: buildPlatformConfigs({
+        targets: publishTargets,
+        modeByPlatform: platformCopyMode,
+        textByPlatform: platformCopyText,
+      }),
     }
-  }, [titleTouched, title, thread, status, assignedTo, publishTargets])
+  }, [titleTouched, title, thread, status, assignedTo, publishTargets, platformCopyMode, platformCopyText])
 
   const persistPost = useCallback(async (mode: 'manual' | 'auto' = 'manual', override?: Partial<{ status: Content['status']; scheduled_at: string | null }>) => {
     if (!post) return false
@@ -433,14 +294,25 @@ export function PostEditorPanel({
       void persistPost('auto')
     }, 1200)
     return () => clearTimeout(timer)
-  }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, targetPlatforms, persistPost])
+  }, [open, post, hasChanges, isSaving, isAutoSaving, title, thread, status, assignedTo, targetPlatforms, platformCopyMode, platformCopyText, persistPost])
+
+  const handlePlatformCopyModeChange = useCallback((platform: PlatformType, mode: 'sync' | 'custom') => {
+    setPlatformCopyMode((prev) => ({ ...prev, [platform]: mode }))
+    if (mode === 'custom') {
+      setPlatformCopyText((prev) => {
+        if (typeof prev[platform] === 'string') return prev
+        const fallbackText = thread.map((item) => item.content).join('\n\n').trim()
+        return { ...prev, [platform]: fallbackText }
+      })
+    }
+  }, [thread])
 
   const handlePublish = useCallback(async () => {
     if (!post) return
     if (!hasContent) return toast.error('Add some content before publishing.')
 
     const eligibleTargets = publishTargets.filter((platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform))
-    if (eligibleTargets.length === 0) return toast.error('No publish-ready connected channels selected. Connect X or LinkedIn first.')
+    if (eligibleTargets.length === 0) return toast.error('Select at least one publish-ready channel.')
 
     setIsPublishing(true)
     try {
@@ -460,23 +332,32 @@ export function PostEditorPanel({
       if (successful === 0) throw new Error('No platforms were published successfully')
       if (failed > 0) toast.error(`Published to ${successful} platform(s), but ${failed} failed. Check publish history for details.`)
       else toast.success(`Published to ${successful} platform${successful === 1 ? '' : 's'}.`)
+
+      const refreshed = await fetch(`/api/content/${post.id}`, { cache: 'no-store' })
+      if (refreshed.ok) {
+        const refreshedBody = await refreshed.json().catch(() => null)
+        if (refreshedBody?.data) {
+          onPostUpdated(refreshedBody.data as Content)
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to publish')
     } finally {
       setIsPublishing(false)
     }
-  }, [post, hasContent, publishTargets, connectedPlatforms, publishablePlatforms, persistPost])
+  }, [post, hasContent, publishTargets, connectedPlatforms, publishablePlatforms, persistPost, onPostUpdated])
 
-  const handleSchedule = useCallback(async () => {
+  const handleSchedule = useCallback(async (requestedDate?: Date) => {
     if (!post) return
     if (!hasContent) return toast.error('Add some content before scheduling.')
 
     setIsScheduling(true)
     try {
-      const scheduledAt = new Date(Date.now() + 60 * 60 * 1000)
+      const scheduledAt = requestedDate || new Date(Date.now() + 60 * 60 * 1000)
       const saved = await persistPost('manual', { status: 'SCHEDULED', scheduled_at: scheduledAt.toISOString() })
       if (!saved) throw new Error('Failed to schedule post')
       setStatus('SCHEDULED')
+      setScheduledDate(scheduledAt)
       toast.success(`Scheduled for ${scheduledAt.toLocaleString()}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to schedule')
@@ -498,40 +379,43 @@ export function PostEditorPanel({
   }, [open, handlePublish])
 
   const topSection = (
-    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-      <div className="space-y-2">
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</label>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value as typeof status)}
-          className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
-        >
-          <option value="DRAFT">Draft</option>
-          <option value="IN_REVIEW">In Review</option>
-          <option value="APPROVED">Approved</option>
-          <option value="SCHEDULED">Scheduled</option>
-          <option value="PUBLISHED">Shared</option>
-          <option value="ARCHIVED">Archived</option>
-        </select>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">Owner</label>
-        <select
-          value={assignedTo}
-          onChange={(e) => setAssignedTo(e.target.value)}
-          className="h-10 w-full rounded-[8px] border border-border bg-card px-3 text-sm text-foreground"
-        >
-          <option value="">Unassigned</option>
-          {teamMembers
-            .filter((member) => member.user?.id)
-            .map((member) => (
-              <option key={member.id} value={member.user?.id || ''}>
-                {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
-              </option>
-            ))}
-        </select>
-      </div>
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        {ticketKey || 'POST'}
+      </span>
+      <select
+        aria-label="Post status"
+        value={status}
+        onChange={(e) => setStatus(e.target.value as typeof status)}
+        className="h-9 min-w-[128px] rounded-full border border-border bg-card px-3 text-xs text-foreground"
+      >
+        <option value="DRAFT">Draft</option>
+        <option value="IN_REVIEW">In Review</option>
+        <option value="APPROVED">Approved</option>
+        <option value="SCHEDULED">Scheduled</option>
+        <option value="PUBLISHED">Shared</option>
+        <option value="ARCHIVED">Archived</option>
+      </select>
+      <select
+        aria-label="Post owner"
+        value={assignedTo}
+        onChange={(e) => setAssignedTo(e.target.value)}
+        className="h-9 min-w-[150px] rounded-full border border-border bg-card px-3 text-xs text-foreground"
+      >
+        <option value="">Unassigned</option>
+        {teamMembers
+          .filter((member) => member.user?.id)
+          .map((member) => (
+            <option key={member.id} value={member.user?.id || ''}>
+              {member.user?.name || member.user?.full_name || member.user?.email || 'Unknown'}
+            </option>
+          ))}
+      </select>
+      {hasLinkedIdeaContext ? (
+        <Button size="xs" variant="outline" className="h-8 rounded-full px-3 text-[11px]" onClick={() => setShowIdeaContext((prev) => !prev)}>
+          {showIdeaContext ? 'Hide idea context' : 'Show idea context'}
+        </Button>
+      ) : null}
     </div>
   )
 
@@ -554,16 +438,6 @@ export function PostEditorPanel({
         {post ? (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto bg-white p-4 custom-scrollbar dark:bg-[#050505]">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{ticketKey || 'POST'}</div>
-                {hasLinkedIdeaContext ? (
-                  <Button size="xs" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => setShowIdeaContext((prev) => !prev)}>
-                    {showIdeaContext ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    {showIdeaContext ? 'Hide Context' : 'Show Context'}
-                  </Button>
-                ) : null}
-              </div>
-
               <div className="flex flex-col gap-3 lg:flex-row">
                 {hasLinkedIdeaContext && showIdeaContext ? (
                   <aside className="w-full shrink-0 lg:w-[220px]">
@@ -606,11 +480,6 @@ export function PostEditorPanel({
                     activeIndex={activeIndex}
                     onActiveIndexChange={setActiveIndex}
                     onThreadItemChange={(index, value) => setThread((prev) => prev.map((item, idx) => idx === index ? { ...item, content: value } : item))}
-                    onAddThreadItem={() => {
-                      const next = [...thread, { id: `thread-${Date.now()}`, content: '' }]
-                      setThread(next)
-                      setActiveIndex(next.length - 1)
-                    }}
                     onRemoveThreadItem={(index) => {
                       if (thread.length === 1) {
                         setThread([{ id: thread[0]?.id || 'thread-1', content: '' }])
@@ -621,25 +490,24 @@ export function PostEditorPanel({
                       setThread(next)
                       setActiveIndex(Math.min(index, next.length - 1))
                     }}
-                    isBookmarked={isBookmarked}
-                    onToggleBookmark={() => setIsBookmarked((prev) => !prev)}
+                    sourcePlatform={sourcePlatform}
                     selectedPlatform={selectedPlatform}
                     onSelectedPlatformChange={setSelectedPlatform}
-                    platformMeta={PLATFORMS}
+                    platformMeta={COMPOSER_PLATFORMS}
                     publishTargets={publishTargets}
-                    targetSummary={targetSummary}
                     onToggleTargetPlatform={(platform) => {
                       if (!connectedPlatforms.includes(platform)) return
                       setTargetPlatforms((prev) => prev.includes(platform) ? prev.filter((item) => item !== platform) : [...prev, platform])
                     }}
-                    selectedPlatformConnected={connectedPlatforms.includes(selectedPlatform)}
-                    selectedPlatformPublishable={publishablePlatforms.has(selectedPlatform)}
-                    connectionsLoading={connectionsLoading}
+                    platformCopyMode={platformCopyMode}
+                    platformCopyText={platformCopyText}
+                    onPlatformCopyModeChange={handlePlatformCopyModeChange}
+                    onPlatformCopyTextChange={(platform, text) => setPlatformCopyText((prev) => ({ ...prev, [platform]: text }))}
                     connectingPlatform={connectingPlatform}
-                    onConnectPlatform={handleConnectPlatform}
+                    onConnectPlatform={connectFromComposer}
                     platformPickerOpen={platformPickerOpen}
                     onPlatformPickerOpenChange={setPlatformPickerOpen}
-                    platformRows={platformRows}
+                    platformRows={composerPlatformRows as ComposerPlatformRow[]}
                     topSection={topSection}
                     footerSection={footerSection}
                   />
@@ -648,16 +516,23 @@ export function PostEditorPanel({
             </div>
 
             <div className="sticky bottom-0 border-t border-border bg-white px-4 py-2.5 dark:bg-[#050505]">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 pb-2">
                 <Button size="sm" className="h-8" onClick={() => void persistPost('manual')} disabled={isSaving || !hasChanges}>{isSaving ? 'Saving...' : 'Save Post'}</Button>
-                <Button size="sm" variant="outline" className="h-8" onClick={() => void handleSchedule()} disabled={isScheduling || isPublishing || !hasContent}>{isScheduling ? 'Scheduling...' : 'Schedule'}</Button>
-                <Button size="sm" className="h-8" onClick={() => void handlePublish()} disabled={isPublishing || isScheduling || !hasContent}>{isPublishing ? 'Publishing...' : 'Publish'}</Button>
                 <Button size="sm" variant="outline" className="h-8" onClick={() => onOpenFullEditor(post.id)}>Open Page Editor</Button>
                 <div className="ml-auto text-[10px] text-muted-foreground">
                   {isAutoSaving ? 'Autosaving...' : lastSavedAt ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Autosave on'}
                 </div>
               </div>
-              <div className="mt-1 text-right text-[10px] text-muted-foreground">Press Ctrl/Cmd + Enter to publish</div>
+              <PublishControls
+                onPublish={() => void handlePublish()}
+                onSchedule={(date) => void handleSchedule(date)}
+                isPublishing={isPublishing}
+                isScheduling={isScheduling}
+                scheduleDisabled={!hasContent}
+                publishDisabled={!hasContent || !hasPublishReadyTarget}
+                publishHint={hasContent && !hasPublishReadyTarget ? 'Select a publish-ready target.' : null}
+                scheduledDate={scheduledDate}
+              />
             </div>
           </div>
         ) : (
@@ -666,14 +541,9 @@ export function PostEditorPanel({
 
         <SandboxConfirmDialog
           open={sandboxConnectPlatform !== null}
-          platformName={sandboxConnectPlatform ? PLATFORMS[sandboxConnectPlatform].name : 'platform'}
+          platformName={sandboxConnectPlatform ? COMPOSER_PLATFORMS[sandboxConnectPlatform].name : 'platform'}
           onCancel={() => setSandboxConnectPlatform(null)}
-          onConfirm={() => {
-            if (!sandboxConnectPlatform) return
-            const selected = sandboxConnectPlatform
-            setSandboxConnectPlatform(null)
-            void runConnectPlatform(selected, true)
-          }}
+          onConfirm={() => void confirmSandboxConnect()}
         />
       </SheetContent>
     </Sheet>

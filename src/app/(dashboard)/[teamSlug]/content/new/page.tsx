@@ -11,9 +11,12 @@ import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/co
 import { PublishControls } from '@/components/publish/PublishControls'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
 import {
+  buildPlatformConfigs,
   COMPOSER_PLATFORMS,
   isSupportedPlatform,
   serializeThreadToBlocks,
+  type PlatformCopyModeMap,
+  type PlatformCopyTextMap,
   type ThreadItem,
 } from '@/components/composer/composerShared'
 import { useComposerPlatforms } from '@/components/composer/useComposerPlatforms'
@@ -48,7 +51,7 @@ export default function NewContentPage() {
   const router = useRouter()
   const params = useParams()
   const teamSlug = params.teamSlug as string
-  const { currentUser, currentTeam } = useAppStore()
+  const { currentTeam } = useAppStore()
   const { saving, setSaving } = useContentStore()
 
   const [contentId, setContentId] = useState<string | null>(null)
@@ -57,7 +60,8 @@ export default function NewContentPage() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>('twitter')
   const [targetPlatforms, setTargetPlatforms] = useState<PlatformType[]>(['twitter'])
-  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [platformCopyMode, setPlatformCopyMode] = useState<PlatformCopyModeMap>({})
+  const [platformCopyText, setPlatformCopyText] = useState<PlatformCopyTextMap>({})
   const [isPublishing, setIsPublishing] = useState(false)
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null)
@@ -68,7 +72,6 @@ export default function NewContentPage() {
   const {
     connectedPlatforms,
     publishablePlatforms,
-    connectionsLoading,
     connectingPlatform,
     sandboxConnectPlatform,
     setSandboxConnectPlatform,
@@ -82,21 +85,24 @@ export default function NewContentPage() {
   })
 
   const currentContent = thread[activeIndex]?.content || ''
-  const totalCharacters = thread.reduce((sum, item) => sum + item.content.length, 0)
   const hasContent = thread.some((item) => item.content.trim().length > 0)
   const hasDraftInput = hasContent || title.trim().length > 0
   const isSaved = !saving
-  const selectedPlatformConnected = connectedPlatforms.includes(selectedPlatform)
+  const publishReadyPlatformSet = useMemo(
+    () => new Set(composerPlatformRows.filter((row) => row.isPublishable).map((row) => row.id)),
+    [composerPlatformRows]
+  )
 
   const publishTargets = useMemo(() => {
     const targets = targetPlatforms.length > 0 ? targetPlatforms : [selectedPlatform]
     return Array.from(new Set(targets))
   }, [targetPlatforms, selectedPlatform])
+  const sourcePlatform = useMemo<PlatformType>(() => {
+    if (publishTargets.includes('twitter')) return 'twitter'
+    return publishTargets[0] || selectedPlatform
+  }, [publishTargets, selectedPlatform])
+  const selectedPlatformAllowsThreadEditing = selectedPlatform === sourcePlatform
 
-  const targetSummary = useMemo(
-    () => publishTargets.map((platform) => COMPOSER_PLATFORMS[platform].name).join(', '),
-    [publishTargets]
-  )
   const hasPublishReadyTarget = useMemo(
     () => publishTargets.some((platform) => connectedPlatforms.includes(platform) && publishablePlatforms.has(platform)),
     [publishTargets, connectedPlatforms, publishablePlatforms]
@@ -106,11 +112,15 @@ export default function NewContentPage() {
     (override?: Partial<Pick<ContentMutationPayload, 'status' | 'scheduled_at'>>): ContentMutationPayload => ({
       title: title.trim() || 'Untitled post',
       blocks: serializeThreadToBlocks(thread),
-      platforms: publishTargets.map((platform) => ({ platform, enabled: true })),
+      platforms: buildPlatformConfigs({
+        targets: publishTargets,
+        modeByPlatform: platformCopyMode,
+        textByPlatform: platformCopyText,
+      }),
       status: override?.status,
       scheduled_at: override?.scheduled_at,
     }),
-    [title, thread, publishTargets]
+    [title, thread, publishTargets, platformCopyMode, platformCopyText]
   )
 
   const createContentRecord = useCallback(
@@ -207,7 +217,12 @@ export default function NewContentPage() {
         const savedTargets = data.targets.filter((id: string) => isSupportedPlatform(id)) as PlatformType[]
         setTargetPlatforms(savedTargets.length > 0 ? savedTargets : ['twitter'])
       }
-      setIsBookmarked(Boolean(data.bookmarked))
+      if (data.platformCopyMode && typeof data.platformCopyMode === 'object') {
+        setPlatformCopyMode(data.platformCopyMode as PlatformCopyModeMap)
+      }
+      if (data.platformCopyText && typeof data.platformCopyText === 'object') {
+        setPlatformCopyText(data.platformCopyText as PlatformCopyTextMap)
+      }
     } catch (error) {
       console.error('Failed to load draft', error)
     } finally {
@@ -224,6 +239,26 @@ export default function NewContentPage() {
     if (targetPlatforms.includes(selectedPlatform)) return
     setTargetPlatforms((prev) => [...prev, selectedPlatform])
   }, [selectedPlatform, connectedPlatforms, targetPlatforms])
+
+  useEffect(() => {
+    setTargetPlatforms((prev) => {
+      const filtered = prev.filter((platform) => publishReadyPlatformSet.has(platform))
+      if (filtered.length > 0) return filtered
+      return publishReadyPlatformSet.has('twitter') ? ['twitter'] : prev
+    })
+  }, [publishReadyPlatformSet])
+
+  useEffect(() => {
+    if (publishReadyPlatformSet.has(selectedPlatform)) return
+    if (publishReadyPlatformSet.has('twitter')) {
+      setSelectedPlatform('twitter')
+      return
+    }
+    const nextPlatform = targetPlatforms.find((platform) => publishReadyPlatformSet.has(platform))
+    if (nextPlatform) {
+      setSelectedPlatform(nextPlatform)
+    }
+  }, [publishReadyPlatformSet, selectedPlatform, targetPlatforms])
 
   useEffect(() => {
     if (!hasHydratedDraft || !currentTeam?.id || contentId) return
@@ -256,7 +291,8 @@ export default function NewContentPage() {
         thread,
         platform: selectedPlatform,
         targets: targetPlatforms,
-        bookmarked: isBookmarked,
+        platformCopyMode,
+        platformCopyText,
         savedAt: new Date().toISOString(),
       }
       localStorage.setItem(`draft_${teamSlug}`, JSON.stringify(draftData))
@@ -281,7 +317,8 @@ export default function NewContentPage() {
     thread,
     selectedPlatform,
     targetPlatforms,
-    isBookmarked,
+    platformCopyMode,
+    platformCopyText,
     teamSlug,
     contentId,
     hasDraftInput,
@@ -290,6 +327,23 @@ export default function NewContentPage() {
     updateContentRecord,
     buildMutationPayload,
   ])
+
+  useEffect(() => {
+    if (!contentId || !currentTeam?.id) return
+
+    const timer = setTimeout(async () => {
+      setSaving(true)
+      try {
+        await updateContentRecord(contentId, buildMutationPayload({ status: 'DRAFT', scheduled_at: null }))
+      } catch (error) {
+        console.error('Failed to update platform copy variants:', error)
+      } finally {
+        setSaving(false)
+      }
+    }, 450)
+
+    return () => clearTimeout(timer)
+  }, [platformCopyMode, platformCopyText, contentId, currentTeam?.id, updateContentRecord, buildMutationPayload, setSaving])
 
   const handleContentChange = (index: number, value: string) => {
     setThread((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, content: value } : item)))
@@ -317,6 +371,17 @@ export default function NewContentPage() {
     setTargetPlatforms((prev) =>
       prev.includes(platform) ? prev.filter((item) => item !== platform) : [...prev, platform]
     )
+  }
+
+  const handlePlatformCopyModeChange = (platform: PlatformType, mode: 'sync' | 'custom') => {
+    setPlatformCopyMode((prev) => ({ ...prev, [platform]: mode }))
+    if (mode === 'custom') {
+      setPlatformCopyText((prev) => {
+        if (typeof prev[platform] === 'string') return prev
+        const fallbackText = thread.map((item) => item.content).join('\n\n').trim()
+        return { ...prev, [platform]: fallbackText }
+      })
+    }
   }
 
   const handlePublish = useCallback(async () => {
@@ -405,6 +470,7 @@ export default function NewContentPage() {
       if (
         (event.metaKey || event.ctrlKey) &&
         event.key === 'ArrowDown' &&
+        selectedPlatformAllowsThreadEditing &&
         activeIndex === thread.length - 1 &&
         currentContent.length > 0
       ) {
@@ -415,63 +481,12 @@ export default function NewContentPage() {
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [activeIndex, thread.length, currentContent, addThreadItem, handlePublish])
+  }, [activeIndex, thread.length, currentContent, addThreadItem, handlePublish, selectedPlatformAllowsThreadEditing])
 
   return (
     <div className="flex min-h-full flex-col bg-background">
-      <header className="border-b border-border">
-        <DashboardContainer className="max-w-[680px] py-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-[15px] font-semibold text-foreground">New Post</h1>
-              <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Draft
-              </span>
-              {contentId ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/${teamSlug}/collaboration?focus=${encodeURIComponent(contentId)}`)
-                  }
-                  className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-foreground transition-colors hover:bg-accent"
-                >
-                  In Collaboration
-                </button>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Targets {publishTargets.length}
-              </span>
-              {thread.length > 1 ? (
-                <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {thread.length} blocks
-                </span>
-              ) : null}
-              <span
-                className={cn(
-                  'rounded-full border border-border bg-card px-2.5 py-1 text-[10px] uppercase tracking-wide flex items-center gap-1',
-                  isSaved ? 'text-muted-foreground' : 'text-primary'
-                )}
-              >
-                <span
-                  className={cn(
-                    'h-1.5 w-1.5 rounded-full',
-                    isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse'
-                  )}
-                />
-                {isSaved ? 'Saved' : 'Saving...'}
-              </span>
-            </div>
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            @{currentUser?.email?.split('@')[0] || 'user'}
-          </p>
-        </DashboardContainer>
-      </header>
-
       <div className="flex-1 overflow-y-auto">
-        <DashboardContainer className="max-w-[680px] py-6">
+        <DashboardContainer className="max-w-[680px] py-8">
           <PostComposerWorkspace
             title={title}
             onTitleChange={setTitle}
@@ -479,32 +494,39 @@ export default function NewContentPage() {
             activeIndex={activeIndex}
             onActiveIndexChange={setActiveIndex}
             onThreadItemChange={handleContentChange}
-            onAddThreadItem={addThreadItem}
             onRemoveThreadItem={removeThreadItem}
-            isBookmarked={isBookmarked}
-            onToggleBookmark={() => setIsBookmarked((prev) => !prev)}
+            sourcePlatform={sourcePlatform}
             selectedPlatform={selectedPlatform}
             onSelectedPlatformChange={setSelectedPlatform}
             platformMeta={COMPOSER_PLATFORMS}
             publishTargets={publishTargets}
-            targetSummary={targetSummary}
             onToggleTargetPlatform={toggleTargetPlatform}
-            selectedPlatformConnected={selectedPlatformConnected}
-            selectedPlatformPublishable={publishablePlatforms.has(selectedPlatform)}
-            connectionsLoading={connectionsLoading}
+            platformCopyMode={platformCopyMode}
+            platformCopyText={platformCopyText}
+            onPlatformCopyModeChange={handlePlatformCopyModeChange}
+            onPlatformCopyTextChange={(platform, text) =>
+              setPlatformCopyText((prev) => ({ ...prev, [platform]: text }))
+            }
             connectingPlatform={connectingPlatform}
             onConnectPlatform={connectFromComposer}
             platformPickerOpen={platformPickerOpen}
             onPlatformPickerOpenChange={setPlatformPickerOpen}
             platformRows={composerPlatformRows as ComposerPlatformRow[]}
+            topSection={
+              <div className="mb-3 flex justify-end">
+                <span
+                  className={cn(
+                    'rounded-md border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2 py-1 text-xs inline-flex items-center gap-1',
+                    isSaved ? 'text-muted-foreground' : 'text-primary'
+                  )}
+                >
+                  <span className={cn('h-1.5 w-1.5 rounded-full', isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse')} />
+                  {isSaved ? 'Saved' : 'Saving...'}
+                </span>
+              </div>
+            }
             footerSection={
-              <div className="sticky bottom-0 z-20 -mx-2 mt-6 border-t border-border bg-background/95 px-2 pb-2 pt-4 backdrop-blur">
-                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Targets: {targetSummary}</span>
-                  {thread.length > 1 ? (
-                    <span>{totalCharacters.toLocaleString()} chars • {thread.length} blocks</span>
-                  ) : null}
-                </div>
+              <div className="sticky bottom-0 z-20 -mx-2 mt-4 border-t border-[var(--sidebar-divider)] bg-background/95 px-2 pb-1 pt-3 backdrop-blur-sm">
                 <PublishControls
                   onPublish={() => void handlePublish()}
                   onSchedule={(date) => handleSchedule(date)}
