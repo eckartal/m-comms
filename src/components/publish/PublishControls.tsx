@@ -83,7 +83,12 @@ export function PublishControls({
               <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-[320px] border border-border bg-card shadow-lg">
+          <PopoverContent
+            align="start"
+            side="top"
+            sideOffset={10}
+            className="z-[120] isolate w-[320px] border border-border bg-background text-foreground shadow-2xl"
+          >
             <div className="space-y-3">
               <div>
                 <p className="text-sm font-medium text-foreground">Schedule</p>
