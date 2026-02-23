@@ -57,7 +57,7 @@ export function PublishControls({
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-2">
+    <div className="mt-1 flex flex-col gap-2">
       <div className="flex gap-2">
         <Popover
           open={schedulePickerOpen}
@@ -70,10 +70,9 @@ export function PublishControls({
             <Button
               variant="outline"
               className={cn(
-                'flex-1 gap-1.5 font-medium',
+                'h-10 flex-1 gap-1.5 rounded-xl px-3 font-medium',
                 'border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] text-foreground',
                 'hover:bg-accent hover:text-foreground',
-                'h-10 px-3',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
               disabled={scheduleDisabled || isScheduling || isPublishing}
@@ -87,7 +86,7 @@ export function PublishControls({
             align="start"
             side="top"
             sideOffset={10}
-            className="z-[120] isolate w-[320px] border border-border bg-background text-foreground shadow-2xl"
+            className="z-[120] isolate w-[320px] rounded-2xl border border-[var(--sidebar-divider)] bg-background text-foreground shadow-2xl"
           >
             <div className="space-y-3">
               <div>
@@ -123,10 +122,9 @@ export function PublishControls({
 
         <Button
           className={cn(
-            'flex-1 gap-1.5 font-medium',
+            'h-10 flex-1 gap-1.5 rounded-xl px-4 font-medium',
             'border border-[var(--sidebar-divider)] bg-foreground text-background',
             'hover:bg-foreground/90',
-            'h-10 px-4',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
           onClick={onPublish}
@@ -151,8 +149,8 @@ export function PublishControls({
 
       <div className="text-center leading-none">
         <span className="text-xs text-muted-foreground">
-          Press <kbd className="rounded border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-1.5 py-0.5 text-foreground font-medium">⌘</kbd>
-          <kbd className="rounded border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-1.5 py-0.5 text-foreground font-medium">↵</kbd> to publish
+          Press <kbd className="rounded-md border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-1.5 py-0.5 text-foreground font-medium">⌘</kbd>
+          <kbd className="rounded-md border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-1.5 py-0.5 text-foreground font-medium">↵</kbd> to publish
         </span>
       </div>
 

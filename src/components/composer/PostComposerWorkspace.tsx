@@ -381,17 +381,17 @@ export function PostComposerWorkspace({
       {topSection}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="inline-flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] p-1">
+        <div className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-[var(--sidebar-divider)] bg-card p-1.5 shadow-sm">
           {visiblePlatformTabs.map((platform) => (
             <button
               key={platform}
               type="button"
               onClick={() => onSelectedPlatformChange(platform)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition-colors',
                 selectedPlatform === platform
                   ? 'border-foreground bg-foreground text-background'
-                  : 'border-transparent bg-transparent text-foreground hover:border-[var(--sidebar-divider)] hover:bg-background'
+                  : 'border-transparent bg-transparent text-foreground hover:border-[var(--sidebar-divider)] hover:bg-[var(--sidebar-elevated)]'
               )}
               title={`Edit ${getPlatformLabel(platform)} copy`}
             >
@@ -406,7 +406,7 @@ export function PostComposerWorkspace({
             <button
               type="button"
               onClick={() => onPlatformPickerOpenChange(true)}
-              className="rounded-md border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="rounded-xl border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Add publishable channels
             </button>
@@ -414,7 +414,7 @@ export function PostComposerWorkspace({
           <button
             type="button"
             onClick={() => onPlatformPickerOpenChange(true)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--sidebar-divider)] bg-background text-foreground transition-colors hover:bg-accent"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--sidebar-divider)] bg-background text-foreground transition-colors hover:bg-accent"
             title="Manage channels"
             aria-label="Manage channels"
           >
@@ -424,7 +424,7 @@ export function PostComposerWorkspace({
       </div>
 
       {!isSourcePlatform && visiblePlatformTabs.includes(selectedPlatform) ? (
-        <div className="mb-4 flex items-center">
+        <div className="mb-4 flex items-center rounded-2xl border border-[var(--sidebar-divider)] bg-card px-3 py-2">
           <label className="inline-flex items-center gap-3 text-sm text-foreground">
             <button
               type="button"
@@ -452,7 +452,7 @@ export function PostComposerWorkspace({
       ) : null}
 
       <div
-        className="rounded-xl border border-[var(--sidebar-divider)] bg-card"
+        className="rounded-2xl border border-[var(--sidebar-divider)] bg-card shadow-sm"
         onDrop={(event) => {
           event.preventDefault()
           if (isSyncedReadOnlyEditor) return
@@ -465,7 +465,7 @@ export function PostComposerWorkspace({
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             placeholder="Title"
-            className="h-10 rounded-lg border-transparent bg-transparent px-0 text-base font-medium text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+            className="h-12 rounded-xl border-transparent bg-transparent px-0 text-[22px] font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
           />
         </div>
 
@@ -475,7 +475,7 @@ export function PostComposerWorkspace({
               value={selectedPlatformCustomText}
               onChange={(event) => onPlatformCopyTextChange(selectedPlatform, event.target.value)}
               placeholder="Write your platform-specific copy..."
-              className="min-h-[210px] w-full resize-y rounded-lg border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-3 py-3 text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground"
+              className="min-h-[280px] w-full resize-y rounded-xl border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-4 py-3 text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground"
             />
             <div className="mt-2 flex items-center justify-end">
               <span className={cn('text-xs tabular-nums', selectedPlatformCustomOverLimit ? 'text-red-500' : 'text-muted-foreground')}>
@@ -495,8 +495,8 @@ export function PostComposerWorkspace({
                   <div key={item.id}>
                     <div
                       className={cn(
-                        'relative rounded-lg border px-1 transition-colors',
-                        isActive ? 'border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]' : 'border-transparent bg-transparent hover:bg-accent/50'
+                        'relative rounded-xl border px-1 transition-colors',
+                        isActive ? 'border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]' : 'border-transparent bg-transparent hover:bg-accent/40'
                       )}
                       onClick={() => onActiveIndexChange(index)}
                     >
@@ -530,7 +530,7 @@ export function PostComposerWorkspace({
                                     e.stopPropagation()
                                     onRemoveThreadItem(index)
                                   }}
-                                  className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+                                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
                                   title="Remove block"
                                 >
                                   <X className="h-4 w-4" />
@@ -593,7 +593,7 @@ export function PostComposerWorkspace({
       {footerSection}
 
       <Dialog open={platformPickerOpen} onOpenChange={onPlatformPickerOpenChange}>
-        <DialogContent className="max-w-2xl border-border bg-card">
+        <DialogContent className="max-w-2xl rounded-2xl border-[var(--sidebar-divider)] bg-card">
           <DialogHeader>
             <DialogTitle>Channels</DialogTitle>
             <DialogDescription>

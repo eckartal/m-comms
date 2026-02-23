@@ -10,6 +10,8 @@ import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   buildPlatformConfigs,
   COMPOSER_PLATFORMS,
@@ -20,6 +22,7 @@ import {
   type ThreadItem,
 } from '@/components/composer/composerShared'
 import { useComposerPlatforms } from '@/components/composer/useComposerPlatforms'
+import { CalendarClock, CheckCircle2, Eye, FileText, Layers3, Sparkles } from 'lucide-react'
 
 async function parseRequestError(response: Response, fallbackMessage: string) {
   const body = await response.json().catch(() => null)
@@ -88,6 +91,15 @@ export default function NewContentPage() {
   const hasContent = thread.some((item) => item.content.trim().length > 0)
   const hasDraftInput = hasContent || title.trim().length > 0
   const isSaved = !saving
+  const postWordCount = useMemo(
+    () =>
+      thread
+        .map((item) => item.content.trim())
+        .join(' ')
+        .split(/\s+/)
+        .filter(Boolean).length,
+    [thread]
+  )
   const publishReadyPlatformSet = useMemo(
     () => new Set(composerPlatformRows.filter((row) => row.isPublishable).map((row) => row.id)),
     [composerPlatformRows]
@@ -461,6 +473,27 @@ export default function NewContentPage() {
     }
   }, [hasContent, persistDraft, router, teamSlug])
 
+  const handleSaveDraft = useCallback(async () => {
+    setSaving(true)
+    try {
+      await persistDraft({ status: 'DRAFT', scheduled_at: null })
+      toast.success('Draft saved')
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save draft')
+    } finally {
+      setSaving(false)
+    }
+  }, [persistDraft, setSaving])
+
+  const handlePreview = useCallback(() => {
+    if (!hasDraftInput) {
+      toast.message('Add a title or content to preview.')
+      return
+    }
+    toast.message('Preview mode is coming next. Publish output already uses this content.')
+  }, [hasDraftInput])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -486,60 +519,173 @@ export default function NewContentPage() {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <div className="flex-1 overflow-y-auto">
-        <DashboardContainer className="max-w-[680px] py-8">
-          <PostComposerWorkspace
-            title={title}
-            onTitleChange={setTitle}
-            thread={thread}
-            activeIndex={activeIndex}
-            onActiveIndexChange={setActiveIndex}
-            onThreadItemChange={handleContentChange}
-            onRemoveThreadItem={removeThreadItem}
-            sourcePlatform={sourcePlatform}
-            selectedPlatform={selectedPlatform}
-            onSelectedPlatformChange={setSelectedPlatform}
-            platformMeta={COMPOSER_PLATFORMS}
-            publishTargets={publishTargets}
-            onToggleTargetPlatform={toggleTargetPlatform}
-            platformCopyMode={platformCopyMode}
-            platformCopyText={platformCopyText}
-            onPlatformCopyModeChange={handlePlatformCopyModeChange}
-            onPlatformCopyTextChange={(platform, text) =>
-              setPlatformCopyText((prev) => ({ ...prev, [platform]: text }))
-            }
-            connectingPlatform={connectingPlatform}
-            onConnectPlatform={connectFromComposer}
-            platformPickerOpen={platformPickerOpen}
-            onPlatformPickerOpenChange={setPlatformPickerOpen}
-            platformRows={composerPlatformRows as ComposerPlatformRow[]}
-            topSection={
-              <div className="mb-3 flex justify-end">
+        <DashboardContainer className="max-w-[1320px] py-8">
+          <div className="mb-6 rounded-2xl border border-[var(--sidebar-divider)] bg-card px-4 py-3 shadow-sm md:px-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--sidebar-elevated)] text-muted-foreground">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-foreground">New Post</p>
+                  <p className="text-xs text-muted-foreground">Distraction-free composer with platform-ready output.</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
-                    'rounded-md border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2 py-1 text-xs inline-flex items-center gap-1',
+                    'inline-flex items-center gap-1 rounded-full border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2.5 py-1 text-[11px]',
                     isSaved ? 'text-muted-foreground' : 'text-primary'
                   )}
                 >
                   <span className={cn('h-1.5 w-1.5 rounded-full', isSaved ? 'bg-emerald-500' : 'bg-primary animate-pulse')} />
-                  {isSaved ? 'Saved' : 'Saving...'}
+                  {isSaved ? 'Saved just now' : 'Saving...'}
                 </span>
+                <Button variant="outline" className="h-9 rounded-xl px-3 text-xs" onClick={() => void handleSaveDraft()}>
+                  Save draft
+                </Button>
+                <Button variant="ghost" className="h-9 rounded-xl px-3 text-xs" onClick={handlePreview}>
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview
+                </Button>
+                <Button
+                  className="h-9 rounded-xl px-3 text-xs"
+                  disabled={!hasContent || !hasPublishReadyTarget || isPublishing || isScheduling}
+                  onClick={() => void handlePublish()}
+                >
+                  Publish
+                </Button>
               </div>
-            }
-            footerSection={
-              <div className="sticky bottom-0 z-20 -mx-2 mt-4 border-t border-[var(--sidebar-divider)] bg-background/95 px-2 pb-1 pt-3 backdrop-blur-sm">
-                <PublishControls
-                  onPublish={() => void handlePublish()}
-                  onSchedule={(date) => handleSchedule(date)}
-                  isPublishing={isPublishing}
-                  isScheduling={isScheduling}
-                  scheduleDisabled={!hasContent}
-                  publishDisabled={!hasContent || !hasPublishReadyTarget}
-                  publishHint={hasContent && !hasPublishReadyTarget ? 'Select a publish-ready target.' : null}
-                  scheduledDate={scheduledDate}
-                />
-              </div>
-            }
-          />
+            </div>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-[200px_minmax(0,1fr)_320px]">
+            <aside className="space-y-2">
+              {[
+                { id: 'drafts', label: 'Drafts', icon: FileText, active: true },
+                { id: 'scheduled', label: 'Scheduled', icon: CalendarClock, active: false },
+                { id: 'published', label: 'Published', icon: CheckCircle2, active: false },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs transition-colors',
+                    item.active
+                      ? 'border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] text-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                  )}
+                >
+                  <item.icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </button>
+              ))}
+            </aside>
+
+            <section className="min-w-0">
+              <PostComposerWorkspace
+                title={title}
+                onTitleChange={setTitle}
+                thread={thread}
+                activeIndex={activeIndex}
+                onActiveIndexChange={setActiveIndex}
+                onThreadItemChange={handleContentChange}
+                onRemoveThreadItem={removeThreadItem}
+                sourcePlatform={sourcePlatform}
+                selectedPlatform={selectedPlatform}
+                onSelectedPlatformChange={setSelectedPlatform}
+                platformMeta={COMPOSER_PLATFORMS}
+                publishTargets={publishTargets}
+                onToggleTargetPlatform={toggleTargetPlatform}
+                platformCopyMode={platformCopyMode}
+                platformCopyText={platformCopyText}
+                onPlatformCopyModeChange={handlePlatformCopyModeChange}
+                onPlatformCopyTextChange={(platform, text) =>
+                  setPlatformCopyText((prev) => ({ ...prev, [platform]: text }))
+                }
+                connectingPlatform={connectingPlatform}
+                onConnectPlatform={connectFromComposer}
+                platformPickerOpen={platformPickerOpen}
+                onPlatformPickerOpenChange={setPlatformPickerOpen}
+                platformRows={composerPlatformRows as ComposerPlatformRow[]}
+                footerSection={
+                  <div className="sticky bottom-0 z-20 mt-4 rounded-2xl border border-[var(--sidebar-divider)] bg-background/95 p-3 backdrop-blur-sm">
+                    <PublishControls
+                      onPublish={() => void handlePublish()}
+                      onSchedule={(date) => handleSchedule(date)}
+                      isPublishing={isPublishing}
+                      isScheduling={isScheduling}
+                      scheduleDisabled={!hasContent}
+                      publishDisabled={!hasContent || !hasPublishReadyTarget}
+                      publishHint={hasContent && !hasPublishReadyTarget ? 'Select a publish-ready target.' : null}
+                      scheduledDate={scheduledDate}
+                    />
+                  </div>
+                }
+              />
+            </section>
+
+            <aside className="space-y-3">
+              <Card className="rounded-2xl border-[var(--sidebar-divider)] bg-card/90 shadow-sm">
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-sm">Post Setup</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>Source channel</span>
+                    <span className="text-foreground">{COMPOSER_PLATFORMS[sourcePlatform].name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Target channels</span>
+                    <span className="text-foreground">{publishTargets.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Word count</span>
+                    <span className="text-foreground">{postWordCount}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-[var(--sidebar-divider)] bg-card/90 shadow-sm">
+                <CardHeader className="pb-0">
+                  <CardTitle className="text-sm">Quality Bar</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>Title</span>
+                    <span className={title.trim() ? 'text-emerald-600' : 'text-amber-600'}>
+                      {title.trim() ? 'Ready' : 'Missing'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Body</span>
+                    <span className={hasContent ? 'text-emerald-600' : 'text-amber-600'}>
+                      {hasContent ? 'Ready' : 'Missing'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Publish targets</span>
+                    <span className={hasPublishReadyTarget ? 'text-emerald-600' : 'text-amber-600'}>
+                      {hasPublishReadyTarget ? 'Ready' : 'Needs setup'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-[var(--sidebar-divider)] bg-card/90 shadow-sm">
+                <CardHeader className="pb-0">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Layers3 className="h-3.5 w-3.5 text-muted-foreground" />
+                    Publishing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">
+                  Keyboard shortcut: <span className="font-medium text-foreground">Cmd/Ctrl + Enter</span>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
         </DashboardContainer>
       </div>
 
