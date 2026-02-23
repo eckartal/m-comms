@@ -244,6 +244,9 @@ export default function IntegrationsPage() {
   }
 
   const socialIntegrations = integrations.filter((integration) => integration.id !== 'blog')
+  const primaryPlatformIds = new Set(['twitter', 'linkedin', 'instagram'])
+  const primaryIntegrations = socialIntegrations.filter((integration) => primaryPlatformIds.has(integration.id))
+  const otherIntegrations = socialIntegrations.filter((integration) => !primaryPlatformIds.has(integration.id))
   const selectedPlatform = integrations.find((integration) => integration.id === settingsPlatformId) || null
   const missingOauthPlatforms = socialIntegrations.filter(
     (integration) => integration.connectable !== false && integration.oauth_configured === false
@@ -284,56 +287,82 @@ export default function IntegrationsPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-card">
-        {socialIntegrations.map((integration, index) => {
-          const isConnecting = connecting === integration.id
-          const isConnected = integration.connected
-          const isDegraded = isConnected && integration.accounts.length === 0
-          const requiresConfiguration = defaultConnectionMode === 'real_oauth' && integration.oauth_configured === false
-          const connectLabel = isConnecting
-            ? 'Connecting...'
-            : requiresConfiguration
-            ? 'Config Required'
-            : isDegraded
-            ? 'Repair'
-            : isConnected
-            ? 'Connected'
-            : 'Connect'
+      <div className="space-y-4">
+        {[
+          { label: 'Primary', items: primaryIntegrations },
+          { label: 'All channels', items: otherIntegrations },
+        ].map((group) => {
+          if (group.items.length === 0) return null
 
           return (
-            <div
-              key={integration.id}
-              className={`flex items-center justify-between px-4 py-3 ${index !== socialIntegrations.length - 1 ? 'border-b border-border' : ''}`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-                  <PlatformIcon platform={integration.id} className="h-5 w-5 text-foreground" />
-                </div>
-                <p className="text-sm font-medium text-foreground">{integration.name}</p>
+            <section key={group.label} className="overflow-hidden rounded-xl border border-[var(--sidebar-divider)] bg-card">
+              <div className="border-b border-[var(--sidebar-divider)] px-4 py-2 md:px-5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={isConnected && !isDegraded ? 'secondary' : 'default'}
-                  size="sm"
-                  className="h-8 min-w-[92px]"
-                  onClick={() => handleConnect(integration.id)}
-                  disabled={isConnecting || (isConnected && !isDegraded) || requiresConfiguration}
-                >
-                  {isConnecting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
-                  {!isConnecting && !isConnected ? <Plus className="mr-1 h-3.5 w-3.5" /> : null}
-                  {connectLabel}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setSettingsPlatformId(integration.id)}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
+              <div className="divide-y divide-[var(--sidebar-divider)]">
+                {group.items.map((integration) => {
+                  const isConnecting = connecting === integration.id
+                  const isConnected = integration.connected
+                  const isDegraded = isConnected && integration.accounts.length === 0
+                  const requiresConfiguration = defaultConnectionMode === 'real_oauth' && integration.oauth_configured === false
+                  const connectLabel = isConnecting
+                    ? 'Connecting...'
+                    : requiresConfiguration
+                    ? 'Set up'
+                    : isDegraded
+                    ? 'Repair'
+                    : 'Connect'
+
+                  return (
+                    <div
+                      key={integration.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2 md:px-5"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--sidebar-elevated)]">
+                          <PlatformIcon platform={integration.id} className="h-4 w-4 text-foreground" />
+                        </div>
+                        <p className="truncate text-sm font-medium text-foreground">{integration.name}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {isConnected && !isDegraded ? (
+                          <span
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full"
+                            title="Connected"
+                            aria-label="Connected"
+                          >
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          </span>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 min-w-[82px] border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2.5 text-xs font-medium text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40"
+                            onClick={() => handleConnect(integration.id)}
+                            disabled={isConnecting || requiresConfiguration}
+                          >
+                            {isConnecting ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                            {!isConnecting && !requiresConfiguration ? <Plus className="mr-1 h-3.5 w-3.5" /> : null}
+                            {connectLabel}
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+                          onClick={() => setSettingsPlatformId(integration.id)}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            </section>
           )
         })}
       </div>
