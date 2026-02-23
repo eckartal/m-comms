@@ -347,6 +347,17 @@ export async function POST(request: Request) {
       error = retry.error
     }
 
+    if (error && isMissingScheduledColumnError(error)) {
+      delete insertData.scheduled_at
+      const retry = await supabase
+        .from('content')
+        .insert(insertData)
+        .select('*')
+        .single()
+      data = retry.data
+      error = retry.error
+    }
+
     if (error) {
       console.error('Error creating content:', error)
       if (isMissingIdeaColumnsError(error)) {

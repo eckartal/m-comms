@@ -18,6 +18,13 @@ type RawUser = {
   avatar_url?: string | null
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
 function normalizeUser(user: RawUser | RawUser[] | null | undefined) {
   const source = Array.isArray(user) ? user[0] : user
   if (!source) return null
@@ -159,7 +166,7 @@ export async function GET(
       console.error('Error fetching content comments:', commentsResult.error)
     }
 
-    const baseData = base.data as Record<string, unknown>
+    const baseData = asRecord(base.data)
     const createdBy = normalizeUser((baseData as { createdBy?: RawUser | RawUser[] | null }).createdBy)
     const assignedTo = normalizeUser((baseData as { assignedTo?: RawUser | RawUser[] | null }).assignedTo)
     const writer = normalizeUser((baseData as { writer?: RawUser | RawUser[] | null }).writer)
@@ -221,16 +228,18 @@ export async function PUT(
         )
         .eq('id', contentId)
         .maybeSingle()
-      currentContent = fallbackCurrent.data
-        ? {
-            ...fallbackCurrent.data,
+      const fallbackData = asRecord(fallbackCurrent.data)
+      const fallbackContent = fallbackCurrent.data
+        ? ({
+            ...fallbackData,
             writer_id: null,
             scheduled_at:
-              'scheduled_at' in (fallbackCurrent.data as Record<string, unknown>)
-                ? (fallbackCurrent.data as { scheduled_at?: string | null }).scheduled_at ?? null
+              'scheduled_at' in fallbackData
+                ? (fallbackData as { scheduled_at?: string | null }).scheduled_at ?? null
                 : null,
-          }
+          } as unknown as typeof currentContent)
         : null
+      currentContent = fallbackContent
       currentError = fallbackCurrent.error
     }
 
@@ -321,6 +330,20 @@ export async function PUT(
       const fallbackUpdate = await runUpdate(fallbackPayload, false)
       data = fallbackUpdate.data
       error = fallbackUpdate.error
+    }
+
+    if (error && isMissingScheduledColumnError(error)) {
+      const fallbackPayload = { ...updateData }
+      delete fallbackPayload.scheduled_at
+      const fallbackUpdate = await runUpdate(fallbackPayload, true)
+      data = fallbackUpdate.data
+      error = fallbackUpdate.error
+      if (error && isMissingWriterColumnError(error)) {
+        delete fallbackPayload.writer_id
+        const secondFallback = await runUpdate(fallbackPayload, false)
+        data = secondFallback.data
+        error = secondFallback.error
+      }
     }
 
     if (error) {
