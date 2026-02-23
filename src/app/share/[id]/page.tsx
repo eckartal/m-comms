@@ -1,74 +1,40 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
-import { ContentEditor } from '@/components/editor/ContentEditor'
-import { CommentList } from '@/components/comments/CommentList'
-import type { Content } from '@/types'
+import { notFound } from 'next/navigation'
+import { SharedContentWorkspace } from '@/components/share/SharedContentWorkspace'
+import { resolveSharedContent } from '@/lib/shareAccess'
+import type { ContentBlock } from '@/types'
 
 interface SharePageProps {
-  searchParams: Promise<{ token: string }>
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ token?: string }>
 }
 
-export default async function SharePage({ searchParams }: SharePageProps) {
+export default async function SharePage({ params, searchParams }: SharePageProps) {
+  const { id } = await params
   const { token } = await searchParams
-  const supabase = await createClient()
 
   if (!token) {
-    redirect('/login')
-  }
-
-  // Get content with share token
-  const { data: content, error } = await supabase
-    .from('content')
-    .select(`
-      *,
-      createdBy:created_by(id, name, avatar_url)
-    `)
-    .eq('share_token', token)
-    .single()
-
-  if (error || !content) {
     notFound()
   }
 
-  const shareSettings = content.share_settings as { allow_comments?: boolean } | null
+  const shared = await resolveSharedContent(id, token)
+
+  if (!shared) {
+    notFound()
+  }
+
+  const blocks = Array.isArray(shared.content.blocks)
+    ? (shared.content.blocks as ContentBlock[])
+    : []
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{content.title || 'Untitled'}</h1>
-            <p className="text-gray-500 text-sm">
-              Shared by {content.createdBy?.name || 'Unknown'}
-            </p>
-          </div>
-          <div className="text-sm text-gray-500">
-            Read-only view
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Content */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow p-6">
-              <ContentEditor
-                content={content as Content}
-                readOnly={true}
-              />
-            </div>
-          </div>
-
-          {/* Comments Sidebar */}
-          {shareSettings?.allow_comments !== false && (
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow h-[600px]">
-                <CommentList contentId={content.id} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <SharedContentWorkspace
+      contentId={id}
+      token={token}
+      title={shared.content.title || 'Untitled'}
+      blocks={blocks}
+      sharedBy={shared.content.createdBy?.name || 'Unknown'}
+      allowComments={shared.settings.allowComments}
+      allowEditing={shared.settings.allowEditing}
+    />
   )
 }

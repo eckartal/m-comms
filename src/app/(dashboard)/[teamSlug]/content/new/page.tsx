@@ -10,6 +10,8 @@ import { DashboardContainer } from '@/components/layout/DashboardContainer'
 import { PostComposerWorkspace, type ComposerPlatformRow } from '@/components/composer/PostComposerWorkspace'
 import { PublishControls } from '@/components/publish/PublishControls'
 import { SandboxConfirmDialog } from '@/components/oauth/SandboxConfirmDialog'
+import { ShareModal } from '@/components/share/ShareModal'
+import { Button } from '@/components/ui/button'
 import {
   buildPlatformConfigs,
   COMPOSER_PLATFORMS,
@@ -512,7 +514,16 @@ export default function NewContentPage() {
             onPlatformPickerOpenChange={setPlatformPickerOpen}
             platformRows={composerPlatformRows as ComposerPlatformRow[]}
             topSection={
-              <div className="mb-3 flex justify-end">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  {contentId ? (
+                    <ShareModal contentId={contentId} />
+                  ) : (
+                    <Button variant="outline" size="sm" disabled>
+                      Share for feedback
+                    </Button>
+                  )}
+                </div>
                 <span
                   className={cn(
                     'inline-flex items-center gap-1 rounded-full border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] px-2.5 py-1 text-[11px]',

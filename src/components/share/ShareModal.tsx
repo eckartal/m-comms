@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Copy, Check, Users, Globe, Lock } from 'lucide-react'
+import { Copy, Check, Link2 } from 'lucide-react'
+import type { SharePermission } from '@/lib/share'
 
 interface ShareModalProps {
   contentId: string
@@ -17,6 +17,7 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
   const [isOpen, setIsOpen] = useState(false)
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [shareUrl, setShareUrl] = useState(initialShareUrl)
+  const [permission, setPermission] = useState<SharePermission>('comment')
   const [copied, setCopied] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -26,6 +27,7 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
       const { data } = await response.json()
       setIsPublic(data.isPublic)
       setShareUrl(data.shareUrl)
+      setPermission((data.permission || 'comment') as SharePermission)
     }
   }
 
@@ -36,13 +38,45 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
     }
   }
 
+  const updateSettings = async (nextPermission: SharePermission) => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/content/${contentId}/share`, {
+        method: isPublic ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enableShare: true,
+          permission: nextPermission,
+          allowComments: true,
+          allowEditing: nextPermission === 'edit',
+        }),
+      })
+
+      if (response.ok) {
+        const { data } = await response.json()
+        setIsPublic(data.isPublic)
+        setShareUrl(data.shareUrl)
+        setPermission((data.permission || nextPermission) as SharePermission)
+      }
+    } catch (error) {
+      console.error('Error updating share settings:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleToggleShare = async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`/api/content/${contentId}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enableShare: !isPublic }),
+        body: JSON.stringify({
+          enableShare: !isPublic,
+          permission,
+          allowComments: true,
+          allowEditing: permission === 'edit',
+        }),
       })
 
       if (response.ok) {
@@ -52,6 +86,23 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
       }
     } catch (error) {
       console.error('Error toggling share:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRevoke = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/content/${contentId}/share`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        setIsPublic(false)
+        setShareUrl(null)
+      }
+    } catch (error) {
+      console.error('Error revoking share link:', error)
     } finally {
       setIsLoading(false)
     }
@@ -73,58 +124,28 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Users className="h-4 w-4 mr-2" />
-          Share
+          <Link2 className="h-4 w-4 mr-2" />
+          Share for feedback
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[420px] rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Share Content</DialogTitle>
+          <DialogTitle>Share for feedback</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center gap-3">
-              {isPublic ? (
-                <Globe className="h-5 w-5 text-green-600" />
-              ) : (
-                <Lock className="h-5 w-5 text-gray-500" />
-              )}
-              <div>
-                <p className="font-medium">
-                  {isPublic ? 'Public Link' : 'Private'}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {isPublic
-                    ? 'Anyone with the link can view'
-                    : 'Only team members can access'}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant={isPublic ? 'destructive' : 'default'}
-              size="sm"
-              onClick={handleToggleShare}
-              disabled={isLoading}
-            >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-xl border border-border p-3">
+            <span className="text-sm text-foreground">{isPublic ? 'Link enabled' : 'Link disabled'}</span>
+            <Button size="sm" onClick={handleToggleShare} disabled={isLoading}>
               {isPublic ? 'Disable' : 'Enable'}
             </Button>
           </div>
 
           {isPublic && shareUrl && (
-            <div className="space-y-2">
-              <Label>Share Link</Label>
+            <>
               <div className="flex gap-2">
-                <Input
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1"
-                />
-                <Button
-                  size="icon"
-                  onClick={handleCopyLink}
-                  variant="outline"
-                >
+                <Input value={shareUrl} readOnly className="h-9 rounded-xl" />
+                <Button size="icon" onClick={handleCopyLink} variant="outline" className="h-9 w-9 rounded-xl">
                   {copied ? (
                     <Check className="h-4 w-4 text-green-600" />
                   ) : (
@@ -132,25 +153,43 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
                   )}
                 </Button>
               </div>
-              <p className="text-xs text-gray-500">
-                Share this link to get feedback on your content
-              </p>
-            </div>
-          )}
 
-          <div className="pt-4 border-t">
-            <h4 className="font-medium mb-2">Permissions</h4>
-            <div className="space-y-2 text-sm">
-              <label className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked disabled className="rounded" />
-                View access for anyone with the link
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" defaultChecked className="rounded" />
-                Allow comments on shared content
-              </label>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={permission === 'comment' ? 'default' : 'outline'}
+                  className="rounded-xl"
+                  onClick={() => {
+                    setPermission('comment')
+                    void updateSettings('comment')
+                  }}
+                  disabled={isLoading}
+                >
+                  Comment only
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={permission === 'edit' ? 'default' : 'outline'}
+                  className="rounded-xl"
+                  onClick={() => {
+                    setPermission('edit')
+                    void updateSettings('edit')
+                  }}
+                  disabled={isLoading}
+                >
+                  Can edit
+                </Button>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="destructive" size="sm" onClick={handleRevoke} disabled={isLoading}>
+                  Revoke link
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
