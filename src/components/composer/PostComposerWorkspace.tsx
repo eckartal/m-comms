@@ -625,7 +625,7 @@ export function PostComposerWorkspace({
                     return (
                       <div
                         key={platform.id}
-                        className="flex items-center justify-between rounded-[10px] border border-border bg-background/60 px-3 py-2"
+                        className="flex items-center justify-between rounded-[10px] border border-border bg-background px-3 py-2"
                       >
                         <div className="min-w-0 flex items-center gap-3">
                           <PlatformIcon platform={platform.id} className="h-4 w-4" />
@@ -665,7 +665,7 @@ export function PostComposerWorkspace({
                   key={platform.id}
                   className={cn(
                     'flex items-center justify-between rounded-[10px] border px-3 py-2 transition-colors',
-                    isActive ? 'border-ring bg-accent/50' : 'border-border bg-background/60'
+                    isActive ? 'border-ring bg-accent/50' : 'border-border bg-background'
                   )}
                   onClick={() => {
                     if (!platform.isPublishable) return

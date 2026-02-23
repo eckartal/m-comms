@@ -5,57 +5,7 @@
 @custom-variant light (&:is(.light *));
 
 :root {
-  /* Dark Terminal Palette - Ghostty-inspired with proper contrast */
-  --background: #000000;
-  --foreground: #e5e5e5;
-  --card: #050505;
-  --card-foreground: #e5e5e5;
-  --popover: #0a0a0a;
-  --popover-foreground: #e5e5e5;
-  --primary: #0a66c2;
-  --primary-foreground: #ffffff;
-  --secondary: #0a0a0a;
-  --secondary-foreground: #e5e5e5;
-  --muted: #171717;
-  --muted-foreground: #a3a3a3;
-  --accent: #171717;
-  --accent-foreground: #e5e5e5;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --input: #262626;
-  --ring: #0a66c2;
-  --border: #262626;
-  --radius: 2px;
-
-  /* Sidebar */
-  --sidebar: #000000;
-  --sidebar-foreground: #e5e5e5;
-  --sidebar-primary: #0a66c2;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #171717;
-  --sidebar-accent-foreground: #e5e5e5;
-  --sidebar-border: #262626;
-  --sidebar-ring: #0a66c2;
-
-  /* Chart colors - proper grayscale for dark backgrounds */
-  --chart-1: #e5e5e5;
-  --chart-2: #a3a3a3;
-  --chart-3: #737373;
-  --chart-4: #525252;
-  --chart-5: #262626;
-
-  /* Dashboard layout contract */
-  --sidebar-width-expanded: 264px;
-  --sidebar-width-collapsed: 76px;
-  --header-height: 52px;
-  --content-max-width: 1200px;
-  --content-gutter-sm: 16px;
-  --content-gutter-md: 24px;
-  --content-gutter-lg: 32px;
-}
-
-/* Light Theme - Clean and minimal */
-.light {
+  /* Light theme is the default */
   --background: #ffffff;
   --foreground: #171717;
   --card: #ffffff;
@@ -64,17 +14,17 @@
   --popover-foreground: #171717;
   --primary: #0a66c2;
   --primary-foreground: #ffffff;
-  --secondary: #f3f4f6;
+  --secondary: #f4f5f7;
   --secondary-foreground: #171717;
-  --muted: #f3f4f6;
+  --muted: #f5f6f8;
   --muted-foreground: #6b7280;
   --accent: #f3f4f6;
   --accent-foreground: #171717;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --input: #e5e7eb;
+  --input: #e7e9ee;
   --ring: #0a66c2;
-  --border: #e5e7eb;
+  --border: #e6e8ec;
   --radius: 6px;
 
   /* Sidebar */
@@ -86,13 +36,103 @@
   --sidebar-accent-foreground: #171717;
   --sidebar-border: #e5e7eb;
   --sidebar-ring: #0a66c2;
+  --sidebar-muted: #6b7280;
+  --sidebar-hover: #f5f6f8;
+  --sidebar-active: #eceef2;
+  --sidebar-elevated: #f9fafb;
+  --sidebar-divider: #e6e8ec;
+  --sidebar-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 18px rgba(15, 23, 42, 0.06);
 
-  /* Chart colors - darker for light backgrounds */
+  /* Chart colors for light backgrounds */
   --chart-1: #171717;
   --chart-2: #6b7280;
   --chart-3: #9ca3af;
   --chart-4: #d1d5db;
   --chart-5: #e5e7eb;
+
+  /* Dashboard layout contract */
+  --sidebar-width-expanded: 264px;
+  --sidebar-width-collapsed: 76px;
+  --header-height: 52px;
+  --content-max-width: 1200px;
+  --content-gutter-sm: 16px;
+  --content-gutter-md: 24px;
+  --content-gutter-lg: 32px;
+}
+
+/* Dark Theme */
+.dark {
+  --background: #0b0c0e;
+  --foreground: #e6e7ea;
+  --card: #111317;
+  --card-foreground: #e6e7ea;
+  --popover: #101216;
+  --popover-foreground: #e6e7ea;
+  --primary: #4b82d8;
+  --primary-foreground: #ffffff;
+  --secondary: #161920;
+  --secondary-foreground: #e6e7ea;
+  --muted: #171a20;
+  --muted-foreground: #a1a8b3;
+  --accent: #1b1f26;
+  --accent-foreground: #e6e7ea;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --input: #2a2f3a;
+  --ring: #4b82d8;
+  --border: #2a2f3a;
+  --radius: 6px;
+
+  --sidebar: #0c0e11;
+  --sidebar-foreground: #e6e7ea;
+  --sidebar-primary: #4b82d8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1b1f26;
+  --sidebar-accent-foreground: #e6e7ea;
+  --sidebar-border: #2a2f3a;
+  --sidebar-ring: #4b82d8;
+  --sidebar-muted: #a1a8b3;
+  --sidebar-hover: #171b21;
+  --sidebar-active: #202632;
+  --sidebar-elevated: #101318;
+  --sidebar-divider: #242a34;
+  --sidebar-shadow: 0 1px 0 rgba(255, 255, 255, 0.02), 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  --chart-1: #e5e7eb;
+  --chart-2: #a3aab5;
+  --chart-3: #76808f;
+  --chart-4: #4d5664;
+  --chart-5: #2a2f3a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @import "shadcn/tailwind.css";
@@ -165,6 +205,37 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: #404040;
+  }
+
+  /* Collaboration-specific tokens to avoid style drift from shared primitives */
+  .collab-toolbar {
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--card) 80%, transparent);
+  }
+
+  .collab-column {
+    border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+    background: var(--card);
+  }
+
+  .collab-card {
+    border: 1px solid color-mix(in oklab, var(--border) 85%, transparent);
+    background: var(--card);
+  }
+
+  .sidebar-surface {
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+  }
+
+  .sidebar-divider {
+    border-color: var(--sidebar-divider);
+  }
+
+  .sidebar-elevated {
+    background: var(--sidebar-elevated);
+    border-color: var(--sidebar-divider);
+    box-shadow: var(--sidebar-shadow);
   }
 }
 

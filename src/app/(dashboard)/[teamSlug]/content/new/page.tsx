@@ -557,7 +557,7 @@ export default function NewContentPage() {
               </div>
             }
             footerSection={
-              <div className="sticky bottom-0 z-20 mt-4 rounded-2xl border border-[var(--sidebar-divider)] bg-background/95 p-3 backdrop-blur-sm">
+              <div className="sticky bottom-0 z-20 mt-4 rounded-2xl border border-[var(--sidebar-divider)] bg-background p-3">
                 <PublishControls
                   onPublish={() => void handlePublish()}
                   onSchedule={(date) => handleSchedule(date)}

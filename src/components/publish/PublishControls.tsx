@@ -86,7 +86,7 @@ export function PublishControls({
             align="start"
             side="top"
             sideOffset={10}
-            className="z-[120] isolate w-[320px] rounded-2xl border border-[var(--sidebar-divider)] bg-background text-foreground shadow-2xl"
+            className="w-[320px] rounded-2xl border border-[var(--sidebar-divider)] bg-popover text-popover-foreground shadow-2xl"
           >
             <div className="space-y-3">
               <div>
