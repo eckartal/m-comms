@@ -464,7 +464,8 @@ export function PostComposerWorkspace({
           <Input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder="Title"
+            aria-label="Post title"
+            placeholder="Post title (shown in Collaboration)"
             className="h-12 rounded-xl border-transparent bg-transparent px-0 text-[22px] font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
           />
         </div>

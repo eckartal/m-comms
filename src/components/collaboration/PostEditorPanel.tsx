@@ -65,7 +65,7 @@ function resolvePostTitle(params: {
   const rawTitle = params.currentTitle.trim()
   const hasMeaningfulTitle = rawTitle.length > 0 && !UNTITLED_TITLE_RE.test(rawTitle)
 
-  if (params.titleTouched) return rawTitle || 'Untitled post'
+  if (params.titleTouched) return rawTitle || 'New post'
   if (hasMeaningfulTitle) return rawTitle
   return inferTitleFromNotes(params.notes, 'POST', params.currentTitle)
 }
