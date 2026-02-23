@@ -11,15 +11,26 @@ interface ShareModalProps {
   contentId: string
   initialIsPublic?: boolean
   initialShareUrl?: string | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
 }
 
-export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl = null }: ShareModalProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function ShareModal({
+  contentId,
+  initialIsPublic = false,
+  initialShareUrl = null,
+  open,
+  onOpenChange,
+  hideTrigger = false,
+}: ShareModalProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [isPublic, setIsPublic] = useState(initialIsPublic)
   const [shareUrl, setShareUrl] = useState(initialShareUrl)
   const [permission, setPermission] = useState<SharePermission>('comment')
   const [copied, setCopied] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const isOpen = open ?? internalOpen
 
   const fetchShareStatus = async () => {
     const response = await fetch(`/api/content/${contentId}/share`)
@@ -32,7 +43,11 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
   }
 
   const handleOpenChange = async (open: boolean) => {
-    setIsOpen(open)
+    if (onOpenChange) {
+      onOpenChange(open)
+    } else {
+      setInternalOpen(open)
+    }
     if (open) {
       await fetchShareStatus()
     }
@@ -122,12 +137,14 @@ export function ShareModal({ contentId, initialIsPublic = false, initialShareUrl
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Link2 className="h-4 w-4 mr-2" />
-          Share for feedback
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger ? (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Link2 className="h-4 w-4 mr-2" />
+            Share for feedback
+          </Button>
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="sm:max-w-[420px] rounded-2xl">
         <DialogHeader>
           <DialogTitle>Share for feedback</DialogTitle>

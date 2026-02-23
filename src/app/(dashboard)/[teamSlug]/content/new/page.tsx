@@ -69,6 +69,9 @@ export default function NewContentPage() {
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null)
   const [platformPickerOpen, setPlatformPickerOpen] = useState(false)
   const [hasHydratedDraft, setHasHydratedDraft] = useState(false)
+  const [isPreparingShare, setIsPreparingShare] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareModalContentId, setShareModalContentId] = useState<string | null>(null)
   const isCreatingInitialRecord = useRef(false)
 
   const {
@@ -462,6 +465,20 @@ export default function NewContentPage() {
     }
   }, [hasContent, persistDraft, router, teamSlug])
 
+  const handleOpenShare = useCallback(async () => {
+    setIsPreparingShare(true)
+    try {
+      const resolvedContentId = await persistDraft({ status: 'DRAFT', scheduled_at: null })
+      setShareModalContentId(resolvedContentId)
+      setShareModalOpen(true)
+    } catch (error) {
+      console.error('Error preparing share link:', error)
+      toast.error(error instanceof Error ? error.message : 'Could not prepare share link')
+    } finally {
+      setIsPreparingShare(false)
+    }
+  }, [persistDraft])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -516,13 +533,17 @@ export default function NewContentPage() {
             topSection={
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
-                  {contentId ? (
-                    <ShareModal contentId={contentId} />
-                  ) : (
-                    <Button variant="outline" size="sm" disabled>
-                      Share for feedback
-                    </Button>
-                  )}
+                  <Button variant="outline" size="sm" onClick={() => void handleOpenShare()} disabled={isPreparingShare}>
+                    {isPreparingShare ? 'Preparing link...' : 'Share for feedback'}
+                  </Button>
+                  {shareModalContentId ? (
+                    <ShareModal
+                      contentId={shareModalContentId}
+                      open={shareModalOpen}
+                      onOpenChange={setShareModalOpen}
+                      hideTrigger
+                    />
+                  ) : null}
                 </div>
                 <span
                   className={cn(
