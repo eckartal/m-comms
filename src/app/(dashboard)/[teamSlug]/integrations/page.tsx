@@ -269,7 +269,7 @@ export default function IntegrationsPage() {
     <DashboardContainer className="space-y-6 py-8 md:py-10">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Integrations</h1>
-        <p className="mt-1 text-muted-foreground">Connect your social media accounts and publishing platforms</p>
+        <p className="mt-1 text-muted-foreground">Connect channels</p>
       </div>
 
       {errorMessage && (
@@ -280,8 +280,7 @@ export default function IntegrationsPage() {
 
       {defaultConnectionMode === 'real_oauth' && missingOauthPlatforms.length > 0 && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          OAuth credentials are missing for: {missingOauthPlatforms.map((item) => item.name).join(', ')}.
-          Add provider client ID/secret to enable real connections.
+          Missing OAuth credentials: {missingOauthPlatforms.map((item) => item.name).join(', ')}.
         </div>
       )}
 
@@ -342,18 +341,11 @@ export default function IntegrationsPage() {
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-foreground">Connection Mode</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            This workspace is currently using {defaultConnectionMode === 'real_oauth' ? 'real OAuth' : 'local sandbox'} connection mode.
-          </CardDescription>
+          <CardDescription className="text-muted-foreground">Current mode</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border border-border bg-muted p-4">
             <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-muted-foreground">
-                {defaultConnectionMode === 'real_oauth'
-                  ? 'Connect opens real provider OAuth and links actual social accounts.'
-                  : 'Connect uses local sandbox accounts for safe local testing.'}
-              </p>
               <div className="flex items-center gap-2">
                 {defaultConnectionMode === 'real_oauth' && (
                   <Button
@@ -383,28 +375,12 @@ export default function IntegrationsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-foreground">Setup Checklist</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Fastest path to first successful real OAuth connection and publish.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>1. Set `NEXT_PUBLIC_APP_URL` to your deploy domain (for example, `https://app.yourdomain.com`).</p>
-          <p>2. Add provider credentials for channels you want to connect (start with X + LinkedIn).</p>
-          <p>3. Configure provider redirect URLs to `&lt;APP_URL&gt;/api/platforms/&lt;platform&gt;/callback`.</p>
-          <p>4. Run `npm run check:go-live` before deploy.</p>
-          <p>5. After deploy, connect accounts from this page and publish a test post.</p>
-        </CardContent>
-      </Card>
-
       <Dialog open={Boolean(settingsPlatformId)} onOpenChange={(open) => !open && setSettingsPlatformId(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedPlatform?.name || 'Platform'} Settings</DialogTitle>
             <DialogDescription>
-              Review connected accounts and manage access for this platform.
+              Connected accounts
             </DialogDescription>
           </DialogHeader>
 

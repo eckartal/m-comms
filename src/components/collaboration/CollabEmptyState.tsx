@@ -23,11 +23,10 @@ export function CollabEmptyState({
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
             <ShieldAlert className="h-5 w-5" />
           </div>
-          <h2 className="text-base font-semibold text-foreground">You don&apos;t have access to this team&apos;s content</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Ask a team admin to grant access.</p>
+          <h2 className="text-base font-semibold text-foreground">Access is restricted</h2>
           <div className="mt-5">
             <Button size="sm" className="h-8" onClick={onGoToTeam}>
-              Go to Team
+              Open team
             </Button>
           </div>
         </div>
@@ -42,11 +41,10 @@ export function CollabEmptyState({
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <FilterX className="h-5 w-5" />
           </div>
-          <h2 className="text-base font-semibold text-foreground">No content matches this filter</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Try clearing your owner/search filters.</p>
+          <h2 className="text-base font-semibold text-foreground">No matching content</h2>
           <div className="mt-5">
             <Button size="sm" className="h-8" onClick={onClearFilters}>
-              Clear Filters
+              Clear filters
             </Button>
           </div>
         </div>
@@ -60,14 +58,13 @@ export function CollabEmptyState({
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <FilePlus2 className="h-5 w-5" />
         </div>
-        <h2 className="text-base font-semibold text-foreground">Start your first collaborative draft</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Create a post, assign an owner, and move it through review.</p>
+        <h2 className="text-base font-semibold text-foreground">No posts yet</h2>
         <div className="mt-5 flex items-center justify-center gap-2">
           <Button size="sm" className="h-8" onClick={onCreatePost}>
-            Create First Post
+            Create post
           </Button>
           <Button size="sm" variant="outline" className="h-8" onClick={onGoToTeam}>
-            Use Team Settings
+            Team settings
           </Button>
         </div>
       </div>

@@ -156,7 +156,6 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
     <aside className="hidden xl:flex xl:w-80 xl:flex-col xl:border-l xl:border-border xl:bg-card/30">
       <div className="border-b border-border p-3">
         <h2 className="text-sm font-medium text-foreground">Collaboration Feed</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Team updates and items needing attention</p>
       </div>
 
       <div className="flex gap-1 border-b border-border p-3">
@@ -278,14 +277,40 @@ export function CollabRightRail({ teamId, content, onOpenContent }: CollabRightR
         ) : null}
 
         {tab === 'activity' && recentActivity.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-            No recent activity yet.
+          <div className="rounded-lg border border-dashed border-border p-3">
+            <p className="text-xs text-muted-foreground">No activity yet.</p>
+            {attentionItems.length + openAnnotationCount > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-xs"
+                onClick={() => {
+                  setTab('attention')
+                  trackRailEvent('attention')
+                }}
+              >
+                View attention
+              </Button>
+            ) : null}
           </div>
         ) : null}
 
-        {tab === 'attention' && attentionItems.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-            Nothing needs attention right now.
+        {tab === 'attention' && attentionItems.length === 0 && openAnnotationCount === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-3">
+            <p className="text-xs text-muted-foreground">All clear.</p>
+            {recentActivity.length > 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 h-7 text-xs"
+                onClick={() => {
+                  setTab('activity')
+                  trackRailEvent('activity')
+                }}
+              >
+                View activity
+              </Button>
+            ) : null}
           </div>
         ) : null}
 

@@ -3,47 +3,18 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  TrendingUp,
-  TrendingDown,
   Eye,
-  Heart,
-  MessageCircle,
-  Share2,
-  Calendar,
-  ArrowUpRight,
+  Plus,
 } from 'lucide-react'
 import { useAppStore } from '@/stores'
 import { cn } from '@/lib/utils'
 import { DashboardContainer } from '@/components/layout/DashboardContainer'
 
-const platformIcons: Record<string, string> = {
-  twitter: '𝕏',
-  linkedin: 'in',
-  instagram: '📷',
-  blog: '📝',
-}
-
-const platformColors: Record<string, string> = {
-  twitter: 'bg-black',
-  linkedin: 'bg-[#0A66C2]',
-  instagram: 'bg-[#E4405F]',
-  blog: 'bg-[#6B7280]',
-}
-
 export default function AnalyticsPage() {
   const { currentTeam } = useAppStore()
   const [period, setPeriod] = useState('7d')
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<{
-    impressions: string
-    impressionsChange: string
-    engagements: string
-    engagementsChange: string
-    comments: string
-    commentsChange: string
-    shares: string
-    sharesChange: string
-  } | null>(null)
+  const stats = null
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -58,9 +29,9 @@ export default function AnalyticsPage() {
     return (
       <DashboardContainer className="py-8 md:py-10">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 w-32 bg-muted rounded" />
-          <div className="h-28 bg-muted rounded" />
-          <div className="h-64 bg-muted rounded" />
+          <div className="h-8 w-32 rounded-lg bg-[var(--sidebar-elevated)]" />
+          <div className="h-24 rounded-xl border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]" />
+          <div className="h-64 rounded-xl border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]" />
         </div>
       </DashboardContainer>
     )
@@ -68,84 +39,44 @@ export default function AnalyticsPage() {
 
   return (
     <DashboardContainer className="py-8 md:py-10">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-[20px] font-medium text-foreground">Analytics</h1>
-            <p className="text-[14px] text-muted-foreground mt-1">
-              Track your content performance across platforms
-            </p>
+            <h1 className="text-lg font-semibold text-foreground">Analytics</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Performance</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-muted rounded-[6px] p-1">
+          <div className="flex items-center rounded-lg border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)] p-1">
               {['7d', '30d', '90d'].map((p) => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
                   className={cn(
-                    'px-3 py-1.5 text-[13px] font-medium rounded-[4px] transition-all',
+                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                     period === p
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-foreground text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
                   )}
                 >
                   {p === '7d' ? '7 days' : p === '30d' ? '30 days' : '90 days'}
                 </button>
               ))}
-            </div>
           </div>
         </div>
 
-        {/* Empty State */}
         {stats === null && (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-              <Eye className="w-8 h-8 text-muted-foreground" />
+          <div className="rounded-2xl border border-[var(--sidebar-divider)] bg-card px-6 py-16 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]">
+              <Eye className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="text-[16px] font-medium text-foreground mb-2">No analytics yet</h3>
-            <p className="text-[14px] text-muted-foreground max-w-md text-center">
-              Analytics will appear once your content is published and starts getting engagement.
-            </p>
+            <h3 className="mb-2 text-base font-medium text-foreground">No analytics yet</h3>
+            <Link
+              href={`/${currentTeam?.slug}/content/new`}
+              className="inline-flex items-center gap-2 rounded-md border border-[var(--sidebar-divider)] bg-foreground px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-foreground/90"
+            >
+              <Plus className="h-4 w-4" />
+              Create post
+            </Link>
           </div>
         )}
     </DashboardContainer>
-  )
-}
-
-function StatCard({
-  title,
-  value,
-  change,
-  icon: Icon,
-}: {
-  title: string
-  value: string
-  change: string
-  icon: typeof Eye
-}) {
-  const isPositive = change.startsWith('+')
-
-  return (
-    <div className="border border-border rounded-[8px] p-4 hover:border-foreground transition-colors">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] text-muted-foreground">{title}</span>
-        <Icon className="w-4 h-4 text-muted-foreground" />
-      </div>
-      <p className="text-[28px] font-medium text-foreground">{value}</p>
-      <div className="flex items-center gap-1 mt-1">
-        {isPositive ? (
-          <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-        ) : (
-          <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-        )}
-        <span className={cn(
-          'text-[13px] font-medium',
-          isPositive ? 'text-emerald-500' : 'text-red-500'
-        )}>
-          {change}
-        </span>
-        <span className="text-[12px] text-muted-foreground">vs last period</span>
-      </div>
-    </div>
   )
 }
