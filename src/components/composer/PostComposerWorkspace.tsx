@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PlatformType } from '@/types'
-import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PlatformIcon } from '@/components/oauth/PlatformIcon'
 import {
   Dialog,
@@ -12,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Check, Loader2, Paperclip, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { Check, ImageIcon, Loader2, Paperclip, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PlatformCopyModeMap, PlatformCopyTextMap } from '@/components/composer/composerShared'
 import { toast } from 'sonner'
@@ -281,33 +280,17 @@ export function PostComposerWorkspace({
     <div className="px-4 pb-2 pt-1">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{mediaItems.length} media</span>
-        {!isSyncedReadOnlyEditor ? (
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--sidebar-divider)] bg-background px-2 py-1 text-[11px] text-foreground hover:bg-accent"
-            >
-              <Plus className="h-3 w-3" />
-              Add
-            </button>
-            {mediaItems.length > 1 ? (
-              <button
-                type="button"
-                onClick={() => setMediaItems([])}
-                className="inline-flex items-center gap-1 rounded-md border border-[var(--sidebar-divider)] bg-background px-2 py-1 text-[11px] text-foreground hover:bg-accent"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear
-              </button>
-            ) : null}
-          </div>
+        {!isSyncedReadOnlyEditor && mediaItems.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => setMediaItems([])}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--sidebar-divider)] bg-background px-2 py-1 text-[11px] text-foreground hover:bg-accent"
+          >
+            <Trash2 className="h-3 w-3" />
+            Clear
+          </button>
         ) : null}
       </div>
-
-      {mediaError ? (
-        <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">{mediaError}</p>
-      ) : null}
 
       <div className={cn('grid gap-2', mediaPreviews.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3')}>
         {mediaPreviews.map((preview, index) => (
@@ -491,23 +474,30 @@ export function PostComposerWorkspace({
                 const isActive = activeIndex === index
                 const itemCharCount = item.content.length
                 const itemOverLimit = itemCharCount > maxChars
+                const showThreadIndex = thread.length > 1
 
                 return (
                   <div key={item.id}>
                     <div
                       className={cn(
                         'relative rounded-xl border px-1 transition-colors',
-                        isActive ? 'border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]' : 'border-transparent bg-transparent hover:bg-accent/40'
+                        thread.length === 1
+                          ? 'border-transparent bg-transparent'
+                          : isActive
+                            ? 'border-[var(--sidebar-divider)] bg-[var(--sidebar-elevated)]'
+                            : 'border-transparent bg-transparent hover:bg-accent/40'
                       )}
                       onClick={() => onActiveIndexChange(index)}
                     >
-                      <div className="absolute left-0 top-3 flex w-8 items-center justify-center">
-                        <span className={cn('text-xs font-medium', isActive ? 'text-muted-foreground' : 'text-border')}>
-                          {index + 1}
-                        </span>
-                      </div>
+                      {showThreadIndex ? (
+                        <div className="absolute left-0 top-3 flex w-8 items-center justify-center">
+                          <span className={cn('text-xs font-medium', isActive ? 'text-muted-foreground' : 'text-border')}>
+                            {index + 1}
+                          </span>
+                        </div>
+                      ) : null}
 
-                      <div className="pl-12 pr-3">
+                      <div className={cn(showThreadIndex ? 'pl-12 pr-3' : 'px-3')}>
                         <textarea
                           value={item.content}
                           onChange={(e) => {
@@ -517,7 +507,7 @@ export function PostComposerWorkspace({
                           onFocus={() => onActiveIndexChange(index)}
                           readOnly={isSyncedReadOnlyEditor}
                           placeholder="Start writing…"
-                          className={`w-full resize-none border-none bg-transparent text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground ${isActive ? 'mt-2 min-h-[100px]' : 'min-h-[72px]'} ${isSyncedReadOnlyEditor ? 'cursor-default' : ''}`}
+                          className={`w-full resize-none border-none bg-transparent text-[16px] leading-[1.7] text-foreground outline-none placeholder:text-muted-foreground ${showThreadIndex && isActive ? 'mt-2 min-h-[100px]' : 'min-h-[72px]'} ${isSyncedReadOnlyEditor ? 'cursor-default' : ''}`}
                           style={{ height: Math.max(80, item.content.split('\n').length * 28 + 40) }}
                         />
 
@@ -555,7 +545,11 @@ export function PostComposerWorkspace({
 
             {mediaPreviewSection}
 
-            <div className="px-4 pb-3">
+            {mediaError ? (
+              <p className="px-4 pb-2 text-xs text-amber-600 dark:text-amber-400">{mediaError}</p>
+            ) : null}
+
+            <div className="border-t border-[var(--sidebar-divider)] px-4 pb-3 pt-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -577,13 +571,40 @@ export function PostComposerWorkspace({
                   event.currentTarget.value = ''
                 }}
               />
-              <EditorToolbar
-                characterCount={characterCount}
-                maxCharacters={maxChars}
-                showCharacterCount={false}
-                onImageUpload={isSyncedReadOnlyEditor ? undefined : () => fileInputRef.current?.click()}
-              />
-              <p className="mt-2 text-xs text-muted-foreground">Cmd/Ctrl + Enter to publish</p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isSyncedReadOnlyEditor) return
+                      fileInputRef.current?.click()
+                    }}
+                    className={cn(
+                      'inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors',
+                      isSyncedReadOnlyEditor
+                        ? 'cursor-not-allowed text-muted-foreground/50'
+                        : 'text-sky-500 hover:bg-sky-500/10 hover:text-sky-400'
+                    )}
+                    title="Add image or video"
+                    aria-label="Add image or video"
+                    disabled={isSyncedReadOnlyEditor}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </button>
+                </div>
+                <span
+                  className={`text-[12px] tabular-nums ${
+                    characterCount > maxChars
+                      ? 'text-red-500'
+                      : characterCount > maxChars * 0.8
+                        ? 'text-amber-500'
+                        : 'text-muted-foreground'
+                  }`}
+                >
+                  {characterCount} / {maxChars}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Cmd/Ctrl + Enter to publish</p>
             </div>
           </>
         )}
